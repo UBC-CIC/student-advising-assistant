@@ -1,0 +1,18 @@
+header = From: Arya Stevinson <arya.stevinson@ubc.ca>
+
+timestamping = on
+robots = off
+wait = 1
+random_wait = on
+reclevel = 0
+header = Accept-Encoding: none
+user_agent = mozilla
+adjust_extension = on
+progress = dot
+follow_tags = a
+cookies = off
+trust_server_names = on
+logfile = wget_log.txt
+no_clobber = off
+verbose = on
+backups = 0
