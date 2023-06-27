@@ -13,6 +13,7 @@ from spacy.language import Language
 import tools
 from tqdm.auto import tqdm
 import logging
+from typing import List, Tuple
 
 """
 DocExtractor class:
@@ -105,15 +106,21 @@ class DumpConfig:
     main_content_attrs: dict
     # list of dicts of attributes describing tags to remove
     # as the first step of processing a page
-    remove_tag_attrs: list[dict]
+    remove_tag_attrs: List[dict]
     # list of tuples: (dict,function) where the dict describes the attributes of a
     # tag to replace, and the function returns a tag to replace it with
     # - The function inputs are the BeautifulSoup tag and the site url, and it 
     #   should output the replacement BeautifulSoup tag
-    replacements: list[tuple[dict,Callable[[BeautifulSoup,str],BeautifulSoup]]]
+    replacements: List[Tuple[dict,Callable[[BeautifulSoup,str],BeautifulSoup]]]
     # function that will return any additional metadata to be added to a document
-    # inputs: page url, page title,s titles of parent pages, text content for the document
-    metadata_extractor: Callable[[str,list[str],list[str],str],dict]
+    # inputs: page url, page titles. titles of parent pages, text content for the document
+    metadata_extractor: Callable[[str,List[str],List[str],str],dict]
+    # Function that, given the contents of a 'parent' document extract, returns any context that 
+    # will be included in the 'context' column for child pages
+    # Eg. if the parent extract describes the purpose of a table, that purpose should be
+    #    considered for child pages containing the actual table
+    # inputs: page url, page titles. titles of parent pages, text content for the document
+    parent_context_extractor: Callable[[str,List[str],List[str],str],str]
 
 class DocIndex:
     """
@@ -363,7 +370,7 @@ class DocExtractor:
             parent_titles = [*parent_titles,title.text.strip()]
         soup = self.preprocess(soup, url, dump_config)
         extracts = self.split_page_by_tag(soup, 0)
-        docs = self.handle_extracts(extracts, url, parent_idx, [], parent_titles, dump_config)
+        docs = self.handle_extracts(extracts, url, parent_idx, [], parent_titles, '', dump_config)
         base_idx = docs[0]['doc_id']
         return (base_idx,docs)
     
@@ -574,7 +581,8 @@ class DocExtractor:
             'links': extract_links,
             'children': children if len(children) > 1 else []})
         
-    def handle_extracts(self, extracts: list[dict], url: str, parent_idx: int, titles: list[str], parent_titles: list[str], dump_config: DumpConfig) -> list[dict]:
+    def handle_extracts(self, extracts: list[dict], url: str, parent_idx: int, titles: list[str], 
+                        parent_titles: list[str], parent_context: str, dump_config: DumpConfig) -> list[dict]:
         """
         Convert the page extracts to document dicts, add documents to the DocIndex, and add parent
         relations to the graph. Further splits the plain text of documents if they are too long.
@@ -583,6 +591,7 @@ class DocExtractor:
         - parent_idx: index of the parent page
         - titles: list of titles within the page, leading to the current extract
         - parent_titles: titles of parent pages in the original site structure
+        - parent_context: context from the parent extract to include with this extract
         - dump_config: DumpConfig for the current site dump
         """
         docs = []
@@ -636,10 +645,15 @@ class DocExtractor:
                     'text': text, 
                     'links': links,
                     'parent_titles': parent_titles,
+                    'context': parent_context,
                     **dump_config.metadata_extractor(url,split_titles,parent_titles,text)})
                 previous_sib_id = idx
 
-            docs.extend(self.handle_extracts(extract['children'],url,first_page_idx,extract_titles,parent_titles,dump_config))
+            parent_context = ''
+            if dump_config.parent_context_extractor:
+                parent_context = dump_config.parent_context_extractor(url,titles,parent_titles,text)
+
+            docs.extend(self.handle_extracts(extract['children'],url,first_page_idx,extract_titles,parent_titles,parent_context,dump_config))
         return docs
     
     def html_to_text(self, html: BeautifulSoup) -> str:

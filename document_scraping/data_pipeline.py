@@ -130,14 +130,14 @@ def main():
 
     urls = [
         'https://vancouver.calendar.ubc.ca/',
-        'https://science.ubc.ca/students/blog'
+        'https://science.ubc.ca/students/'
     ]
     names = [
         'academic_calendar',
-        'science_blog'
+        'science_students'
     ]
     regex_rules = {
-        'science_blog': '.*science.ubc.ca/students/blog.*'
+        'science_students': '.*science.ubc.ca/students.*'
     }
 
     pull_sites(urls,names,regex_rules,output_folder = BASE_DUMP_PATH, wget_exe_path=wget_exe_path, wget_config_path=wget_config_path)

@@ -6,6 +6,7 @@ from tools import write_file
 from os.path import join
 import copy 
 import regex as re
+from typing import List
 
 """
 Processing functions specific to the data sources:
@@ -21,6 +22,18 @@ error_tables = {}
 
 
 ### PAGE PREPROCESSING FUNCTIONS
+
+def parent_context_extractor(url: str, titles: List[str], parent_titles: List[str], text: str) -> str:
+    """
+    Given the contents of a 'parent' document extract, returns any context that 
+    should be considered for child pages.
+    Eg. if the parent extract describes the purpose of a table, that purpose should be
+        considered for child pages containing the actual table
+    """
+    keywords = ['below','as follows']
+    if len(text) < 400 and any(keyword in text for keyword in keywords): 
+        return text
+    return None
 
 def convert_table(table: BeautifulSoup, url: str) -> BeautifulSoup:
     """
@@ -383,19 +396,24 @@ specialization_prefix_regex = f"({'|'.join(specialization_prefixes)}).+"
 specialization_suffix_regex = f".+({'|'.join(specialization_suffixes)})"
 specialization_regex = re.compile(f"^({specialization_prefix_regex}|{specialization_suffix_regex})$")
 
-def calendar_extract_metadata(url: str, titles: list[str], parent_page_titles: list[str], text: str):
+def calendar_extract_metadata(url: str, titles: List[str], parent_titles: List[str], text: str):
     metadata = {}
-    for subtitle in parent_page_titles + titles:
+    for subtitle in parent_titles + titles:
         if 'faculty' not in metadata and re.match(faculty_regex, subtitle):
             metadata['faculty'] = subtitle
         if 'program' not in metadata and re.match(program_regex, subtitle):
             metadata['program'] = subtitle
         if 'specialization' not in metadata and re.match(specialization_regex, subtitle):
             metadata['specialization'] = subtitle
-    
+
+    if re.search('\* \d+ credits of ', text):
+        if 'specialization' in metadata:
+            metadata['context'] = f"This is a list of degree requirements for {metadata['specialization']}.\n"
+        else: metadata['context'] = f'This is a list of degree requirements.\n'
+
     return metadata
 
-def blog_extract_metadata(url: str, titles: list[str], parent_page_titles: list[str], text: str):
+def blog_extract_metadata(url: str, titles: List[str], parent_titles: List[str], text: str):
     metadata = {'faculty': 'The Faculty of Science'}
     return metadata
 
@@ -408,19 +426,21 @@ calendar_config.replacements = [({'name': 'table'}, convert_table)]
 calendar_config.main_content_attrs = {'id': 'primary-content' if calendar_is_new_format else 'unit-content'}
 calendar_config.title_attrs = {'name': 'h1'}
 calendar_config.metadata_extractor = calendar_extract_metadata
+calendar_config.parent_context_extractor = parent_context_extractor
 
-blog_config = DumpConfig()
-blog_config.base_url = 'https://science.ubc.ca/students/blog/'
-blog_config.dump_path = BASE_DUMP_PATH + '\\science.ubc.ca\\students\\blog\\'
-blog_config.remove_tag_attrs = generic_remove_tags + [{'class': 'customBread'},{'id': 'block-views-student-notices-block-2'},{'class':'field-name-field-student-blog-topic'}]
-blog_config.replacements = [({'name': 'table'}, convert_table)]
-blog_config.main_content_attrs = {'id': 'content'}
-blog_config.title_attrs = {'name': 'h1'}
-blog_config.metadata_extractor = blog_extract_metadata
+sc_students_config = DumpConfig()
+sc_students_config.base_url = 'https://science.ubc.ca/students/'
+sc_students_config.dump_path = BASE_DUMP_PATH + '\\science.ubc.ca\\students\\'
+sc_students_config.remove_tag_attrs = generic_remove_tags + [{'class': 'customBread'},{'id': 'block-views-student-notices-block-2'},{'class':'field-name-field-student-blog-topic'}]
+sc_students_config.replacements = [({'name': 'table'}, convert_table)]
+sc_students_config.main_content_attrs = {'id': 'content'}
+sc_students_config.title_attrs = {'name': 'h1'}
+sc_students_config.metadata_extractor = blog_extract_metadata
+sc_students_config.parent_context_extractor = None
 
 ### MAIN FUNCTION
 
-def process_site_dumps(dump_configs: list[DumpConfig] = [calendar_config,blog_config], 
+def process_site_dumps(dump_configs: list[DumpConfig] = [calendar_config,sc_students_config], 
                        redirect_map_path: str = BASE_DUMP_PATH + '\\redirects.txt', 
                        out_path: str = BASE_DUMP_PATH + '\\processed\\'):
     """
