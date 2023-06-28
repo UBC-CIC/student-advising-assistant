@@ -25,3 +25,5 @@ To run the demo:
 - Create a conda env with the command `conda env create -f environment.yml` from the flask_app directory
 - Activate the environment with `conda activate flaskenv` (or whichever name you chose for the environment)
 - Run `flask --app ask_cali --debug run` to run the app in debug mode
+
+*Note:* To work properly, the app will require a .env file with the HUGGINGFACEHUB_API_TOKEN variable set, see https://huggingface.co/docs/hub/security-tokens
