@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Ask Cali Demo</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+  <script
+    type="module"
+    src="https://cdn.jsdelivr.net/gh/zerodevx/zero-md@2/dist/zero-md.min.js"
+  ></script>
+</head>
+
+<body>
+  <header>
+    <h1>Ask Cali</h1>
+    <input id="ask" type="submit" value="Ask another question", style="padding: 10px" />
+  </header>
+  <div id="content" style="justify-content: center; display: flex;">
+    <section>
+      <header>
+        <h2>Answering question:</h2>
+        <p>{{question}}</p>
+        <p><strong>Context: </strong>{% if context == '' %} None {% else %} {{context}}{% endif %}</p>
+      </header>
+      {% for doc in answers%}
+      <aside style="width: var(--width-card-wide);">
+        <h3>
+          Answer {{loop.index}}
+        </h3>
+        <p><strong>Title: </strong>{{' -> '.join(doc.metadata['titles'])}}</p>
+        <p><strong>Url: </strong><a href="{{doc.metadata['url']}}">{{doc.metadata['url']}}</a></p>
+        <h4>Context</h4>
+        <zero-md>
+          <template>
+            <!-- Define your own styles inside a `<style>` tag -->
+            <style>
+              em {
+                font-style: normal;
+                background: lightgoldenrodyellow;
+              }
+            </style>
+          </template>
+          <script type="text/markdown">{{doc.page_content}}</script>
+        </zero-md>
+        <h4>Generated Response</h4>
+        <p>{{doc.metadata['generated_response']}}</p>
+        {% if 'related_links' in doc.metadata and doc.metadata['related_links']|length > 0 %}
+        <h4>
+          Relevant Links
+        </h4>
+        <ul>
+          {% for title,link,doc_id in doc.metadata['related_links'] %}
+            <li>
+              <p>{{title}}: <a href="{{link}}">{{link}}</a></p>
+              <input id="ask" type="submit" value="Ask Cali" style="padding: 10px" onclick="post_form({{doc_id}})"/>
+            </li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+      </aside>
+      {% endfor %}
+    </section>
+</body>
+
+<script type="text/javascript">
+  let form_params = {{form | tojson | safe}}
+
+  // <![CDATA[
+  function post_form(doc_id) {
+    path = window.location.pathname
+    path += '?doc=' + doc_id
+
+    var form = document.createElement("form");
+    form.setAttribute("method", "post");
+    form.setAttribute("action", path);
+
+    for(var key in form_params) {
+        if(form_params.hasOwnProperty(key)) {
+            var hiddenField = document.createElement("input");
+            hiddenField.setAttribute("type", "hidden");
+            hiddenField.setAttribute("name", key);
+            hiddenField.setAttribute("value", form_params[key]);
+
+            form.appendChild(hiddenField);
+         }
+    }
+
+    document.body.appendChild(form);
+    form.submit();
+  }
+
+  document.getElementById("ask").onclick = function () {
+      location.href = "/";
+  };
+  // ]]>
+</script>
+
+</html>

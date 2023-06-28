@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Ask Cali Demo</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+</head>
+
+<body>
+  <header>
+    <h1>Ask Cali</h1>
+  </header>
+  <section>
+    <aside style="width: var(--width-card-wide);">
+      <div style="width: var(--width-card-wide); cursor: pointer;" id="btnSlideUp">
+        <p><strong>About</strong> (click to show/hide)</p>
+      </div>
+      <ul id="description" style="display: none;">
+        <li>
+        Ask Cali is a tool that leverages Large Language Models to search through the Academic Calendar for sections relevant
+        to a query.
+        </li>
+        <li>
+        As an experimental feature, it also uses Generative AI to generate a response to your query, given the sections of
+        the Calendar as context.
+        </li>
+        <li>There is the potential for bias and/or inaccuracy with the generative feature, so please use it with caution.</li>
+      </ul>
+    </aside>
+  </section>
+  <div id="content" style="justify-content: center; display: flex;">
+    <form action="/answer" method="post">
+      <p><strong>Note:</strong> Do not submit any personal or sensitive information through this form </p>
+
+      <p><strong>Context</strong> (these fields are optional, but may improve the relevance of the response)</p>
+      <select name="faculty" id="faculty" style="width: 50%;">
+        <option value="all">All Faculties</option>
+        {% for faculty in faculties.keys() %}
+        <option value="{{faculty}}">{{faculty}}</option>
+        {% endfor %}
+      </select>
+
+      <select name="program" id="program" style="width: 50%;">
+        <option value="all">All Programs</option>
+        {% for faculty in faculties.keys() %}
+        {% for program in faculties[faculty]['programs'].keys() %}
+        <option value="{{program}}" data-faculty="{{faculty}}" disabled hidden>{{program}}</option>
+        {% endfor %}
+        {% endfor %}
+      </select>
+
+      <select name="specialization" id="specialization" style="width: 50%;">
+        <option value="all">All Specializations</option>
+        {% for faculty in faculties.keys() %}
+        {% for program in faculties[faculty]['programs'].keys() %}
+        {% for specialization in faculties[faculty]['programs'][program]['specializations'].keys() %}
+        <option value="{{specialization}}" data-program="{{program}}" disabled hidden>{{specialization}}</option>
+        {% endfor %}
+        {% endfor %}
+        {% endfor %}
+      </select>
+
+      <select name="year" id="year" style="width: 50%;">
+        <option value="all">All Years</option>
+        {% for year in ["First Year","Second Year","Third Year","Fourth Year","Fifth Year"] %}
+        <option value="{{year}}">{{year}}</option>
+        {% endfor %}
+      </select>
+
+      <p><strong>Custom Context</strong></p>
+      <p>(optionally specify your own context, if this box is filled then the context dropdowns will be ignored)</p>
+      <textarea id="context" name="context" cols="40" rows="2"></textarea>
+
+      <label for="question">Enter your question:</label>
+      <textarea id="question" name="question" cols="40" rows="5"></textarea>
+      <input id="submit" type="submit" value="Submit" , style="padding: 10px" />
+    </form>
+  </div>
+  <script type="text/javascript">
+    // <![CDATA[
+    function preloader() {
+      submit = document.getElementById("submit")
+      submit.addEventListener('click', function () {
+        submit.classList.add("loading");
+      }, false);
+
+      $('#faculty').on('change', function () {
+        $("#program option[value='all']").prop("selected", true);
+        $('#program').trigger('change');
+        value = this.value
+        $("#program option").each(function () {
+          if (this.value === "all") {
+            // pass
+          }
+          else if (this.dataset["faculty"] === value) {
+            this.disabled = false
+            this.hidden = false
+          } else {
+            this.disabled = true
+            this.hidden = true
+          }
+        });
+      });
+
+      $('#program').on('change', function () {
+        $("#specialization option[value='all']").prop("selected", true);
+        $('#specialization').trigger('change');
+        value = this.value
+        $("#specialization option").each(function () {
+          if (this.value === "all") {
+            // pass
+          }
+          else if (this.dataset["program"] === value) {
+            this.disabled = false
+            this.hidden = false
+          } else {
+            this.disabled = true
+            this.hidden = true
+          }
+        });
+      });
+
+      $("#faculty option[value='The Faculty of Science']").prop("selected", true);
+      $('#faculty').trigger('change');
+
+      $("#program option[value='Bachelor of Science']").prop("selected", true);
+      $('#program').trigger('change');
+    }
+
+    window.onload = preloader;
+    $(document).ready(function () {
+      $('#btnSlideUp').click(function () {
+        $('#description').slideToggle(1000);
+      });
+    });
+
+    // ]]>
+  </script>
+</body>
+
+</html>
