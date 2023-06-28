@@ -19,7 +19,8 @@ Objective: enhance the accessibility of the Academic Calendar, which is often di
 3. Additional pipeline steps involving generative LLMs will be introduced
 
 ## 3. Demo App
-The repo includes a demo flask app under flask_app
+The repo includes a demo flask app under flask_app, which runs the model for inference.
+
 To run the demo:
 - Create a conda env with the command `conda env create -f environment.yml` from the flask_app directory
 - Activate the environment with `conda activate flaskenv` (or whichever name you chose for the environment)
