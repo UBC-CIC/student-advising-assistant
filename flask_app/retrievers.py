@@ -17,10 +17,10 @@ FAISS_TITLE_PATH = './data/faiss-title'
 FAISS_DOUBLE_PATH = './data/faiss-double'
 FAISS_TRIPLE_PATH = './data/faiss-triple'
 FACULTIES_PATH = './data/faculties.txt'
-EMBEDDINGS_PATH = './embeddings'
-#BASE_EMBEDDING_MODEL = 'sentence-transformers/all-mpnet-base-v2'
-BASE_EMBEDDING_MODEL = 'all-MiniLM-L6-v2'
-DOCS_PATH = './data/website_extracts.csv'
+EMBEDDINGS_PATH = './data/embeddings'
+BASE_EMBEDDING_MODEL = 'sentence-transformers/all-mpnet-base-v2'
+#BASE_EMBEDDING_MODEL = 'all-MiniLM-L6-v2'
+DOCS_PATH = '../document_scraping/processed/website_extracts.csv'
 
 class CombinedEmbeddings(Embeddings):
     """
@@ -78,6 +78,7 @@ base_embeddings = HuggingFaceEmbeddings(model_name=BASE_EMBEDDING_MODEL,model_kw
 embeddings: Dict = {}
 indexes: Dict = {}
 retrievers: Dict = {}
+query_converters: Dict = {}
 
 def load_faculties():
     """
@@ -91,7 +92,7 @@ def load_embeddings(embeddings_dir: str):
     Load all pickled embeddings in the given directory path
     """
     for file in pathlib.Path(embeddings_dir).glob('*.pkl'):
-        with open(f'./{embeddings_dir}/{file}', "rb") as f:
+        with open(file, "rb") as f:
             data = pickle.load(f)
             embeddings[file.stem] = data['embeddings']
 
@@ -103,7 +104,7 @@ def load_retriever_from_embeddings(embedding_names: List[str], doc_contents: Lis
     d = len(embedding_names)
     combined_embeddings_model = CombinedEmbeddings(base_embeddings,d)
     combined_embeddings = combined_embeddings_model.concat_embeddings([embeddings[name] for name in embedding_names])
-    faiss = FAISS.from_embeddings(zip(doc_contents,combined_embeddings), 
+    faiss = FAISS.from_embeddings(list(zip(doc_contents,combined_embeddings)), 
                                   combined_embeddings_model, doc_metadatas, doc_ids)
     retriever = VectorStoreRetriever(vectorstore=faiss)
     retriever.search_kwargs = {'k':5}
@@ -145,16 +146,26 @@ def load_retrievers_from_embeddings():
     """
     Loads retrievers by combining precomputed embeddings
     Loads the following retrievers:
-    - 'triple': concatenation of parent title, title, and page content embeddings
+    - 'triple': concatenation of parent titles, titles, and page content embeddings
+    - 'titles': concatenation of parent titles and titles embeddings
     """
+    load_embeddings(EMBEDDINGS_PATH)
     docs: List[Document] = load_docs(DOCS_PATH)
     doc_contents: List[str] = [doc.page_content for doc in docs]
     doc_metadatas: List[Dict] = [doc.metadata for doc in docs]
     doc_ids: List[int] = [doc.metadata['doc_id'] for doc in docs]
+    
     faiss, retriever = load_retriever_from_embeddings(['parent_title_embeddings','title_embeddings','document_embeddings'],
                                                       doc_contents, doc_metadatas, doc_ids)
     indexes['triple'] = faiss
     retrievers['triple'] = retriever
+    query_converters['triple'] = lambda context, query: retriever_combined_query([context, context, query])
+    
+    faiss, retriever = load_retriever_from_embeddings(['parent_title_embeddings','title_embeddings'],
+                                                      doc_contents, doc_metadatas, doc_ids)
+    indexes['titles'] = faiss
+    retrievers['titles'] = retriever
+    query_converters['titles'] = lambda context, _: retriever_combined_query([context, context])
 
 def docs_from_ids(doc_ids: List[int], retriever: VectorStoreRetriever = None):
     """
@@ -176,25 +187,32 @@ def retriever_context_str(context: str | Dict):
         context_str = ' : '.join(context.values())
     return context_str
 
-def retriever_combined_query(context,query):
-    context_str = retriever_context_str(context)
-    return f"{context_str} | {query} | {query}"
+def retriever_combined_query(args: List[str]):
+    """
+    Combine all args into a single query separated by the separation character
+    """
+    return CombinedEmbeddings.query_separator.join(args)
 
-async def get_documents(retriever,context,query,k=None) -> List[Document]:
+async def get_documents(context,query,k=None,retriever_name=None) -> List[Document]:
     """
     Return the documents from similarity search with the given context and query
     - k: number of documents to return
     """
+    if not retriever_name: retriever_name = choose_retriever(context)
+    retriever = retrievers[retriever_name]
+    
     if k: retriever.search_kwargs = {'k':k}
-    docs = retriever.get_relevant_documents(retriever_combined_query(context,query))
+    context_str = retriever_context_str(context)
+    combined_query = query_converters[retriever_name](context_str,query)
+    docs = retriever.get_relevant_documents(combined_query)
     return [copy.deepcopy(doc) for doc in docs]
 
-def choose_retriever(context: str | Dict) -> VectorStoreRetriever:
+def choose_retriever(context: str | Dict) -> str:
     """
     Choose the right document retriever based on the context
     If the context includes a faculty and the faculty retrievers are loaded,
-    returns the associated retriever
+    returns the name of the associated retriever
     """
     if type(context) == dict and 'faculty' in context and context['faculty'] in retrievers:
-        return retrievers[context['faculty']]
-    else: return retrievers['All']
+        return context['faculty']
+    else: return 'All'
