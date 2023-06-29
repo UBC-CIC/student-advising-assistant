@@ -121,6 +121,26 @@ class DumpConfig:
     #    considered for child pages containing the actual table
     # inputs: page url, page titles. titles of parent pages, text content for the document
     parent_context_extractor: Callable[[str,List[str],List[str],str],str]
+    # Hierarchy of the attributes of tags to split the pages on
+    # Documents are split only if the extract is over the maximum document length
+    # You can specify a predicate function instead of attributes using {'function': <function name>}
+    split_attrs: list
+    # If true, will not split a document on a tag matching split attributes if
+    # the tag contains no text
+    ignore_empty_split_tags: bool
+    # Indicates the index of the last element in split_attrs on which to always split
+    # the document, regardless of extract length. Any entries beyond this index will
+    # only be used to split if the document is longer than the maximum length.
+    mandatory_splits: int
+    # Indexes of split attrs where the text of the tag should not be used as a new title
+    # An integer index will be used instead
+    no_title_splits: list[int]
+    
+    def __init__(self):
+        self.split_attrs = DEFAULT_SPLIT_ATTRS
+        self.ignore_empty_split_tags = DEFAULT_IGNORE_EMPTY_SPLIT_TAGS
+        self.mandatory_splits = DEFAULT_MANDATORY_SPLITS
+        self.no_title_splits = DEFAULT_NO_TITLE_SPLITS
 
 class DocIndex:
     """
@@ -218,20 +238,6 @@ class DocIndex:
         return path in self.path_to_idx
 
 class DocExtractor:
-    # Hierarchy of the attributes of tags to split the pages on
-    # Documents are split only if the extract is over the maximum document length
-    # You can specify a predicate function instead of attributes using {'function': <function name>}
-    split_attrs: list
-    # If true, will not split a document on a tag matching split attributes if
-    # the tag contains no text
-    ignore_empty_split_tags: bool
-    # Indicates the index of the last element in split_attrs on which to always split
-    # the document, regardless of extract length. Any entries beyond this index will
-    # only be used to split if the document is longer than the maximum length.
-    mandatory_splits: int
-    # Indexes of split attrs where the text of the tag should not be used as a new title
-    # An integer index will be used instead
-    no_title_splits: list[int]
     # When the document needs to be split beyond the split attributes, number of
     # characters of overlap to use in the rough splits
     # Note that a token is usually 3-4 characters
@@ -249,10 +255,6 @@ class DocExtractor:
     encoding: str
 
     def __init__(self) -> None:
-        self.split_attrs = DEFAULT_SPLIT_ATTRS
-        self.ignore_empty_split_tags = DEFAULT_IGNORE_EMPTY_SPLIT_TAGS
-        self.mandatory_splits = DEFAULT_MANDATORY_SPLITS
-        self.no_title_splits = DEFAULT_NO_TITLE_SPLITS
         self.overlap_window = DEFAULT_WINDOW_OVERLAP
         self.max_len = DEFAULT_MAX_LEN
         self.link_redirects = {}
@@ -268,6 +270,7 @@ class DocExtractor:
         self.html2text.ignore_emphasis = True
         self.html2text.skip_internal_links = True
         self.html2text.body_width = 0 # No text wrap
+        self.html2text.ul_item_mark = '-'
 
     ### MAIN PARSING FUNCTIONS 
 
@@ -369,7 +372,8 @@ class DocExtractor:
             if not parent_titles: parent_titles = []
             parent_titles = [*parent_titles,title.text.strip()]
         soup = self.preprocess(soup, url, dump_config)
-        extracts = self.split_page_by_tag(soup, 0)
+        extracts = self.split_page_by_tag(soup, 0, dump_config)
+
         docs = self.handle_extracts(extracts, url, parent_idx, [], parent_titles, '', dump_config)
         base_idx = docs[0]['doc_id']
         return (base_idx,docs)
@@ -478,14 +482,14 @@ class DocExtractor:
                 extracts[-1] += ' ' + sent.text
         return extracts
 
-    def split_page_by_tag(self, soup_orig, split_tag_index: int) -> list[dict]:
+    def split_page_by_tag(self, soup_orig, split_tag_index: int, dump_config: DumpConfig) -> list[dict]:
         """
         Splits page by the tags specified by split_attrs, hierarchically, into extracts
         - soup_orig: the BeautifulSoup object for the page to be split. The object will be copied, not modified.
         - split_tag_index: index of the split_attrs list to begin splitting the document on
         """
         
-        if (split_tag_index > self.mandatory_splits and len(self.html_to_text(soup_orig)) <= self.max_len) or split_tag_index >= len(self.split_attrs):
+        if (split_tag_index > dump_config.mandatory_splits and len(self.html_to_text(soup_orig)) <= self.max_len) or split_tag_index >= len(dump_config.split_attrs):
             # if document is already below the maximum length, and all mandatory splits completed, return extract 
             # or there are no more tags to split on
             return [{
@@ -496,14 +500,14 @@ class DocExtractor:
                 'children': []}]
 
         matching_tags = None 
-        if 'function' in self.split_attrs[split_tag_index]:
-            matching_tags = soup_orig.find_all(self.split_attrs[split_tag_index]['function'])
+        if 'function' in dump_config.split_attrs[split_tag_index]:
+            matching_tags = soup_orig.find_all(dump_config.split_attrs[split_tag_index]['function'])
         else:
-            matching_tags = soup_orig.find_all(**self.split_attrs[split_tag_index])
+            matching_tags = soup_orig.find_all(**dump_config.split_attrs[split_tag_index])
 
         if len(matching_tags) == 0:
             # Extract doesn't contain current split tag, move to next tag
-            return self.split_page_by_tag(soup_orig, split_tag_index+1)
+            return self.split_page_by_tag(soup_orig, split_tag_index+1, dump_config)
 
         extracts = []
         soup = make_soup(str(soup_orig)) # duplicate the page's BeautifulSoup object
@@ -516,10 +520,10 @@ class DocExtractor:
         current_anchor_link = None
         next_anchor_link = None
         while soup_current and extract_current:
-            if soup_current in matching_tags and not(self.ignore_empty_split_tags and soup_current.text.strip() == ''):
-                self.add_extract(extracts, extract, current_title, current_anchor_link, extract_links, split_tag_index)
+            if soup_current in matching_tags and not(dump_config.ignore_empty_split_tags and soup_current.text.strip() == ''):
+                self.add_extract(extracts, extract, current_title, current_anchor_link, extract_links, split_tag_index, dump_config)
                 (extract,extract_current) = parent_skeleton(extract_current)
-                if split_tag_index in self.no_title_splits:
+                if split_tag_index in dump_config.no_title_splits:
                     current_title = current_title_idx
                     current_title_idx += 1
                 else:
@@ -564,16 +568,16 @@ class DocExtractor:
                     extract_current = extract_current.parent
         
         # Add the remainder of the current extract
-        self.add_extract(extracts, extract, current_title, current_anchor_link, extract_links, split_tag_index)
+        self.add_extract(extracts, extract, current_title, current_anchor_link, extract_links, split_tag_index, dump_config)
         return extracts
 
-    def add_extract(self, extracts: list[dict], extract: dict, title: str, anchor_link: str, 
-                    extract_links: dict, split_tag_index: int) -> None:
+    def add_extract(self, extracts: list[dict], extract: BeautifulSoup, title: str, anchor_link: str, 
+                    extract_links: dict, split_tag_index: int, dump_config: DumpConfig) -> None:
         """
         Helper function for split_page: finds sub-extracts for the given extract, and adds result
         to the extracts list
         """
-        children = self.split_page_by_tag(extract, split_tag_index+1)
+        children = self.split_page_by_tag(extract, split_tag_index+1, dump_config)
         extracts.append({
             'title': title,
             'html': extract,

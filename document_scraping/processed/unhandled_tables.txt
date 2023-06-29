@@ -1,0 +1,543 @@
+{
+    "https://vancouver.calendar.ubc.ca/academic-programs": [
+        "Academic programs"
+    ],
+    "https://vancouver.calendar.ubc.ca/calendar-history": [
+        "Version releases"
+    ],
+    "https://vancouver.calendar.ubc.ca/emeriti-staff": [
+        "Chancellors Emeriti",
+        "Professors Emeriti"
+    ],
+    "https://vancouver.calendar.ubc.ca/services-facilities-and-organizations/quick-contacts": [
+        "Emergency and Health Services",
+        "Student Services"
+    ],
+    "https://vancouver.calendar.ubc.ca/fees/application-and-administrative-fees": [
+        "Undergraduate and Post-baccalaureate Programs",
+        "Graduate Programs",
+        "Administrative and Document Fees",
+        "Transcript Fees"
+    ],
+    "https://vancouver.calendar.ubc.ca/fees/medical-insurance": [
+        "Extended Health and Dental Plan",
+        "iMed (for International Students)"
+    ],
+    "https://vancouver.calendar.ubc.ca/fees/policies-fees": [
+        "Payment Due Dates",
+        "Undergraduate Formal Exchange Programs",
+        "Fee assessment exceptions"
+    ],
+    "https://vancouver.calendar.ubc.ca/fees/program-course-and-faculty-fees": [
+        "Program and Course Fees",
+        "Faculty Fees"
+    ],
+    "https://vancouver.calendar.ubc.ca/fees/tuition-fees/certificate-programs": [
+        "Certificate Programs"
+    ],
+    "https://vancouver.calendar.ubc.ca/fees/tuition-fees/refund-tuition-fees": [
+        "Winter Courses",
+        "Summer Courses",
+        "Refund of Instalment-Based Tuition"
+    ],
+    "https://vancouver.calendar.ubc.ca/fees/tuition-fees/undergraduate": [
+        "Domestic Students",
+        "International Students",
+        "International Students",
+        "Specialized Undergraduate",
+        "Specialized Undergraduate",
+        "Non-Degree Studies"
+    ],
+    "https://vancouver.calendar.ubc.ca/fees/tuition-fees/undergraduatemaster-management-dual-degree": [
+        "Allocation Percentage",
+        "Domestic",
+        "International"
+    ],
+    "https://vancouver.calendar.ubc.ca/fees/tuition-fees/vantage-college": [
+        "Vantage College"
+    ],
+    "https://vancouver.calendar.ubc.ca/fees/tuition-fees/graduate/doctoral": [
+        "Specialized Doctoral Degree Programs",
+        "Specialized Doctoral Degree Programs",
+        "Specialized Doctoral Degree Programs",
+        "Specialized Doctoral Degree Programs",
+        "Specialized Doctoral Degree Programs",
+        "Specialized Doctoral Degree Programs",
+        "Specialized Doctoral Degree Programs",
+        "Specialized Doctoral Degree Programs",
+        "Standard Doctoral Degree Programs"
+    ],
+    "https://vancouver.calendar.ubc.ca/fees/tuition-fees/graduate/masters": [
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Specialized Master's Degree Programs",
+        "Standard Master's Degree Programs"
+    ],
+    "https://vancouver.calendar.ubc.ca/fees/student-fees/student-fees-established-and-approved-student-society": [
+        "General Student Fees Established and Approved by a Student Society",
+        "General Student Fees Established and Approved by a Student Society",
+        "Undergraduate Student Fees Established and Approved by a Student Society",
+        "Graduate Student Fees Established and Approved by a Student Society"
+    ],
+    "https://vancouver.calendar.ubc.ca/fees/student-fees/student-fees-established-and-approved-ubc-board-governors": [
+        "Student Fees Established and Approved by the UBC Board of Governors"
+    ],
+    "https://vancouver.calendar.ubc.ca/fees/student-fees/summer-session-student-fees": [
+        "Student Fees Established and Approved by a Student Society"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/vancouver-school-economics/bachelor-international-economics/academic-recognition-promotion-and-continuation": [
+        "Summary of Continuation Requirements"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/vancouver-school-economics/bachelor-international-economics/degree-requirements-students-who-enter-program-202324-or-earlier": [
+        "6. Outside Requirement"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/vancouver-school-economics/bachelor-international-economics/degree-requirements-students-who-enter-program-202425-or-later": [
+        "3. Outside Requirement"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/ubc-vantage-college/program-requirements": [
+        "Vantage One Arts",
+        "Vantage One Engineering",
+        "Vantage One Management",
+        "Vantage One Science"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/ubc-vantage-college/transition-ubc-degree-programs": [
+        "Vantage One Engineering",
+        "Vantage One Science"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/school-population-and-public-health/centres-and-partnerships/human-early-learning-partnership": [
+        "Human Early Learning Partnership"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/school-population-and-public-health/centres-and-partnerships/w-maurice-young-centre-applied-ethics": [
+        "W. Maurice Young Centre for Applied Ethics"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/school-music/introduction": [
+        "A School within the Faculty of Arts",
+        "A School within the Faculty of Arts",
+        "A School within the Faculty of Arts"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/school-music/bachelor-music/general-studies-secondary-education-stream": [
+        "General Studies: Secondary Education Stream"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/school-audiology-and-speech-sciences/master-science/admission": [
+        "SPEECH-LANGUAGE PATHOLOGY: Prerequisites for the Speech-Language Pathology Major",
+        "AUDIOLOGY: Prerequisites for the Audiology Major"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-science/bachelor-science/academic-performance-review-and-continuation": [
+        "Students At Risk"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-science/bachelor-science/biology": [
+        "Honours (0983): Evolutionary Biology (EVOL)"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-science/bachelor-science/statistics": [
+        "Probability and Statistics"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-pharmaceutical-sciences/flexible-doctor-pharmacy/degree-requirements": [
+        "Degree Requirements"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-pharmaceutical-sciences/bachelor-pharmaceutical-sciences/degree-requirements": [
+        "Degree Requirements",
+        "Research Experiential Option",
+        "Practicum Experiential Option",
+        "Experiential Options with Honours"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-medicine/bachelor-midwifery/admission": [
+        "Application"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-graduate-and-postdoctoral-studies/degrees-offered": [
+        "Degrees Offered"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-graduate-and-postdoctoral-studies/english-language-proficiency-standards-and-gre-requirements": [
+        "TOEFL and GRE Requirements"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-graduate-and-postdoctoral-studies/degree-programs/museum-education": [
+        "Museum Education"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-graduate-and-postdoctoral-studies/degree-programs/music": [
+        "Contact Information",
+        "Contact Information"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-graduate-and-postdoctoral-studies/degree-programs/oceans-and-fisheries": [
+        "Oceans and Fisheries"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-graduate-and-postdoctoral-studies/degree-programs/science-and-technology-studies": [
+        "Science and Technology Studies"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-education/certificate-programs/certificate-early-years-education-eyed": [
+        "Certificate Requirements"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-education/certificate-programs/certificate-infant-development-and-supported-childcare-idsc": [
+        "Certificate Requirements"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-education/certificate-programs/certificate-teaching-about-visual-and-material-culture": [
+        "Admission Requirements"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-education/certificate-programs/certificate-teaching-english-second-language": [
+        "Certificate Requirements",
+        "Certificate Requirements"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-education/bachelor-education/admission": [
+        "Secondary Teachable Subject Requirements"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-education/bachelor-education/degree-requirements-elementary-middle-years-teacher-education": [
+        "Elementary & Middle Years: 11-Month Option"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-education/bachelor-education/degree-requirements-secondary-teacher-education": [
+        "Secondary Degree Requirements"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-dentistry/dental-hygiene-degree-program/degree-requirements": [
+        "Category 1 - Students who have completed 30 credits of university transfer prerequisites",
+        "Category 2 - Students who have NOT completed 30 credits of university transfer prerequisites",
+        "3. International Degree Completion"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-commerce-and-business-administration/diploma-accounting-program": [
+        "Admission"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-commerce-and-business-administration/undergraduate-program-master-management-dual-degree-program-option": [
+        "Admission"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-commerce-and-business-administration/professional-masters-degrees/academic-regulations": [
+        "1. Academic Standing & Grading Practices"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-commerce-and-business-administration/professional-masters-degrees/dual-degree-program-option-jdmba": [
+        "Dual Degree Program Option: J.D./M.B.A."
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-commerce-and-business-administration/bachelor-commerce/academic-regulations": [
+        "Summary of Continuation Requirements"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-commerce-and-business-administration/bachelor-commerce/degree-requirements": [
+        "Electives"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-arts/institutes-and-centres/centre-european-studies": [
+        "Centre for European Studies"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-arts/institutes-and-centres/liu-institute-global-issues": [
+        "Liu Institute for Global Issues"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-arts/bachelor-media-studies/academic-recognition-promotion-and-continuation": [
+        "Year 1 Continuation",
+        "Year 1 Continuation",
+        "Year 2 and Above Continuation",
+        "Summary of Continuation Requirements for students in Year 2 and Above"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-arts/bachelor-fine-arts/academic-recognition-promotion-and-continuation": [
+        "Continuation Requirements",
+        "Continuation Requirements"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-arts/bachelor-fine-arts/credit-requirements-and-regulations": [
+        "Double-counting"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-arts/bachelor-fine-arts/degree-requirements": [
+        "Research Component"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-arts/bachelor-arts/academic-recognition-promotion-and-continuation": [
+        "Continuation Requirements",
+        "Continuation Requirements"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-arts/bachelor-arts/credit-requirements-and-regulations": [
+        "Double-counting"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-arts/bachelor-arts/degree-requirements-students-who-enter-program-202324-or-earlier": [
+        "2. Language Requirement",
+        "4. Literature Requirement"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-arts/bachelor-arts/degree-requirements-students-who-enter-program-202425-or-later": [
+        "1. Writing and Research Requirement"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-arts/bachelor-arts/united-states-studies": [
+        "Major in United States Studies"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-applied-science/bachelor-applied-science/academic-regulations": [
+        "Academic Standing and Promotion Requirements"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-applied-science/bachelor-applied-science/admission": [
+        "Exemptions for Applied Science"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-applied-science/bachelor-applied-science/biomedical-engineering": [
+        "Stream Based Courses (Please note, Streams for this program are no longer offered)."
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-applied-science/bachelor-applied-science/engineering-physics": [
+        "Engineering Physics",
+        "Engineering Physics",
+        "Co-op Sequence of Placements"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-applied-science/bachelor-applied-science/minor-commerce": [
+        "Minor in Commerce"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-applied-science/bachelor-applied-science/minor-entrepreneurship": [
+        "Minor in Entrepreneurship"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-applied-science/bachelor-applied-science/minor-honours-mathematics": [
+        "Minor in Honours Mathematics"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/courses-study-and-degrees/applied-science": [
+        "Applied Science"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/courses-study-and-degrees/architecture-and-landscape-architecture": [
+        "Architecture and Landscape Architecture"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/courses-study-and-degrees/arts": [
+        "Arts"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/courses-study-and-degrees/audiology-and-speech-sciences": [
+        "Audiology and Speech Sciences"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/courses-study-and-degrees/commerce-and-business-administration": [
+        "Commerce and Business Administration"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/courses-study-and-degrees/community-and-regional-planning": [
+        "Community and Regional Planning"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/courses-study-and-degrees/dentistry": [
+        "Dentistry"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/courses-study-and-degrees/economics": [
+        "Economics"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/courses-study-and-degrees/education": [
+        "Education"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/courses-study-and-degrees/forestry": [
+        "Forestry"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/courses-study-and-degrees/information": [
+        "Information"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/courses-study-and-degrees/journalism": [
+        "Journalism"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/courses-study-and-degrees/kinesiology": [
+        "Kinesiology"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/courses-study-and-degrees/land-and-food-systems": [
+        "Land and Food Systems"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/courses-study-and-degrees/law": [
+        "Law"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/courses-study-and-degrees/medicine": [
+        "Medicine"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/courses-study-and-degrees/music": [
+        "Music"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/courses-study-and-degrees/nursing": [
+        "Nursing"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/courses-study-and-degrees/pharmaceutical-sciences": [
+        "Pharmaceutical Sciences"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/courses-study-and-degrees/population-and-public-health": [
+        "Population and Public Health"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/courses-study-and-degrees/science": [
+        "Science"
+    ],
+    "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/courses-study-and-degrees/social-work": [
+        "Social Work"
+    ],
+    "https://vancouver.calendar.ubc.ca/campus-wide-policies-and-regulations/grading-practices/introduction": [
+        "Introduction",
+        "Introduction",
+        "Introduction"
+    ],
+    "https://vancouver.calendar.ubc.ca/campus-wide-policies-and-regulations/change-registration/course-dropwithdrawal-dates-commerce-masters-level-modules-baxx": [
+        "Full-time M.B.A. Program (starting September 2022)",
+        "Full-time M.B.A. Program (starting September 2023)",
+        "M.B.A.N. Program (starting September 2023)",
+        "M.M. Program (starting September 2023)",
+        "M.M. Program (Dual Degree) (starting June 2023)",
+        "M.M. Program (Dual Degree) (starting June 2023)"
+    ],
+    "https://vancouver.calendar.ubc.ca/alternative-study-options/other-study-options/extended-learning/languages": [
+        "Languages"
+    ],
+    "https://vancouver.calendar.ubc.ca/admissions/applicants-international-baccalaureate-and-advanced-placement-courses": [
+        "International Baccalaureate Certificate Students",
+        "Advanced Placement Students",
+        "Advanced Placement and International Baccalaureate Courses Approved to Satisfy Pre-requisites"
+    ],
+    "https://vancouver.calendar.ubc.ca/admissions/applicants-vantage-college": [
+        "Calculation of Admission Average for Applicants to UBC Vantage College from BC/Yukon Secondary School Curriculum"
+    ],
+    "https://vancouver.calendar.ubc.ca/admissions/program-requirements-canadian-secondary-school-applicants": [
+        "Program Requirements for Canadian Secondary School Applicants",
+        "Program Requirements for Canadian Secondary School Applicants"
+    ],
+    "https://vancouver.calendar.ubc.ca/admissions/undergraduate-application-and-document-deadlines": [
+        "Application Deadlines for Undergraduate Degree and Diploma Programs"
+    ],
+    "https://vancouver.calendar.ubc.ca/admissions/english-language-admission-standard/english-language-competence": [
+        "English Language Competence"
+    ],
+    "https://vancouver.calendar.ubc.ca/admissions/applicants-following-bcyukon-secondary-school-curriculum/minimum-academic-qualifications": [
+        "Minimum Academic Qualifications"
+    ],
+    "https://science.ubc.ca/students/advising.1": [
+        "Talk to an Advisor"
+    ],
+    "https://science.ubc.ca/students/degree-navigator": [
+        "Frequently Asked Questions (FAQ)"
+    ],
+    "https://science.ubc.ca/students/new.1": [
+        "Start Building Your Toolkit for Success"
+    ],
+    "https://science.ubc.ca/students/new": [
+        "Start Building Your Toolkit for Success"
+    ],
+    "https://science.ubc.ca/students/requirements": [
+        "Requirements"
+    ],
+    "https://science.ubc.ca/students/spac/meet-spac": [
+        "Alexis"
+    ],
+    "https://science.ubc.ca/students/new/courses.1": [
+        "Lower Level Requirements"
+    ],
+    "https://science.ubc.ca/students/new/courses": [
+        "Lower Level Requirements"
+    ],
+    "https://science.ubc.ca/students/new/imagine-ubc-orientations": [
+        "What to Expect"
+    ],
+    "https://science.ubc.ca/students/new/specializations": [
+        "Explore UBC Science Program Specializations"
+    ],
+    "https://science.ubc.ca/students/new/courses/transfer": [
+        "Lower Level Requirements"
+    ],
+    "https://science.ubc.ca/students/degree/specializations": [
+        "Specializations"
+    ],
+    "https://science.ubc.ca/students/degree/apply/req": [
+        "Combined Majors and  Combined Honours",
+        "Combined Majors and  Combined Honours",
+        "Combined Majors and  Combined Honours",
+        "Combined Majors and  Combined Honours",
+        "Combined Majors and  Combined Honours",
+        "Combined Majors and  Combined Honours",
+        "Combined Majors and  Combined Honours",
+        "Combined Majors and  Combined Honours",
+        "Combined Majors and  Combined Honours",
+        "Combined Majors and  Combined Honours",
+        "Combined Majors and  Combined Honours",
+        "Combined Majors and  Combined Honours",
+        "Combined Majors and  Combined Honours",
+        "Combined Majors and  Combined Honours",
+        "Combined Majors and  Combined Honours",
+        "Combined Majors and  Combined Honours",
+        "Combined Majors and  Combined Honours",
+        "Combined Majors and  Combined Honours",
+        "Combined Majors and  Combined Honours",
+        "Combined Majors and  Combined Honours",
+        "Combined Majors and  Combined Honours",
+        "Combined Majors and  Combined Honours",
+        "Combined Majors and  Combined Honours",
+        "Combined Majors and  Combined Honours",
+        "Combined Majors and  Combined Honours",
+        "Combined Majors and  Combined Honours",
+        "Combined Majors and  Combined Honours",
+        "Combined Majors and  Combined Honours",
+        "Combined Majors and  Combined Honours",
+        "Combined Majors and  Combined Honours",
+        "Combined Majors and  Combined Honours",
+        "Combined Majors and  Combined Honours",
+        "Combined Majors and  Combined Honours",
+        "Combined Majors and  Combined Honours",
+        "Combined Majors and  Combined Honours",
+        "Combined Majors and  Combined Honours",
+        "Combined Majors and  Combined Honours",
+        "Combined Majors and  Combined Honours",
+        "Combined Majors and  Combined Honours",
+        "Combined Majors and  Combined Honours",
+        "Combined Majors and  Combined Honours",
+        "Combined Majors and  Combined Honours",
+        "Combined Majors and  Combined Honours",
+        "Combined Majors and  Combined Honours",
+        "Combined Majors and  Combined Honours"
+    ],
+    "https://science.ubc.ca/students/blog/employers": [
+        "Highlighted Skills Canadian Employers Look For"
+    ],
+    "https://science.ubc.ca/students/blog/january-2023-deferred-examination-schedule": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "G",
+        "I",
+        "M",
+        "N",
+        "P",
+        "S"
+    ]
+}
