@@ -19,8 +19,8 @@ llm_chain = LLMChain(prompt=prompt, llm=llm)
 filter = LLMChainFilter.from_llm(llm)
 compressor = LLMChainExtractor.from_llm(llm)
 graph = doc_graph_utils.read_graph()
-#retrievers.load_retrievers_from_embeddings()
-retrievers.load_retrievers_from_faiss(by_faculty=True)
+retrievers.load_retrievers_from_embeddings()
+#retrievers.load_retrievers_from_faiss(by_faculty=True)
 
 def print_results(results: List[Document], print_content=False):
     """
@@ -135,7 +135,8 @@ async def run_chain(context: str | Dict, query:str, start_doc:int=None, related:
     - generate: If true, generates a response for each final document
     """
 
-    retriever = retrievers.choose_retriever(context)
+    #retriever = retrievers.choose_retriever(context)
+    retriever = retrievers.retrievers['triple']
     
     docs = None
     if start_doc:
@@ -156,16 +157,17 @@ async def run_chain(context: str | Dict, query:str, start_doc:int=None, related:
         compressed_docs = compressor.compress_documents(docs, llm_combined_query(context,query))
         get_related_links_from_compressed(docs, compressed_docs)
 
-    for idx,doc in enumerate(docs):
-        print(idx)
+    for doc in docs:
         if compress:
-            compressed_content = compressed_docs[idx].page_content
-            compressed_re = re.escape(compressed_content).replace('\ ','(\s|\n)*')
-            if match := re.search(compressed_re, doc.page_content):
-                # highlight the compressed section
-                doc.page_content.replace('*','-')
-                new = add_italics(match.group())
-                doc.page_content = doc.page_content.replace(match.group(), new)
+            compressed_content = [c_doc.page_content for c_doc in compressed_docs if c_doc.metadata['doc_id'] == doc.metadata['doc_id']]
+            if len(compressed_content) > 0: 
+                compressed_content = compressed_content[0]
+                compressed_re = re.escape(compressed_content).replace('\ ','(\s|\n)*')
+                if match := re.search(compressed_re, doc.page_content):
+                    # highlight the compressed section
+                    doc.page_content.replace('*','-')
+                    new = add_italics(match.group())
+                    doc.page_content = doc.page_content.replace(match.group(), new)
 
         # Handle documents starting with a list item
         doc.page_content = doc.page_content.strip()
