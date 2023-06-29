@@ -10,6 +10,7 @@ from typing import List, Dict
 from dotenv import load_dotenv
 
 load_dotenv()
+GRAPH_FILEPATH = '../document_scraping/processed/website_graph.txt'
 
 ### LOAD MODELS 
 comparator = Comparator(retrievers.base_embeddings)
@@ -18,7 +19,7 @@ llm, prompt = load_huggingface_endpoint(huggingface_model_names[0])
 llm_chain = LLMChain(prompt=prompt, llm=llm)
 filter = LLMChainFilter.from_llm(llm)
 compressor = LLMChainExtractor.from_llm(llm)
-graph = doc_graph_utils.read_graph()
+graph = doc_graph_utils.read_graph(GRAPH_FILEPATH)
 retrievers.load_retrievers_from_embeddings()
 #retrievers.load_retrievers_from_faiss(by_faculty=True)
 
@@ -121,7 +122,7 @@ def add_italics(text):
     return text
     
 async def run_chain(context: str | Dict, query:str, start_doc:int=None, related:bool=False,
-                    combine_with_sibs:bool=False, filter:bool=False, compress:bool=True, generate:bool=True):
+                    combine_with_sibs:bool=False, filter:bool=False, compress:bool=False, generate:bool=False):
 
     """
     Run the question answering chain with the given context and query
@@ -135,20 +136,19 @@ async def run_chain(context: str | Dict, query:str, start_doc:int=None, related:
     - generate: If true, generates a response for each final document
     """
 
-    #retriever = retrievers.choose_retriever(context)
-    retriever = retrievers.retrievers['triple']
+    retriever_name = 'triple'
     
     docs = None
     if start_doc:
         docs = retrievers.docs_from_ids([start_doc])
     else:
-        docs = await retrievers.get_documents(retriever,context,query)
+        docs = await retrievers.get_documents(context, query, retriever_name=retriever_name)
 
     if related: 
-        related_docs = get_related_docs(retriever,context,query,docs,score_threshold=0.3)
+        related_docs = get_related_docs(context,query, docs,score_threshold=0.3)
         docs += related_docs
 
-    if combine_with_sibs: combine_sib_docs(retriever,context,query,docs)
+    if combine_with_sibs: combine_sib_docs(docs)
 
     if filter: docs = filter.compress_documents(docs, llm_combined_query(context,query))
 

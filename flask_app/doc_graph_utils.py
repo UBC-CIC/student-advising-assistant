@@ -2,8 +2,6 @@ from typing import List
 import networkx as nx
 from enum import IntEnum
 
-GRAPH_FILEPATH = './data/website_graph.txt'
-
 class DocRelation(IntEnum):
     """
     Represents the possible relationships between documents
@@ -13,11 +11,11 @@ class DocRelation(IntEnum):
     SIBLING_EXTRACT = 3
     SIBLING_SPLIT_EXTRACT = 4
 
-def read_graph() -> nx.DiGraph:
+def read_graph(filepath) -> nx.DiGraph:
     """
     Read the website relationship graph from file
     """
-    graph = nx.read_multiline_adjlist(GRAPH_FILEPATH, create_using=nx.DiGraph, nodetype = int)
+    graph = nx.read_multiline_adjlist(filepath, create_using=nx.DiGraph, nodetype = int)
     return graph 
 
 def get_doc_relation_ids(graph: nx.DiGraph, doc_id: int, relation: DocRelation, in_only = False, out_only = False, only_one=False) -> List[int]:

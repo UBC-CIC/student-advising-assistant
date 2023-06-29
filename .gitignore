@@ -1,1 +1,6 @@
 *.env
+*/__pycache__/
+*/site_dumps
+*/test.py
+*.wget-hsts
+/flask_app/data/embeddings
