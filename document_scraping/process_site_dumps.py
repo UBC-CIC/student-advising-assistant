@@ -219,7 +219,7 @@ def convert_general_table_row(cells: list[BeautifulSoup], footnotes: dict, heade
         li.extend([*convert_cell(cells[0],footnotes),': ',*convert_cell(cells[1],footnotes)])
     elif len(cells) == 1:
         # Assuming this is a note cell, not needing a header
-        return li.extend(convert_cell(cells[0],footnotes))
+        li.extend(convert_cell(cells[0],footnotes))
     else:
         if not headers:
             for cell in cells:
@@ -414,7 +414,10 @@ def calendar_extract_metadata(url: str, titles: List[str], parent_titles: List[s
     return metadata
 
 def blog_extract_metadata(url: str, titles: List[str], parent_titles: List[str], text: str):
-    metadata = {'faculty': 'The Faculty of Science'}
+    metadata = {'faculty': 'The Faculty of Science', 'program': 'Bachelor of Science'}
+    for subtitle in parent_titles + titles:
+        if 'specialization' not in metadata and re.match(specialization_regex, subtitle):
+            metadata['specialization'] = subtitle
     return metadata
 
 calendar_is_new_format = True
@@ -431,18 +434,20 @@ calendar_config.parent_context_extractor = parent_context_extractor
 sc_students_config = DumpConfig()
 sc_students_config.base_url = 'https://science.ubc.ca/students/'
 sc_students_config.dump_path = BASE_DUMP_PATH + '\\science.ubc.ca\\students\\'
-sc_students_config.remove_tag_attrs = generic_remove_tags + [{'class': 'customBread'},{'id': 'block-views-student-notices-block-2'},{'class':'field-name-field-student-blog-topic'}]
+sc_students_config.remove_tag_attrs = generic_remove_tags + [{'class': 'customBread'},{'id': 'block-views-student-notices-block-2'},{'class':'field-name-field-student-blog-topic'},{'class':'menu'}]
 sc_students_config.replacements = [({'name': 'table'}, convert_table)]
 sc_students_config.main_content_attrs = {'id': 'content'}
 sc_students_config.title_attrs = {'name': 'h1'}
 sc_students_config.metadata_extractor = blog_extract_metadata
 sc_students_config.parent_context_extractor = None
+sc_students_config.split_attrs = [{'name': 'h1'},{'name': 'h2'},{'function': lambda x: (x.name == 'h3' or DEFAULT_SPLIT_CLASS in x.get_attribute_list('class'))},{'name': 'h4'}]
+# ^ For the third split attributes, treats h3 and split class as the same level due to the structure of https://science.ubc.ca/students/degree/apply/req
 
 ### MAIN FUNCTION
 
 def process_site_dumps(dump_configs: list[DumpConfig] = [calendar_config,sc_students_config], 
                        redirect_map_path: str = BASE_DUMP_PATH + '\\redirects.txt', 
-                       out_path: str = BASE_DUMP_PATH + '\\processed\\'):
+                       out_path: str = 'processed\\'):
     """
     Parse website dumps
     - dump_configs
