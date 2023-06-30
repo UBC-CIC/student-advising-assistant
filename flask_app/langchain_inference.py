@@ -8,9 +8,11 @@ from llm_utils import load_huggingface_endpoint, llm_combined_query
 import regex as re
 from typing import List, Dict
 from dotenv import load_dotenv
+import os
+from download_s3_files import download_all_dirs
 
 load_dotenv()
-GRAPH_FILEPATH = '../document_scraping/processed/website_graph.txt'
+GRAPH_FILEPATH = os.path.join('data','documents','website_graph.txt')
 
 ### LOAD MODELS 
 comparator = Comparator(retrievers.base_embeddings)
@@ -20,8 +22,8 @@ llm_chain = LLMChain(prompt=prompt, llm=llm)
 filter = LLMChainFilter.from_llm(llm)
 compressor = LLMChainExtractor.from_llm(llm)
 graph = doc_graph_utils.read_graph(GRAPH_FILEPATH)
-retrievers.load_retrievers_from_embeddings()
-#retrievers.load_retrievers_from_faiss(by_faculty=True)
+retrievers.load_retrievers()
+download_all_dirs()
 
 def print_results(results: List[Document], print_content=False):
     """
@@ -136,7 +138,7 @@ async def run_chain(context: str | Dict, query:str, start_doc:int=None, related:
     - generate: If true, generates a response for each final document
     """
 
-    retriever_name = 'triple'
+    retriever_name = 'all-triple'
     
     docs = None
     if start_doc:
