@@ -11,4 +11,4 @@ dependencies:
     - sentence-transformers
     - networkx
     - python-dotenv
-prefix: C:\Users\astevins\AppData\Local\miniconda3\envs\flaskenv
+    - flask[async]

@@ -1,0 +1,8 @@
+pandas
+regex
+bs4
+networkx
+html2text
+spacy
+lxml
+boto3

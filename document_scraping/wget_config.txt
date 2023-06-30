@@ -1,4 +1,4 @@
-header = From: Arya Stevinson <arya.stevinson@ubc.ca>
+header = From: Tien Nguyen <nhantienn@ubc.ca>
 
 timestamping = on
 robots = off
