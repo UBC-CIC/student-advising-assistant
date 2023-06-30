@@ -30,7 +30,7 @@ def download_s3_directory(s3_client, directory: str, output_prefix: str, bucket_
         if os.path.exists(out_path):
             if os.path.getmtime(out_path) >= obj['LastModified'].timestamp():
                 print(f"Skipping '{obj['Key']}', no changes since last download to '{out_path}'")
-            continue
+                continue
         if not os.path.exists(dirpath):
             os.makedirs(dirpath, exist_ok=True)
         print(f"Downloading '{obj['Key']}' to '{out_path}'")
