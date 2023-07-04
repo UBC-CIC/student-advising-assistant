@@ -1,15 +1,17 @@
 from langchain.docstore.document import Document
 from langchain import LLMChain
 from langchain.retrievers.document_compressors import LLMChainFilter, LLMChainExtractor
-import doc_graph_utils
-from comparator import Comparator
-import retrievers
-from llm_utils import load_huggingface_endpoint, llm_combined_query
 import regex as re
 from typing import List, Dict
 from dotenv import load_dotenv
 import os
 from download_s3_files import download_all_dirs
+import retrievers
+import llm_utils
+import doc_graph_utils
+from comparator import Comparator
+import copy
+from numpy import isnan
 
 load_dotenv()
 GRAPH_FILEPATH = os.path.join('data','documents','website_graph.txt')
@@ -17,7 +19,7 @@ GRAPH_FILEPATH = os.path.join('data','documents','website_graph.txt')
 ### LOAD MODELS 
 comparator = Comparator(retrievers.base_embeddings)
 huggingface_model_names = ['google/flan-t5-xxl','google/flan-ul2','tiiuae/falcon-7b-instruct']
-llm, prompt = load_huggingface_endpoint(huggingface_model_names[0])
+llm, prompt = llm_utils.load_huggingface_endpoint(huggingface_model_names[0])
 llm_chain = LLMChain(prompt=prompt, llm=llm)
 filter = LLMChainFilter.from_llm(llm)
 compressor = LLMChainExtractor.from_llm(llm)
@@ -83,7 +85,6 @@ def get_related_docs(context, query, docs, child_docs = False, sib_docs = False,
     """
     candidate_doc_ids = set()
     doc_ids = [doc.metadata['doc_id'] for doc in docs]
-    context_str = retrievers.retriever_context_str(context)
 
     # Finding related doc ids
     for doc_id in doc_ids:
@@ -97,7 +98,7 @@ def get_related_docs(context, query, docs, child_docs = False, sib_docs = False,
     candidate_docs = retrievers.docs_from_ids(candidate_doc_ids)
 
     # Score the query against the doc titles
-    scores = comparator.compare_query_to_texts(query,[' : '.join(doc.metadata['titles']) for doc in candidate_docs],context_str)[0]
+    scores = comparator.compare_query_to_texts(query,[' : '.join(doc.metadata['titles']) for doc in candidate_docs])[0]
 
     related_docs = [doc for (score,doc) in sorted(zip(scores,candidate_docs), key=lambda x: x[0]) 
                       if score >= score_threshold and doc.metadata['doc_id'] not in doc_ids]
@@ -122,13 +123,48 @@ def add_italics(text):
     for match in re.finditer('[\w\d][^\n\*]+[\w\d]',text):
         text = text.replace(match.group(),f"*{match.group()}*")
     return text
+
+def generate_answer(doc, query):
+    """
+    Generate an answer based on the given document, plus additional context if defined for the document
+    """
+    titles = ' -> '.join(doc.metadata['parent_titles'] + doc.metadata['titles'])
+    content = titles + '\n\n' + doc.page_content
+    return llm_chain.run(doc=content,query=query)
+
+def docs_for_llms(docs: List[Document]):
+    """
+    Modifies the page_content of each doc, so the page contents are optimized for input to an LLM
+    Does the following transformations:
+    - Adds the sequence of page titles to the contents
+    - Adds the context sentence if provided
+    """
+    for doc in docs:
+        content = ' -> '.join(doc.metadata['parent_titles'] + doc.metadata['titles'])
+        if 'context' in doc.metadata and not isnan(doc.metadata['context']) and doc.metadata['context'] != '': 
+            content += '\n\n' + doc.metadata['context']
+        content += '\n\n' + doc.page_content
+        doc.metadata['original_page_content'] = doc.page_content
+        doc.page_content = content
+
+def choose_retrievers(program_info: Dict):
+    """
+    Choose the appropriate retriever(s) given the program information dict
+    If more than one retriever should be included, returns multiple
+    """
+    if 'faculty' in program_info and program_info['faculty'] == 'The Faculty of Science':
+        #return ['sc-triple','none-triple']
+        return ['sc-triple']
+    else:
+        return ['all-triple']
     
-async def run_chain(context: str | Dict, query:str, start_doc:int=None, related:bool=False,
-                    combine_with_sibs:bool=False, filter:bool=False, compress:bool=False, generate:bool=False):
+async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=None, related:bool=False,
+                    combine_with_sibs:bool=False, do_filter:bool=True, compress:bool=True, generate:bool=True):
 
     """
     Run the question answering chain with the given context and query
-    - context: A string or dict describing the context of the query, eg. values describe the faculty and program
+    - program_info: Dict of values describe the faculty, program, specialization, and/or year
+    - topic: Topic of the question
     - query: The text query
     - start_doc: If provided, will start searching with the provided document index rather than performing similarity search
     - related: If true, fetches related documents with high enough cosine similarity
@@ -138,25 +174,32 @@ async def run_chain(context: str | Dict, query:str, start_doc:int=None, related:
     - generate: If true, generates a response for each final document
     """
 
-    retriever_name = 'all-triple'
+    retriever_names = choose_retrievers(program_info)
+    llm_query = llm_utils.llm_query(program_info, topic, query)
     
-    docs = None
+    print(llm_query)
+    
+    docs = []
     if start_doc:
-        docs = retrievers.docs_from_ids([start_doc])
+        docs += retrievers.docs_from_ids([start_doc])
     else:
-        docs = await retrievers.get_documents(context, query, retriever_name=retriever_name)
+        for retriever_name in retriever_names:
+            retriever_context_str = retrievers.retriever_context_str(program_info, topic, retriever_name)
+            docs += await retrievers.get_documents(retriever_context_str, query, retriever_name)
 
+    docs_for_llms(docs)
+    
     if related: 
-        related_docs = get_related_docs(context,query, docs,score_threshold=0.3)
+        related_docs = get_related_docs(topic, query, docs, score_threshold=0.3, child_docs=True)
         docs += related_docs
 
     if combine_with_sibs: combine_sib_docs(docs)
 
-    if filter: docs = filter.compress_documents(docs, llm_combined_query(context,query))
+    if do_filter: docs = filter.compress_documents(docs, llm_query)
 
     compressed_docs = None
     if compress: 
-        compressed_docs = compressor.compress_documents(docs, llm_combined_query(context,query))
+        compressed_docs = compressor.compress_documents(docs, llm_query)
         get_related_links_from_compressed(docs, compressed_docs)
 
     for doc in docs:
@@ -166,8 +209,7 @@ async def run_chain(context: str | Dict, query:str, start_doc:int=None, related:
                 compressed_content = compressed_content[0]
                 compressed_re = re.escape(compressed_content).replace('\ ','(\s|\n)*')
                 if match := re.search(compressed_re, doc.page_content):
-                    # highlight the compressed section
-                    doc.page_content.replace('*','-')
+                    # Highlight the compressed section
                     new = add_italics(match.group())
                     doc.page_content = doc.page_content.replace(match.group(), new)
 
@@ -175,8 +217,11 @@ async def run_chain(context: str | Dict, query:str, start_doc:int=None, related:
         doc.page_content = doc.page_content.strip()
         if doc.page_content.startswith('*'): doc.page_content = '  ' + doc.page_content
 
+        # Replace any occurrence of 4 spaces, since it will be interepreted as a code block in markdown
+        doc.page_content = doc.page_content.replace('    ', '   ')
+        
         if generate:
-            generated = llm_chain.run(doc=doc.page_content,query=llm_combined_query(context,query))
+            generated = generate_answer(doc, llm_query)
             doc.metadata['generated_response'] = generated
         else:
             doc.metadata['generated_response'] = 'Text generation is turned off'

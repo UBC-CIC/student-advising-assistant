@@ -5,6 +5,7 @@
   <title>Ask Cali Demo</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
 </head>
 
 <body>
@@ -33,25 +34,24 @@
     <form action="/answer" method="post">
       <p><strong>Note:</strong> Do not submit any personal or sensitive information through this form </p>
 
-      <p><strong>Context</strong> (these fields are optional, but may improve the relevance of the response)</p>
-      <select name="faculty" id="faculty" style="width: 50%;">
-        <option value="all">All Faculties</option>
+      <input type="text" id="faculty" name="faculty" list="faculty_list" placeholder="All Faculties" style="width: 50%;">
+      <datalist id="faculty_list">
         {% for faculty in faculties.keys() %}
         <option value="{{faculty}}">{{faculty}}</option>
         {% endfor %}
-      </select>
+      </datalist>
 
-      <select name="program" id="program" style="width: 50%;">
-        <option value="all">All Programs</option>
+      <input type="text" id="program" name="program" list="program_list" placeholder="All Programs" style="width: 50%;">
+      <datalist id="program_list">
         {% for faculty in faculties.keys() %}
         {% for program in faculties[faculty]['programs'].keys() %}
         <option value="{{program}}" data-faculty="{{faculty}}" disabled hidden>{{program}}</option>
         {% endfor %}
         {% endfor %}
-      </select>
+      </datalist>
 
-      <select name="specialization" id="specialization" style="width: 50%;">
-        <option value="all">All Specializations</option>
+      <input type="text" id="specialization" name="specialization" list="specialization_list" placeholder="All Specializations" style="width: 50%;">
+      <datalist id="specialization_list">
         {% for faculty in faculties.keys() %}
         {% for program in faculties[faculty]['programs'].keys() %}
         {% for specialization in faculties[faculty]['programs'][program]['specializations'].keys() %}
@@ -59,18 +59,22 @@
         {% endfor %}
         {% endfor %}
         {% endfor %}
-      </select>
+      </datalist>
 
-      <select name="year" id="year" style="width: 50%;">
-        <option value="all">All Years</option>
+      <input type="text" id="year" name="year" list="year_list" placeholder="All Years" style="width: 50%;">
+      <datalist id="year_list">
         {% for year in ["First Year","Second Year","Third Year","Fourth Year","Fifth Year"] %}
         <option value="{{year}}">{{year}}</option>
         {% endfor %}
-      </select>
+      </datalist>
 
-      <p><strong>Custom Context</strong></p>
-      <p>(optionally specify your own context, if this box is filled then the context dropdowns will be ignored)</p>
-      <textarea id="context" name="context" cols="40" rows="2"></textarea>
+      <label 
+        for="topic" 
+        title="Eg. 'Second year specialization application', 'academic concessions', etc.">
+        What is the topic of your question?
+        <i class="fa fa-question-circle" style="font-size:18px"></i>
+        </label>
+      <textarea id="topic" name="topic" cols="40" rows="1"></textarea>
 
       <label for="question">Enter your question:</label>
       <textarea id="question" name="question" cols="40" rows="5"></textarea>
@@ -86,11 +90,10 @@
       }, false);
 
       $('#faculty').on('change', function () {
-        $("#program option[value='all']").prop("selected", true);
-        $('#program').trigger('change');
+        $("#program").val('');
         value = this.value
-        $("#program option").each(function () {
-          if (this.value === "all") {
+        $("#program_list option").each(function () {
+          if (this.value === "All Programs") {
             // pass
           }
           else if (this.dataset["faculty"] === value) {
@@ -104,11 +107,10 @@
       });
 
       $('#program').on('change', function () {
-        $("#specialization option[value='all']").prop("selected", true);
-        $('#specialization').trigger('change');
+        $("#specialization").val('');
         value = this.value
-        $("#specialization option").each(function () {
-          if (this.value === "all") {
+        $("#specialization_list option").each(function () {
+          if (this.value === "All Specializations") {
             // pass
           }
           else if (this.dataset["program"] === value) {
@@ -121,10 +123,10 @@
         });
       });
 
-      $("#faculty option[value='The Faculty of Science']").prop("selected", true);
+      $("#faculty").val('The Faculty of Science');
       $('#faculty').trigger('change');
 
-      $("#program option[value='Bachelor of Science']").prop("selected", true);
+      $("#program").val('Bachelor of Science');
       $('#program').trigger('change');
     }
 

@@ -48,13 +48,13 @@ def load_retrievers():
     """
     Load retrievers as defined in index_config.json from the s3 bucket
     """
-    for i_config in index_config['indexes']:
-        index_path = os.path.join(INDEXES_PATH,i_config['name'])
+    for name, i_config in index_config['indexes'].items():
+        index_path = os.path.join(INDEXES_PATH,name)
         embeddings_model = CombinedEmbeddings(base_embeddings, len(i_config['embeddings']))
         faiss,retriever = load_retriever_from_faiss(index_path,embeddings_model)
-        indexes[i_config['name']] = faiss
-        retrievers[i_config['name']] = retriever
-        query_converters[i_config['name']] = lambda context, query: retriever_combined_query([query,query,query])
+        indexes[name] = faiss
+        retrievers[name] = retriever
+        query_converters[name] = lambda context, query: retriever_combined_query([context + ':' + query, context + ':' + query, context + ':' + query])
 
 def docs_from_ids(doc_ids: List[int], retriever: VectorStoreRetriever = None):
     """
@@ -67,34 +67,40 @@ def docs_from_ids(doc_ids: List[int], retriever: VectorStoreRetriever = None):
         docs.append(retriever.vectorstore.docstore.search(id))
     return [copy.deepcopy(doc) for doc in docs]
 
-def retriever_context_str(context: str | Dict):
+def retriever_context_str(program_info: Dict, topic: str, retriever_name: str):
     """
-    Convert a context string or dict to a string for the document retriever
+    Create a context string for a retriever
+    - program_info: Dict of faculty and program information
+    - topic: Topic of the query
+    - retriever_name: Name of the retriever to prepare context for
+    Information included from the program_info may be different depending on the retriever
     """
-    context_str = context
-    if type(context) == dict:
-        context_str = ' : '.join(context.values())
-    return context_str
+    program_info_copy = copy.copy(program_info)
+    
+    if 'faculty' in index_config['indexes'][retriever_name]:
+        # Ignore faculty in context if the retriever is already for a particular faculty
+        program_info_copy.pop('faculty',None)
+        program_info_copy.pop('program',None)
+        
+    return ' : '.join(list(program_info_copy.values()) + [topic])
 
 def retriever_combined_query(args: List[str]):
     """
     Combine all args into a single query separated by the separation character
     """
     joined = CombinedEmbeddings.query_separator.join(args)
-    print(joined)
     return joined
 
-async def get_documents(context,query,k=None,retriever_name=None) -> List[Document]:
+async def get_documents(context: str, query: str, retriever_name: str, k = 5) -> List[Document]:
     """
     Return the documents from similarity search with the given context and query
+    - context: Text that describes the topic or other context of the query
+    - query: The question to answer
     - k: number of documents to return
     """
-    if not retriever_name: retriever_name = choose_retriever(context)
     retriever = retrievers[retriever_name]
-    
-    if k: retriever.search_kwargs = {'k':k}
-    context_str = retriever_context_str(context)
-    combined_query = query_converters[retriever_name](context_str,query)
+    retriever.search_kwargs = {'k':k}
+    combined_query = query_converters[retriever_name](context,query)
     docs = retriever.get_relevant_documents(combined_query)
     return [copy.deepcopy(doc) for doc in docs]
 

@@ -20,24 +20,21 @@ def home():
 @app.route('/answer', methods=['POST'])
 async def answer():
     # Submission from the form template
-    context = ''
+    topic = request.form['topic']
     question = request.form['question']
-    if request.form['context']:
-        context = request.form['context']
-    else:
-        filter_elems = ['faculty','program','specialization','year']
-        context = {filter_elem: request.form[filter_elem] for filter_elem in filter_elems if request.form[filter_elem] != 'all'}
-
+    filter_elems = ['faculty','program','specialization','year']
+    program_info = {filter_elem: request.form[filter_elem] for filter_elem in filter_elems if request.form[filter_elem] != ''}
+    
     # Checks if the form was submitted with a starting document id
     start_doc = request.args.get('doc')
     if start_doc:
         start_doc = int(start_doc)
 
     # Run the model inference
-    docs = await run_chain(context,question,start_doc=start_doc)
+    docs = await run_chain(program_info,topic,question,start_doc=start_doc)
 
     # Render the results
-    context_str = context if type(context) == str else ' : '.join(context.values())
+    context_str = ' : '.join(list(program_info.values()) + [topic])
     return render_template('ans.html',question=question,context=context_str,answers=docs,
                            form=request.form.to_dict())
 
