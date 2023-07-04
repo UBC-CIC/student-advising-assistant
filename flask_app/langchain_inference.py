@@ -203,6 +203,8 @@ async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=Non
         get_related_links_from_compressed(docs, compressed_docs)
 
     for doc in docs:
+        highlighted_text = None
+        
         if compress:
             compressed_content = [c_doc.page_content for c_doc in compressed_docs if c_doc.metadata['doc_id'] == doc.metadata['doc_id']]
             if len(compressed_content) > 0: 
@@ -211,19 +213,21 @@ async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=Non
                 if match := re.search(compressed_re, doc.page_content):
                     # Highlight the compressed section
                     new = add_italics(match.group())
-                    doc.page_content = doc.page_content.replace(match.group(), new)
-
+                    highlighted_text = doc.page_content.replace(match.group(), new)
+                    
+        if generate:
+            generated = generate_answer(doc, llm_query)
+            doc.metadata['generated_response'] = generated
+        else:
+            doc.metadata['generated_response'] = 'Text generation is turned off'
+        
+        if highlighted_text: doc.page_content = highlighted_text
+        
         # Handle documents starting with a list item
         doc.page_content = doc.page_content.strip()
         if doc.page_content.startswith('*'): doc.page_content = '  ' + doc.page_content
 
         # Replace any occurrence of 4 spaces, since it will be interepreted as a code block in markdown
         doc.page_content = doc.page_content.replace('    ', '   ')
-        
-        if generate:
-            generated = generate_answer(doc, llm_query)
-            doc.metadata['generated_response'] = generated
-        else:
-            doc.metadata['generated_response'] = 'Text generation is turned off'
     
     return docs
