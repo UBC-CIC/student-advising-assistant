@@ -16,7 +16,6 @@ Script to download the data sources using wget, and then split all pages into do
 downstream tasks.
 """
 
-logging.getLogger().setLevel(logging.DEBUG)
 redirect_log_re = re.compile('http[^\n]*(\n[^\n]*){2}301 Moved Permanently\nLocation:\s[^\n\s]*')
 
 def pull_sites(base_urls, names, system_os, regex_rules = {}, output_folder = './', additional_urls_file = None, wget_exe_path = './wget.exe', wget_config_path = './wget_config.txt'):
@@ -89,6 +88,10 @@ def pull_sites(base_urls, names, system_os, regex_rules = {}, output_folder = '.
             raise OSError(f"OS {system_os} is not currently supported")
         logging.info(f'- Completed pull for additional urls')
         get_redirects_from_log(log_file, redirects)
+    
+    # Cleanup copied files
+    logging.info("Cleanup any duplicated files from wget")
+    cleanup_copy_files(output_folder)
     
     redirects_path = join(output_folder,'redirects.txt')
     def writer(): 
