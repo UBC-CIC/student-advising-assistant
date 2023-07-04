@@ -1,6 +1,5 @@
 from typing import Callable
 import os
-import botocore
 
 """
 Tools used by various document scraping scripts
@@ -21,14 +20,16 @@ def write_file(writer: Callable):
             print("Could not save the files. Make sure the files to write are not open.")
             response = input("Try saving files again? <y,n> ")
 
-"""
-Arguments:
-    directory: the directory that will be recursively upload
-    bucketname: the name of the s3 bucket to upload
-    s3_client: the S3 client generated with boto3.client("s3")
-"""
 
-def upload_files(directory: str, bucket_name: str, s3_client: botocore.client.BaseClient):
+def upload_files(directory: str, bucket_name: str, s3_client):
+
+    """
+    Arguments:
+        directory: the directory that will be recursively upload
+        bucketname: the name of the s3 bucket to upload
+        s3_client: the S3 client generated with boto3.client("s3")
+    """
+    
     for root, dirs, files in os.walk(directory):
         for file in files:
             local_path = os.path.join(root, file)

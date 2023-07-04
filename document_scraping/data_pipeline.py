@@ -1,6 +1,7 @@
 import subprocess
 import platform
 from os.path import join
+from os import makedirs
 import os
 import sys
 import regex as re
@@ -33,7 +34,7 @@ def pull_sites(base_urls, names, system_os, regex_rules = {}, output_folder = '.
     - wget_config_path: path to the wget config file (aka .wgetrc)
     """
     # create the output dir if not exists, otherwise do nothing
-    os.makedirs(output_folder, exist_ok=True)
+    makedirs(output_folder, exist_ok=True)
     redirects = {}
     total_num = 0
     for base_url, name in zip(base_urls,names):
@@ -85,6 +86,7 @@ def pull_sites(base_urls, names, system_os, regex_rules = {}, output_folder = '.
     
     redirects_path = join(output_folder,'redirects.txt')
     def writer(): 
+        makedirs(output_folder, exist_ok=True)
         with open(redirects_path,'w') as f: json.dump(redirects,f)
     
     write_file(writer)

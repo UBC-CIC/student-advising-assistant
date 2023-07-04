@@ -7,6 +7,7 @@ from os.path import join
 import copy 
 import regex as re
 from typing import List
+from os import makedirs
 
 """
 Processing functions specific to the data sources:
@@ -423,7 +424,7 @@ def blog_extract_metadata(url: str, titles: List[str], parent_titles: List[str],
 calendar_is_new_format = True
 calendar_config = DumpConfig()
 calendar_config.base_url = 'https://vancouver.calendar.ubc.ca/'
-calendar_config.dump_path = BASE_DUMP_PATH + '\\vancouver.calendar.ubc.ca\\'
+calendar_config.dump_path = join(BASE_DUMP_PATH, 'vancouver.calendar.ubc.ca') # os.path.join() will automatically create the correct path for any OS
 calendar_config.remove_tag_attrs = generic_remove_tags + [{'id': 'block-shareblock'}] if calendar_is_new_format else [{'id': 'shadedBox'},{'id': 'breadcrumbsWrapper'}]
 calendar_config.replacements = [({'name': 'table'}, convert_table)]
 calendar_config.main_content_attrs = {'id': 'primary-content' if calendar_is_new_format else 'unit-content'}
@@ -433,7 +434,7 @@ calendar_config.parent_context_extractor = parent_context_extractor
 
 sc_students_config = DumpConfig()
 sc_students_config.base_url = 'https://science.ubc.ca/students/'
-sc_students_config.dump_path = BASE_DUMP_PATH + '\\science.ubc.ca\\students\\'
+sc_students_config.dump_path = join(BASE_DUMP_PATH, "science.ubc.ca", "students")
 sc_students_config.remove_tag_attrs = generic_remove_tags + [{'class': 'customBread'},{'id': 'block-views-student-notices-block-2'},{'class':'field-name-field-student-blog-topic'},{'class':'menu'}]
 sc_students_config.replacements = [({'name': 'table'}, convert_table)]
 sc_students_config.main_content_attrs = {'id': 'content'}
@@ -446,8 +447,8 @@ sc_students_config.split_attrs = [{'name': 'h1'},{'name': 'h2'},{'function': lam
 ### MAIN FUNCTION
 
 def process_site_dumps(dump_configs: list[DumpConfig] = [calendar_config,sc_students_config], 
-                       redirect_map_path: str = BASE_DUMP_PATH + '\\redirects.txt', 
-                       out_path: str = 'processed\\'):
+                       redirect_map_path: str = join(BASE_DUMP_PATH, 'redirects.txt'), 
+                       out_path: str = 'processed/'):
     """
     Parse website dumps
     - dump_configs
@@ -467,6 +468,7 @@ def process_site_dumps(dump_configs: list[DumpConfig] = [calendar_config,sc_stud
     doc_extractor.parse_folder(dump_configs,out_path)
 
     def writer():
+        makedirs("processed", exist_ok=True)
         unhandled_tables_file = join(out_path,'unhandled_tables.txt')
         error_tables_file = join(out_path,'error_tables.txt')
         with open(unhandled_tables_file,'w') as f:
