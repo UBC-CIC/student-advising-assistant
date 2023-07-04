@@ -56,6 +56,9 @@ def pull_sites(base_urls, names, system_os, regex_rules = {}, output_folder = '.
             elif system_os in ["Darwin", "Linux"]:
                 check_call(["wget", f'--config={wget_config_path}', f'--output-file={log_file}', '--recursive', 
                             f'--directory-prefix={output_folder}', rule_arg, base_url], stderr=STDOUT)
+            else:
+                logging.error(f"OS {system_os} is not currently supported. Currently supported OS are Windows, Darwin and Linux")
+                raise OSError(f"OS {system_os} is not currently supported")
             logging.info(f'- Successfully pulled from {base_url}')
         except CalledProcessError as exc:
             if exc.returncode == 8:
@@ -78,9 +81,12 @@ def pull_sites(base_urls, names, system_os, regex_rules = {}, output_folder = '.
         if system_os == "Windows":
             subprocess.check_call([wget_exe_path, f'--config={wget_config_path}', f'--output-file={log_file}', 
                                 f'--input-file={additional_urls_file}', f'--directory-prefix={output_folder}'])
-        elif system_os == "Darwin":
+        elif system_os in ["Darwin", "Linux"]:
             subprocess.check_call(["wget", f'--config={wget_config_path}', f'--output-file={log_file}', 
                                 f'--input-file={additional_urls_file}', f'--directory-prefix={output_folder}'])
+        else:
+            logging.error(f"OS {system_os} is not currently supported. Currently supported OS are Windows, Darwin and Linux")
+            raise OSError(f"OS {system_os} is not currently supported")
         logging.info(f'- Completed pull for additional urls')
         get_redirects_from_log(log_file, redirects)
     
