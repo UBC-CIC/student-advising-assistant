@@ -353,10 +353,10 @@ class DocExtractor:
 
         try:
             tools.write_file(writer)
-            logging.info(' Wrote files "website_extracts.csv" and "website_graph.txt"')
+            log.info(' Wrote files "website_extracts.csv" and "website_graph.txt"')
         except:
-            logging.error(" Didn't save the parsed document files")
-        logging.info(' Document parsing complete')
+            log.error(" Didn't save the parsed document files")
+        log.info(' Document parsing complete')
 
     def parse_page(self, html: str, parent_idx: int, url: str, dump_config: DumpConfig) -> Tuple[int,list[dict]]:
         """
