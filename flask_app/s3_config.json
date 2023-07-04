@@ -1,0 +1,8 @@
+{
+    "bucket-name": "sagemaker-document-embeddings",
+    "directories": {
+        "embeddings": "embeddings",
+        "documents": "documents",
+        "indexes": "indexes"
+    }
+}

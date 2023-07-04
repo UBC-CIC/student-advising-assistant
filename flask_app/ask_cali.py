@@ -6,10 +6,11 @@ Simple flask app to demo model inference
 from flask import Flask, request, render_template
 import json
 from langchain_inference import run_chain
+import os 
 
 app = Flask(__name__)
 faculties = {}
-BASE_FILEPATH = './'
+FACULTIES_PATH = os.path.join('data','documents','faculties.txt')
 
 @app.route('/', methods=['GET'])
 def home():
@@ -43,7 +44,7 @@ async def answer():
 def setup():
     # Upon loading, load the available settings for the form
     global faculties
-    with open(BASE_FILEPATH + 'data/faculties.txt','r') as f:
+    with open(FACULTIES_PATH) as f:
         faculties = json.load(f)
 
 setup()
