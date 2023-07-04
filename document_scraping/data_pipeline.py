@@ -1,5 +1,7 @@
 import subprocess
+import platform
 from os.path import join
+from os import makedirs
 import os
 import sys
 import regex as re
@@ -17,7 +19,7 @@ downstream tasks.
 logging.getLogger().setLevel(logging.DEBUG)
 redirect_log_re = re.compile('http[^\n]*(\n[^\n]*){2}301 Moved Permanently\nLocation:\s[^\n\s]*')
 
-def pull_sites(base_urls, names, regex_rules = {}, output_folder = './', additional_urls_file = None, wget_exe_path = './wget.exe', wget_config_path = './wget_config.txt'):
+def pull_sites(base_urls, names, system_os, regex_rules = {}, output_folder = './', additional_urls_file = None, wget_exe_path = './wget.exe', wget_config_path = './wget_config.txt'):
     """
     Uses wget to pull the indicated websites, and processes
     the files into one combined csv of documents for use in the UBC Science 
@@ -31,6 +33,8 @@ def pull_sites(base_urls, names, regex_rules = {}, output_folder = './', additio
     - wget_exe_path: path to the wget.exe file
     - wget_config_path: path to the wget config file (aka .wgetrc)
     """
+    # create the output dir if not exists, otherwise do nothing
+    makedirs(output_folder, exist_ok=True)
     redirects = {}
     total_num = 0
     for base_url, name in zip(base_urls,names):
@@ -46,8 +50,15 @@ def pull_sites(base_urls, names, regex_rules = {}, output_folder = './', additio
             logging.info(f'- Beginning pull from {base_url}, making call to wget')
             logging.info(f'    - ** This may take a long time')
             logging.info(f'    - Check the log file {log_file} for updates')
-            check_call([wget_exe_path, f'--config={wget_config_path}', f'--output-file={log_file}', '--recursive', 
-                        f'--directory-prefix={output_folder}', rule_arg, base_url], stderr=STDOUT)
+            if system_os == "Windows":
+                check_call([wget_exe_path, f'--config={wget_config_path}', f'--output-file={log_file}', '--recursive', 
+                            f'--directory-prefix={output_folder}', rule_arg, base_url], stderr=STDOUT)
+            elif system_os in ["Darwin", "Linux"]:
+                check_call(["wget", f'--config={wget_config_path}', f'--output-file={log_file}', '--recursive', 
+                            f'--directory-prefix={output_folder}', rule_arg, base_url], stderr=STDOUT)
+            else:
+                logging.error(f"OS {system_os} is not currently supported. Currently supported OS are Windows, Darwin and Linux")
+                raise OSError(f"OS {system_os} is not currently supported")
             logging.info(f'- Successfully pulled from {base_url}')
         except CalledProcessError as exc:
             if exc.returncode == 8:
@@ -67,13 +78,21 @@ def pull_sites(base_urls, names, regex_rules = {}, output_folder = './', additio
         logging.info('Additional urls')
         log_file = f'wget_log_additional.txt'
         logging.info(f'- Beginning pull for additional urls listed in {additional_urls_file}, making call to wget')
-        subprocess.check_call([wget_exe_path, f'--config={wget_config_path}', f'--output-file={log_file}', 
-                               f'--input-file={additional_urls_file}', f'--directory-prefix={output_folder}'])
+        if system_os == "Windows":
+            subprocess.check_call([wget_exe_path, f'--config={wget_config_path}', f'--output-file={log_file}', 
+                                f'--input-file={additional_urls_file}', f'--directory-prefix={output_folder}'])
+        elif system_os in ["Darwin", "Linux"]:
+            subprocess.check_call(["wget", f'--config={wget_config_path}', f'--output-file={log_file}', 
+                                f'--input-file={additional_urls_file}', f'--directory-prefix={output_folder}'])
+        else:
+            logging.error(f"OS {system_os} is not currently supported. Currently supported OS are Windows, Darwin and Linux")
+            raise OSError(f"OS {system_os} is not currently supported")
         logging.info(f'- Completed pull for additional urls')
         get_redirects_from_log(log_file, redirects)
     
     redirects_path = join(output_folder,'redirects.txt')
     def writer(): 
+        makedirs(output_folder, exist_ok=True)
         with open(redirects_path,'w') as f: json.dump(redirects,f)
     
     write_file(writer)
@@ -125,7 +144,11 @@ def get_redirects_from_log(log_file, redirects):
 def main():
     logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
-    wget_exe_path = 'wget.exe'
+    # check the system OS since Windows Machine requires a wget.exe
+    # darwin (OS X) and Linux probably not
+    system_os = platform.system()
+    logging.info(f"System OS: {system_os}")
+    wget_exe_path = "wget.exe"
     wget_config_path = 'wget_config.txt'
 
     urls = [
@@ -140,7 +163,7 @@ def main():
         'science_students': '.*science.ubc.ca/students.*'
     }
 
-    pull_sites(urls,names,regex_rules,output_folder = BASE_DUMP_PATH, wget_exe_path=wget_exe_path, wget_config_path=wget_config_path)
+    pull_sites(urls,names,system_os,regex_rules,output_folder = BASE_DUMP_PATH, wget_exe_path=wget_exe_path, wget_config_path=wget_config_path)
     process_site_dumps()
 
 if __name__ == '__main__':

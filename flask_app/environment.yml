@@ -2,10 +2,13 @@ name: flaskenv
 channels:
   - defaults
 dependencies:
-  - flask
-  - langchain
-  - faiss-cpu
-  - sentence-transformers
-  - networkx
-  - python-dotenv
-prefix: C:\Users\astevins\AppData\Local\miniconda3\envs\flaskenv
+  - pip 
+  - pip:
+    - pandas
+    - flask
+    - langchain
+    - faiss-cpu
+    - sentence-transformers
+    - networkx
+    - python-dotenv
+    - flask[async]

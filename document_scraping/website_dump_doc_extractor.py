@@ -1,4 +1,4 @@
-from os import listdir, sep
+from os import listdir, sep, makedirs
 import os.path
 from urllib.parse import urljoin
 from enum import IntEnum
@@ -347,6 +347,7 @@ class DocExtractor:
 
         log.info('Writing files')
         def writer():
+            makedirs(out_path, exist_ok=True)
             df.to_csv(os.path.join(out_path,"website_extracts.csv"),encoding=self.encoding)    # save pages to csv
             nx.write_multiline_adjlist(self.graph,os.path.join(out_path,"website_graph.txt"))    # save page graph to file
 
