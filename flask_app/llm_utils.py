@@ -3,32 +3,13 @@
 Utility functions for loading LLMs and associated prompts
 """
 
-from langchain import HuggingFaceHub, SagemakerEndpoint, PromptTemplate, Prompt
+from langchain import HuggingFaceHub, SagemakerEndpoint, Prompt
 from langchain.llms import BaseLLM
 from langchain.llms.sagemaker_endpoint import LLMContentHandler
-from huggingface_qa import HuggingFaceQAEndpoint, query_context_split
-from langchain.prompts.few_shot import FewShotPromptTemplate
-from prompts.degree_requirements import few_shot_examples
+from huggingface_qa import HuggingFaceQAEndpoint
 import json
 from typing import Tuple, Dict
-
-### PROMPTS AND PROMPT TEMPLATES 
-default_template = "Context: {doc}\n\nQuestion: {query} If you don't know the answer, just say 'I don't know'. \n\nAnswer:"
-
-falcon_template = """
-    Answer the question based on the context below. Keep the answer short and concise. Respond "Unsure about answer" if not sure about the answer.
-    Context:{doc}\n
-    Question:{query}\n
-    Answer:""".strip()
-
-few_shot_example_prompt = PromptTemplate(input_variables=["doc", "query", "answer"], template="Evidence:{doc}\nQuestion:{query}\nAnswer:{answer}")
-
-few_shot_prompt = FewShotPromptTemplate(
-    examples=few_shot_examples, 
-    example_prompt=few_shot_example_prompt, 
-    suffix="Evidence:{doc}\nQuestion:{query}\nAnswer:", 
-    input_variables=["doc","query"]
-)
+import prompts.prompts as prompts
 
 ### HELPER CLASSES
 class ContentHandler(LLMContentHandler):
@@ -49,31 +30,27 @@ class ContentHandler(LLMContentHandler):
         return response_json[0]["generated_text"]
     
 ### LLM INPUT FUNCTIONS
-def llm_context_str(context: str | Dict):
+def llm_program_str(program_info: Dict):
     """
-    Generate a text string from a context dict, for 
+    Generate a text string from a dict of program info, for 
     input to an LLM
     """
     context_str = ''
-    if type(context) == dict:
-        context_str = ''
-        if 'faculty' in context:
-            context_str += f"I am in {context['faculty']}"
-        if 'program' in context:
-            context_str += f", {context['program']}"
-        if 'specialization' in context:
-            context_str += f", {context['specialization']}"
-        if 'year' in context:
-            context_str += f"in {context['year']}"
-    else:
-        context_str = context
-    return context_str
+    if 'faculty' in program_info:
+        context_str += f"I am in {program_info['faculty']}"
+    if 'program' in program_info:
+        context_str += f", {program_info['program']}"
+    if 'specialization' in program_info:
+        context_str += f", {program_info['specialization']}"
+    if 'year' in program_info:
+        context_str += f"in {program_info['year']}"
+    return context_str if context_str is '' else context_str + '.'
 
-def llm_combined_query(context,query):
+def llm_query(program_info: Dict, topic: str, query: str):
     """
     Combine a context string with a query for use as input to LLM
     """
-    return f"{llm_context_str(context)}. {query}"
+    return prompts.llm_query_prompt.format(program_info=llm_program_str(program_info), topic=topic, query=query)
 
 ### MODEL LOADING FUNCTIONS
 def load_sagemaker_endpoint(endpoint_name) -> Tuple[BaseLLM,Prompt]:
@@ -88,17 +65,15 @@ def load_sagemaker_endpoint(endpoint_name) -> Tuple[BaseLLM,Prompt]:
             model_kwargs={"temperature": 0.8, "max_new_tokens":200},
             content_handler=content_handler,
         )
-    prompt = PromptTemplate(template=default_template, input_variables=["doc","query"])
-    return llm,prompt
+    return llm, prompts.default_qa_prompt
 
 def load_huggingface_endpoint(name: str) -> Tuple[BaseLLM,Prompt]:
     """
     Loads the LLM and prompt for a huggingface text generation inference endpoint
     Requires that the HUGGINGFACEHUB_API_TOKEN environment variable is set
     """
-    llm = HuggingFaceHub(repo_id=name, model_kwargs={"temperature":0.1, "max_new_tokens":200})
-    prompt = PromptTemplate(template=default_template, input_variables=["doc","query"])
-    return llm,prompt
+    llm = HuggingFaceHub(repo_id=name, model_kwargs={"temperature":0.01, "max_new_tokens":200})
+    return llm, prompts.default_qa_prompt
 
 def load_huggingface_qa_endpoint(name: str) -> Tuple[BaseLLM,Prompt]:
     """
@@ -106,6 +81,4 @@ def load_huggingface_qa_endpoint(name: str) -> Tuple[BaseLLM,Prompt]:
     eg. name = deepset/deberta-v3-large-squad2
     """
     llm = HuggingFaceQAEndpoint(repo_id=name)
-    template = "{query}" + query_context_split + "{doc}"
-    prompt = PromptTemplate(template=template, input_variables=["doc","query"])
-    return llm,prompt
+    return llm, prompts.huggingface_qa_prompt
