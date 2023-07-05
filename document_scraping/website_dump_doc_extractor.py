@@ -532,7 +532,7 @@ class DocExtractor:
                     current_title = current_title_idx
                     current_title_idx += 1
                 else:
-                    current_title = soup_current.text.strip()
+                    current_title = soup_current.text.strip().replace('\n','')
                 extract_links = {}
                 current_anchor_link = next_anchor_link
                 next_anchor_link = None
