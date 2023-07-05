@@ -539,6 +539,9 @@ class DocExtractor:
                 elif soup_current.has_attr('id'):
                     # Link is anchor link
                     next_anchor_link = soup_current['id']
+                elif soup_current.has_attr('name'):
+                    # Link is anchor link
+                    next_anchor_link = soup_current['name']
             if hasattr(soup_current,'contents') and len(soup_current.contents) > 0:
                 # Move to child element
                 child = soup_current.contents[0]
