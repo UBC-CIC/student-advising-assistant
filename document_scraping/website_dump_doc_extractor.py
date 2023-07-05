@@ -620,8 +620,8 @@ class DocExtractor:
                     extract['links'] = {}
                 
             if extract['anchor_link'] is not None:
-                url = re.sub(r'#\d+\Z','',url)
-                url = f'{url}#{extract["anchor_link"]}'
+                url = re.sub(r'#.+\Z','',url) # remove existing anchor
+                url = f'{url}#{extract["anchor_link"]}' # add new anchor
 
             extract_titles = [*titles,extract["title"]]
             text = self.html_to_text(extract['html'])
