@@ -521,21 +521,25 @@ class DocExtractor:
         current_anchor_link = None
         next_anchor_link = None
         while soup_current and extract_current:
-            if hasattr(soup_current,'id') and soup_current.has_attr('id'):
-                # Use an attribute with an id as an anchor for the next extract
-                next_anchor_link = soup_current['id']
-                
             if soup_current in matching_tags and not(dump_config.ignore_empty_split_tags and soup_current.text.strip() == ''):
                 self.add_extract(extracts, extract, current_title, current_anchor_link, extract_links, split_tag_index, dump_config)
                 (extract,extract_current) = parent_skeleton(extract_current)
+                
                 if split_tag_index in dump_config.no_title_splits:
+                    # Don't take the title from this tag as specified by the dump config
                     current_title = current_title_idx
                     current_title_idx += 1
                 else:
                     current_title = soup_current.text.strip().replace('\n','')
+                    
                 extract_links = {}
                 current_anchor_link = next_anchor_link
                 next_anchor_link = None
+                
+                # Remove the title text from the soup
+                for content in soup_current.contents:
+                    content.extract()
+                    
             if soup_current.name == 'a':
                 if soup_current.has_attr('href'):
                     # Add link to extract links
