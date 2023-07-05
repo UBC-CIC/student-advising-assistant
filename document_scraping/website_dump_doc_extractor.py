@@ -353,10 +353,10 @@ class DocExtractor:
 
         try:
             tools.write_file(writer)
-            logging.info(' Wrote files "website_extracts.csv" and "website_graph.txt"')
+            log.info(' Wrote files "website_extracts.csv" and "website_graph.txt"')
         except:
-            logging.error(" Didn't save the parsed document files")
-        logging.info(' Document parsing complete')
+            log.error(" Didn't save the parsed document files")
+        log.info(' Document parsing complete')
 
     def parse_page(self, html: str, parent_idx: int, url: str, dump_config: DumpConfig) -> Tuple[int,list[dict]]:
         """
@@ -539,6 +539,9 @@ class DocExtractor:
                 elif soup_current.has_attr('id'):
                     # Link is anchor link
                     next_anchor_link = soup_current['id']
+                elif soup_current.has_attr('name'):
+                    # Link is anchor link
+                    next_anchor_link = soup_current['name']
             if hasattr(soup_current,'contents') and len(soup_current.contents) > 0:
                 # Move to child element
                 child = soup_current.contents[0]
@@ -617,8 +620,8 @@ class DocExtractor:
                     extract['links'] = {}
                 
             if extract['anchor_link'] is not None:
-                url = re.sub(r'#\d+\Z','',url)
-                url = f'{url}#{extract["anchor_link"]}'
+                url = re.sub(r'#.+\Z','',url) # remove existing anchor
+                url = f'{url}#{extract["anchor_link"]}' # add new anchor
 
             extract_titles = [*titles,extract["title"]]
             text = self.html_to_text(extract['html'])
