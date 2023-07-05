@@ -87,10 +87,11 @@ class DocRelation(IntEnum):
     """
     Represents the possible relationships between documents
     """
-    PARENT = 1
-    LINK = 2
-    SIBLING_EXTRACT = 3
-    SIBLING_SPLIT_EXTRACT = 4
+    PARENT_PAGE = 1
+    PARENT_EXTRACT = 2
+    LINK = 3
+    SIBLING_EXTRACT = 4
+    SIBLING_SPLIT_EXTRACT = 5
 
 class DumpConfig:
     """
@@ -375,7 +376,7 @@ class DocExtractor:
         soup = self.preprocess(soup, url, dump_config)
         extracts = self.split_page_by_tag(soup, 0, dump_config)
 
-        docs = self.handle_extracts(extracts, url, parent_idx, [], parent_titles, '', dump_config)
+        docs = self.handle_extracts(extracts, url, parent_idx, [], parent_titles, '', dump_config, root_level = True)
         base_idx = docs[0]['doc_id']
         return (base_idx,docs)
     
@@ -598,7 +599,7 @@ class DocExtractor:
             'children': children if len(children) > 1 else []})
         
     def handle_extracts(self, extracts: list[dict], url: str, parent_idx: int, titles: list[str], 
-                        parent_titles: list[str], parent_context: str, dump_config: DumpConfig) -> list[dict]:
+                        parent_titles: list[str], parent_context: str, dump_config: DumpConfig, root_level = False) -> list[dict]:
         """
         Convert the page extracts to document dicts, add documents to the DocIndex, and add parent
         relations to the graph. Further splits the plain text of documents if they are too long.
@@ -609,6 +610,7 @@ class DocExtractor:
         - parent_titles: titles of parent pages in the original site structure
         - parent_context: context from the parent extract to include with this extract
         - dump_config: DumpConfig for the current site dump
+        - root_level: True if the given list of extracts is at the root level of a website (top of the split hierarchy)
         """
         docs = []
         previous_sib_id = None
@@ -644,8 +646,13 @@ class DocExtractor:
                     links = {title:href for (title,href) in extract['links'].items() if title in text}
 
                 idx = self.doc_index.add_doc(extract_titles,url,parent_titles=parent_titles)
-                if not first_page_idx: first_page_idx = idx
-                add_page_relation(self.graph, parent_idx, idx, DocRelation.PARENT) # add edge from parent page to this page
+                if not first_page_idx: first_page_idx = idx # keep the index of the first page in the split texts
+                
+                if root_level:
+                    add_page_relation(self.graph, parent_idx, idx, DocRelation.PARENT_PAGE) # add edge from parent page to this page
+                else:
+                    add_page_relation(self.graph, parent_idx, idx, DocRelation.PARENT_EXTRACT) # add edge from parent extract to this page
+                    
                 if previous_sib_id:
                     # add edge from previous sibling to this page
                     relation = DocRelation.SIBLING_SPLIT_EXTRACT if split_idx > 0 else DocRelation.SIBLING_EXTRACT
