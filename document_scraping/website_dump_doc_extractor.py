@@ -521,6 +521,10 @@ class DocExtractor:
         current_anchor_link = None
         next_anchor_link = None
         while soup_current and extract_current:
+            if soup_current.has_attr('id'):
+                # Use an attribute with an id as an anchor for the next extract
+                next_anchor_link = soup_current['id']
+                
             if soup_current in matching_tags and not(dump_config.ignore_empty_split_tags and soup_current.text.strip() == ''):
                 self.add_extract(extracts, extract, current_title, current_anchor_link, extract_links, split_tag_index, dump_config)
                 (extract,extract_current) = parent_skeleton(extract_current)
