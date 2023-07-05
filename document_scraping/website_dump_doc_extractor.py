@@ -521,7 +521,7 @@ class DocExtractor:
         current_anchor_link = None
         next_anchor_link = None
         while soup_current and extract_current:
-            if soup_current.has_attr('id'):
+            if hasattr(soup_current,'id') and soup_current.has_attr('id'):
                 # Use an attribute with an id as an anchor for the next extract
                 next_anchor_link = soup_current['id']
                 
@@ -636,12 +636,10 @@ class DocExtractor:
             split_texts = self.split_extract_by_sentence(text) if len(text) > self.max_len else [text]
             for split_idx, text in enumerate(split_texts):
                 links = extract['links']
-                split_titles = extract_titles
                 if len(split_texts) > 1:
                     links = {title:href for (title,href) in extract['links'].items() if title in text}
-                    split_titles = [*split_titles,str(split_idx+1)]
 
-                idx = self.doc_index.add_doc(split_titles,url,parent_titles=parent_titles)
+                idx = self.doc_index.add_doc(extract_titles,url,parent_titles=parent_titles)
                 if not first_page_idx: first_page_idx = idx
                 add_page_relation(self.graph, parent_idx, idx, DocRelation.PARENT) # add edge from parent page to this page
                 if previous_sib_id:
@@ -653,12 +651,13 @@ class DocExtractor:
                     'doc_id': idx, 
                     'url': url, 
                     'parent': parent_idx, 
-                    'titles': split_titles, 
+                    'titles': extract_titles, 
                     'text': text, 
                     'links': links,
                     'parent_titles': parent_titles,
                     'context': parent_context,
-                    **dump_config.metadata_extractor(url,split_titles,parent_titles,text)})
+                    'split_idx': split_idx,
+                    **dump_config.metadata_extractor(url,extract_titles,parent_titles,text)})
                 previous_sib_id = idx
 
             parent_context = ''
