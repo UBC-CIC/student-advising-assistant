@@ -80,6 +80,7 @@ DEFAULT_MAX_LEN = 1000
 DEFAULT_ENCODING = 'utf-8-sig'
 DEFAULT_WINDOW_OVERLAP = 200
 DEFAULT_LINK_IGNORE_REGEX = r'mailto:.*'
+DEFAULT_ALLOW_LINK_SPLITS = False
 
 ### CLASS DEFINITIONS
 
@@ -136,12 +137,17 @@ class DumpConfig:
     # Indexes of split attrs where the text of the tag should not be used as a new title
     # An integer index will be used instead
     no_title_splits: list[int]
+    # If true, allows splitting on a tag that contains a link tag
+    # Otherwise, doesn't split on tags containing a link
+    # Setting this to false could be useful for, eg., a newsfeed page or blog that links to articles
+    allow_link_splits: bool
     
     def __init__(self):
         self.split_attrs = DEFAULT_SPLIT_ATTRS
         self.ignore_empty_split_tags = DEFAULT_IGNORE_EMPTY_SPLIT_TAGS
         self.mandatory_splits = DEFAULT_MANDATORY_SPLITS
         self.no_title_splits = DEFAULT_NO_TITLE_SPLITS
+        self.allow_link_splits = DEFAULT_ALLOW_LINK_SPLITS
 
 class DocIndex:
     """
@@ -522,7 +528,7 @@ class DocExtractor:
         current_anchor_link = None
         next_anchor_link = None
         while soup_current and extract_current:
-            if soup_current in matching_tags and not(dump_config.ignore_empty_split_tags and soup_current.text.strip() == ''):
+            if soup_current in matching_tags and self.should_split_on_tag(soup_current, dump_config):
                 self.add_extract(extracts, extract, current_title, current_anchor_link, extract_links, split_tag_index, dump_config)
                 (extract,extract_current) = parent_skeleton(extract_current)
                 
@@ -584,6 +590,21 @@ class DocExtractor:
         self.add_extract(extracts, extract, current_title, current_anchor_link, extract_links, split_tag_index, dump_config)
         return extracts
 
+    def should_split_on_tag(self, tag: BeautifulSoup, dump_config: DumpConfig):
+        """
+        For a tag that matched the split attributes, check if the tag should be used as a split
+        tag depending on the dump configuration
+        """
+        if dump_config.ignore_empty_split_tags and tag.text.strip() == '':
+            # The tag text is empty and the configuration is set to not split on empty tags
+            return False
+        elif not dump_config.allow_link_splits and (link_tag := tag.find('a')): 
+            if link_tag.text.strip() == tag.text.strip():
+                # All text in the tag is part of a link, and the configuration is set to not
+                # split on tags that are links
+                return False
+        return True
+        
     def add_extract(self, extracts: list[dict], extract: BeautifulSoup, title: str, anchor_link: str, 
                     extract_links: dict, split_tag_index: int, dump_config: DumpConfig) -> None:
         """

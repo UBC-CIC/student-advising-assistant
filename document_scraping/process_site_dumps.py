@@ -451,6 +451,7 @@ sc_students_config.split_attrs = [{'name': 'h1'},{'name': 'h2'},{'function': lam
 # ^ For the third split attributes, treats h3 and split class as the same level due to the structure of https://science.ubc.ca/students/degree/apply/req
 sc_students_config.mandatory_splits = 2
 
+
 ### MAIN FUNCTION
 
 def process_site_dumps(dump_configs: list[DumpConfig] = [calendar_config,sc_students_config], 
