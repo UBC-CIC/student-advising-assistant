@@ -56,12 +56,12 @@ def load_retrievers():
         retrievers[name] = retriever
         query_converters[name] = lambda context, query: retriever_combined_query([context + ':' + query, context + ':' + query, context + ':' + query])
 
-def docs_from_ids(doc_ids: List[int], retriever: VectorStoreRetriever = None):
+def docs_from_ids(doc_ids: List[int], retriever_name: str):
     """
     Return a list of documents from a list of document indexes
     """
     docs = []
-    if not retriever: retriever = retrievers['All']
+    retriever = retrievers[retriever_name]
     for doc_id in doc_ids:
         id = retriever.vectorstore.index_to_docstore_id[doc_id]
         docs.append(retriever.vectorstore.docstore.search(id))

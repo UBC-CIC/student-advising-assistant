@@ -76,34 +76,22 @@ def get_related_links_from_sim(context, query, docs, score_threshold = 0.5):
         links = [(title,link,doc_id) for (title,(link,doc_id)),score in zip(doc.metadata['links'].items(),scores_span) if score >= score_threshold]
         doc.metadata['related_links'] = links
 
-def get_related_docs(context, query, docs, child_docs = False, sib_docs = False, score_threshold = 0.5) -> List[Document]:
-    """
-    Searches through documents related to the given documents:
-    - Gets immediate children and/or siblings
-    - Computes similarity between the query and the related document's title
-    - Returns documents with similarity over the threshold
-    """
-    candidate_doc_ids = set()
+def get_doc_children(docs: List[Document], retriever_name: str) -> List[Document]:
+    
+    # Finding child doc ids
     doc_ids = [doc.metadata['doc_id'] for doc in docs]
-
-    # Finding related doc ids
+    child_doc_ids = []
+    
     for doc_id in doc_ids:
-        if child_docs: candidate_doc_ids.update(doc_graph_utils.get_doc_child_ids(graph, doc_id))
-        if sib_docs: candidate_doc_ids.update(doc_graph_utils.get_doc_sib_ids(graph, doc_id))
+        child_doc_ids.extend(doc_graph_utils.get_doc_child_extract_ids(graph, doc_id))
 
-    if len(candidate_doc_ids) == 0:
+    if len(child_doc_ids) == 0:
         return []
     
     # Fetching related docs
-    candidate_docs = retrievers.docs_from_ids(candidate_doc_ids)
-
-    # Score the query against the doc titles
-    scores = comparator.compare_query_to_texts(query,[' : '.join(doc.metadata['titles']) for doc in candidate_docs])[0]
-
-    related_docs = [doc for (score,doc) in sorted(zip(scores,candidate_docs), key=lambda x: x[0]) 
-                      if score >= score_threshold and doc.metadata['doc_id'] not in doc_ids]
-
-    return related_docs
+    child_docs = retrievers.docs_from_ids(child_doc_ids, retriever_name)
+    
+    return child_docs
 
 def combine_sib_docs(docs) -> List[Document]:
     """
@@ -158,8 +146,8 @@ def choose_retrievers(program_info: Dict):
     else:
         return ['all-triple']
     
-async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=None, related:bool=False,
-                    combine_with_sibs:bool=False, do_filter:bool=True, compress:bool=True, generate:bool=True):
+async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=None, children:bool=True,
+                    combine_with_sibs:bool=False, do_filter:bool=True, compress:bool=False, generate:bool=False):
 
     """
     Run the question answering chain with the given context and query
@@ -167,7 +155,7 @@ async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=Non
     - topic: Topic of the question
     - query: The text query
     - start_doc: If provided, will start searching with the provided document index rather than performing similarity search
-    - related: If true, fetches related documents with high enough cosine similarity
+    - children: If true, fetches child extracts of all retrieved documents
     - combine_with_sibs: If true, combines all documents with their immediate sibling documents
     - filter: If true, applies a LLM filter step to the retrieved documents to remove irrelevant documents
     - compress: If true, applies a LLM compres step to compress documents, extracting relevant sections
@@ -189,9 +177,8 @@ async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=Non
 
     docs_for_llms(docs)
     
-    if related: 
-        related_docs = get_related_docs(topic, query, docs, score_threshold=0.3, child_docs=True)
-        docs += related_docs
+    if children: 
+        docs += get_doc_children(docs, 'all-triple')
 
     if combine_with_sibs: combine_sib_docs(docs)
 
