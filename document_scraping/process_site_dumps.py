@@ -374,6 +374,7 @@ def get_row_cells(row: BeautifulSoup) -> list[BeautifulSoup]:
 BASE_DUMP_PATH = 'site_dumps'
 
 generic_remove_tags = [
+    {'name': 'form'},                   # ignore forms
     {'class': 'sr-only'},               # screenreader only tags
     {'class': 'hidden'},                # hidden tags
     {'name': 'a', 'href': '#top'}       # 'go to top' links
@@ -435,7 +436,13 @@ calendar_config.parent_context_extractor = parent_context_extractor
 sc_students_config = DumpConfig()
 sc_students_config.base_url = 'https://science.ubc.ca/students/'
 sc_students_config.dump_path = join(BASE_DUMP_PATH, "science.ubc.ca", "students")
-sc_students_config.remove_tag_attrs = generic_remove_tags + [{'class': 'customBread'},{'id': 'block-views-student-notices-block-2'},{'class':'field-name-field-student-blog-topic'},{'class':'menu'}]
+sc_students_config.remove_tag_attrs = generic_remove_tags + [{'class': 'customBread'}, # breadcrumb
+                                                             {'id': 'block-views-student-notices-block-2'},
+                                                             {'class':'field-name-field-student-blog-topic'},
+                                                             {'class':'menu'},
+                                                             {'class':'pager'}, # page control
+                                                             {'class': 'nav'},   # nav menus
+                                                             ]
 sc_students_config.replacements = [({'name': 'table'}, convert_table)]
 sc_students_config.main_content_attrs = {'id': 'content'}
 sc_students_config.title_attrs = {'name': 'h1'}
@@ -443,6 +450,8 @@ sc_students_config.metadata_extractor = blog_extract_metadata
 sc_students_config.parent_context_extractor = None
 sc_students_config.split_attrs = [{'name': 'h1'},{'name': 'h2'},{'function': lambda x: (x.name == 'h3' or DEFAULT_SPLIT_CLASS in x.get_attribute_list('class'))},{'name': 'h4'}]
 # ^ For the third split attributes, treats h3 and split class as the same level due to the structure of https://science.ubc.ca/students/degree/apply/req
+sc_students_config.mandatory_splits = 2
+
 
 ### MAIN FUNCTION
 
