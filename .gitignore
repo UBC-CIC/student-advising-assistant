@@ -4,3 +4,4 @@
 */test.py
 *.wget-hsts
 /flask_app/data/*
+**.DS_Store

@@ -72,9 +72,15 @@ export class VpcStack extends Stack {
       subnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
     });
 
-    // Add Cloudwatch endpoint to VPC
+    // Add ECR endpoint to VPC
     this.vpc.addInterfaceEndpoint("ECR Endpoint", {
       service: ec2.InterfaceVpcEndpointAwsService.ECR,
+      subnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
+    });
+
+    // Add ECR Docker endpoint to VPC
+    this.vpc.addInterfaceEndpoint("ECR Docker Endpoint", {
+      service: ec2.InterfaceVpcEndpointAwsService.ECR_DOCKER,
       subnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
     });
 
