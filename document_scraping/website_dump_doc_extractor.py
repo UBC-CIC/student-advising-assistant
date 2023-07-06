@@ -80,6 +80,7 @@ DEFAULT_MAX_LEN = 1000
 DEFAULT_ENCODING = 'utf-8-sig'
 DEFAULT_WINDOW_OVERLAP = 200
 DEFAULT_LINK_IGNORE_REGEX = r'mailto:.*'
+DEFAULT_ALLOW_LINK_SPLITS = False
 
 ### CLASS DEFINITIONS
 
@@ -87,10 +88,11 @@ class DocRelation(IntEnum):
     """
     Represents the possible relationships between documents
     """
-    PARENT = 1
-    LINK = 2
-    SIBLING_EXTRACT = 3
-    SIBLING_SPLIT_EXTRACT = 4
+    PARENT_PAGE = 1
+    PARENT_EXTRACT = 2
+    LINK = 3
+    SIBLING_EXTRACT = 4
+    SIBLING_SPLIT_EXTRACT = 5
 
 class DumpConfig:
     """
@@ -135,12 +137,17 @@ class DumpConfig:
     # Indexes of split attrs where the text of the tag should not be used as a new title
     # An integer index will be used instead
     no_title_splits: list[int]
+    # If true, allows splitting on a tag that contains a link tag
+    # Otherwise, doesn't split on tags containing a link
+    # Setting this to false could be useful for, eg., a newsfeed page or blog that links to articles
+    allow_link_splits: bool
     
     def __init__(self):
         self.split_attrs = DEFAULT_SPLIT_ATTRS
         self.ignore_empty_split_tags = DEFAULT_IGNORE_EMPTY_SPLIT_TAGS
         self.mandatory_splits = DEFAULT_MANDATORY_SPLITS
         self.no_title_splits = DEFAULT_NO_TITLE_SPLITS
+        self.allow_link_splits = DEFAULT_ALLOW_LINK_SPLITS
 
 class DocIndex:
     """
@@ -353,10 +360,10 @@ class DocExtractor:
 
         try:
             tools.write_file(writer)
-            logging.info(' Wrote files "website_extracts.csv" and "website_graph.txt"')
+            log.info(' Wrote files "website_extracts.csv" and "website_graph.txt"')
         except:
-            logging.error(" Didn't save the parsed document files")
-        logging.info(' Document parsing complete')
+            log.error(" Didn't save the parsed document files")
+        log.info(' Document parsing complete')
 
     def parse_page(self, html: str, parent_idx: int, url: str, dump_config: DumpConfig) -> Tuple[int,list[dict]]:
         """
@@ -375,7 +382,7 @@ class DocExtractor:
         soup = self.preprocess(soup, url, dump_config)
         extracts = self.split_page_by_tag(soup, 0, dump_config)
 
-        docs = self.handle_extracts(extracts, url, parent_idx, [], parent_titles, '', dump_config)
+        docs = self.handle_extracts(extracts, url, parent_idx, [], parent_titles, '', dump_config, root_level = True)
         base_idx = docs[0]['doc_id']
         return (base_idx,docs)
     
@@ -521,17 +528,25 @@ class DocExtractor:
         current_anchor_link = None
         next_anchor_link = None
         while soup_current and extract_current:
-            if soup_current in matching_tags and not(dump_config.ignore_empty_split_tags and soup_current.text.strip() == ''):
+            if soup_current in matching_tags and self.should_split_on_tag(soup_current, dump_config):
                 self.add_extract(extracts, extract, current_title, current_anchor_link, extract_links, split_tag_index, dump_config)
                 (extract,extract_current) = parent_skeleton(extract_current)
+                
                 if split_tag_index in dump_config.no_title_splits:
+                    # Don't take the title from this tag as specified by the dump config
                     current_title = current_title_idx
                     current_title_idx += 1
                 else:
-                    current_title = soup_current.text.strip()
+                    current_title = soup_current.text.strip().replace('\n','')
+                    
                 extract_links = {}
                 current_anchor_link = next_anchor_link
                 next_anchor_link = None
+                
+                # Remove the title text from the soup
+                for content in soup_current.contents:
+                    content.extract()
+                    
             if soup_current.name == 'a':
                 if soup_current.has_attr('href'):
                     # Add link to extract links
@@ -539,6 +554,9 @@ class DocExtractor:
                 elif soup_current.has_attr('id'):
                     # Link is anchor link
                     next_anchor_link = soup_current['id']
+                elif soup_current.has_attr('name'):
+                    # Link is anchor link
+                    next_anchor_link = soup_current['name']
             if hasattr(soup_current,'contents') and len(soup_current.contents) > 0:
                 # Move to child element
                 child = soup_current.contents[0]
@@ -572,6 +590,21 @@ class DocExtractor:
         self.add_extract(extracts, extract, current_title, current_anchor_link, extract_links, split_tag_index, dump_config)
         return extracts
 
+    def should_split_on_tag(self, tag: BeautifulSoup, dump_config: DumpConfig):
+        """
+        For a tag that matched the split attributes, check if the tag should be used as a split
+        tag depending on the dump configuration
+        """
+        if dump_config.ignore_empty_split_tags and tag.text.strip() == '':
+            # The tag text is empty and the configuration is set to not split on empty tags
+            return False
+        elif not dump_config.allow_link_splits and (link_tag := tag.find('a')): 
+            if link_tag.text.strip() == tag.text.strip():
+                # All text in the tag is part of a link, and the configuration is set to not
+                # split on tags that are links
+                return False
+        return True
+        
     def add_extract(self, extracts: list[dict], extract: BeautifulSoup, title: str, anchor_link: str, 
                     extract_links: dict, split_tag_index: int, dump_config: DumpConfig) -> None:
         """
@@ -587,7 +620,7 @@ class DocExtractor:
             'children': children if len(children) > 1 else []})
         
     def handle_extracts(self, extracts: list[dict], url: str, parent_idx: int, titles: list[str], 
-                        parent_titles: list[str], parent_context: str, dump_config: DumpConfig) -> list[dict]:
+                        parent_titles: list[str], parent_context: str, dump_config: DumpConfig, root_level = False) -> list[dict]:
         """
         Convert the page extracts to document dicts, add documents to the DocIndex, and add parent
         relations to the graph. Further splits the plain text of documents if they are too long.
@@ -598,6 +631,7 @@ class DocExtractor:
         - parent_titles: titles of parent pages in the original site structure
         - parent_context: context from the parent extract to include with this extract
         - dump_config: DumpConfig for the current site dump
+        - root_level: True if the given list of extracts is at the root level of a website (top of the split hierarchy)
         """
         docs = []
         previous_sib_id = None
@@ -617,8 +651,8 @@ class DocExtractor:
                     extract['links'] = {}
                 
             if extract['anchor_link'] is not None:
-                url = re.sub(r'#\d+\Z','',url)
-                url = f'{url}#{extract["anchor_link"]}'
+                url = re.sub(r'#.+\Z','',url) # remove existing anchor
+                url = f'{url}#{extract["anchor_link"]}' # add new anchor
 
             extract_titles = [*titles,extract["title"]]
             text = self.html_to_text(extract['html'])
@@ -629,14 +663,17 @@ class DocExtractor:
             split_texts = self.split_extract_by_sentence(text) if len(text) > self.max_len else [text]
             for split_idx, text in enumerate(split_texts):
                 links = extract['links']
-                split_titles = extract_titles
                 if len(split_texts) > 1:
                     links = {title:href for (title,href) in extract['links'].items() if title in text}
-                    split_titles = [*split_titles,str(split_idx+1)]
 
-                idx = self.doc_index.add_doc(split_titles,url,parent_titles=parent_titles)
-                if not first_page_idx: first_page_idx = idx
-                add_page_relation(self.graph, parent_idx, idx, DocRelation.PARENT) # add edge from parent page to this page
+                idx = self.doc_index.add_doc(extract_titles,url,parent_titles=parent_titles)
+                if not first_page_idx: first_page_idx = idx # keep the index of the first page in the split texts
+                
+                if root_level:
+                    add_page_relation(self.graph, parent_idx, idx, DocRelation.PARENT_PAGE) # add edge from parent page to this page
+                else:
+                    add_page_relation(self.graph, parent_idx, idx, DocRelation.PARENT_EXTRACT) # add edge from parent extract to this page
+                    
                 if previous_sib_id:
                     # add edge from previous sibling to this page
                     relation = DocRelation.SIBLING_SPLIT_EXTRACT if split_idx > 0 else DocRelation.SIBLING_EXTRACT
@@ -646,12 +683,13 @@ class DocExtractor:
                     'doc_id': idx, 
                     'url': url, 
                     'parent': parent_idx, 
-                    'titles': split_titles, 
+                    'titles': extract_titles, 
                     'text': text, 
                     'links': links,
                     'parent_titles': parent_titles,
                     'context': parent_context,
-                    **dump_config.metadata_extractor(url,split_titles,parent_titles,text)})
+                    'split_idx': split_idx,
+                    **dump_config.metadata_extractor(url,extract_titles,parent_titles,text)})
                 previous_sib_id = idx
 
             parent_context = ''

@@ -441,14 +441,11 @@
     "https://vancouver.calendar.ubc.ca/admissions/applicants-following-bcyukon-secondary-school-curriculum/minimum-academic-qualifications": [
         "Minimum Academic Qualifications"
     ],
-    "https://science.ubc.ca/students/advising.1": [
+    "https://science.ubc.ca/students/advising": [
         "Talk to an Advisor"
     ],
     "https://science.ubc.ca/students/degree-navigator": [
         "Frequently Asked Questions (FAQ)"
-    ],
-    "https://science.ubc.ca/students/new.1": [
-        "Start Building Your Toolkit for Success"
     ],
     "https://science.ubc.ca/students/new": [
         "Start Building Your Toolkit for Success"
@@ -458,9 +455,6 @@
     ],
     "https://science.ubc.ca/students/spac/meet-spac": [
         "Alexis"
-    ],
-    "https://science.ubc.ca/students/new/courses.1": [
-        "Lower Level Requirements"
     ],
     "https://science.ubc.ca/students/new/courses": [
         "Lower Level Requirements"
