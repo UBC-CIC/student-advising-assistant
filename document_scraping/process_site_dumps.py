@@ -374,6 +374,7 @@ def get_row_cells(row: BeautifulSoup) -> list[BeautifulSoup]:
 BASE_DUMP_PATH = 'site_dumps'
 
 generic_remove_tags = [
+    {'name': 'form'},                   # ignore forms
     {'class': 'sr-only'},               # screenreader only tags
     {'class': 'hidden'},                # hidden tags
     {'name': 'a', 'href': '#top'}       # 'go to top' links
@@ -439,8 +440,8 @@ sc_students_config.remove_tag_attrs = generic_remove_tags + [{'class': 'customBr
                                                              {'id': 'block-views-student-notices-block-2'},
                                                              {'class':'field-name-field-student-blog-topic'},
                                                              {'class':'menu'},
-                                                             {'class':'pager'}, # page control,
-                                                             {'class': 'nav'}   # nav menus
+                                                             {'class':'pager'}, # page control
+                                                             {'class': 'nav'},   # nav menus
                                                              ]
 sc_students_config.replacements = [({'name': 'table'}, convert_table)]
 sc_students_config.main_content_attrs = {'id': 'content'}
