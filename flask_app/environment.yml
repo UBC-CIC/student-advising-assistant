@@ -12,3 +12,5 @@ dependencies:
     - networkx
     - python-dotenv
     - flask[async]
+    - pinecone-client 
+    - pinecone-text

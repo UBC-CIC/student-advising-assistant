@@ -6,25 +6,22 @@ from typing import List, Dict
 from dotenv import load_dotenv
 import os
 from download_s3_files import download_all_dirs
-import retrievers
 import llm_utils
 import doc_graph_utils
 from comparator import Comparator
-import copy
 from numpy import isnan
+from retrievers import PineconeRetriever
 
 load_dotenv()
 GRAPH_FILEPATH = os.path.join('data','documents','website_graph.txt')
 
 ### LOAD MODELS 
-comparator = Comparator(retrievers.base_embeddings)
 huggingface_model_names = ['google/flan-t5-xxl','google/flan-ul2','tiiuae/falcon-7b-instruct']
 llm, prompt = llm_utils.load_huggingface_endpoint(huggingface_model_names[0])
 llm_chain = LLMChain(prompt=prompt, llm=llm)
 filter = LLMChainFilter.from_llm(llm)
 compressor = LLMChainExtractor.from_llm(llm)
 graph = doc_graph_utils.read_graph(GRAPH_FILEPATH)
-retrievers.load_retrievers()
 download_all_dirs()
 
 def print_results(results: List[Document], print_content=False):
@@ -146,8 +143,8 @@ def choose_retrievers(program_info: Dict):
     else:
         return ['all-triple']
     
-async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=None, children:bool=True,
-                    combine_with_sibs:bool=False, do_filter:bool=True, compress:bool=False, generate:bool=False):
+async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=None, children:bool=False,
+                    combine_with_sibs:bool=False, do_filter:bool=False, compress:bool=False, generate:bool=False):
 
     """
     Run the question answering chain with the given context and query
@@ -162,18 +159,16 @@ async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=Non
     - generate: If true, generates a response for each final document
     """
 
-    retriever_names = choose_retrievers(program_info)
+    retriever = PineconeRetriever()
     llm_query = llm_utils.llm_query(program_info, topic, query)
     
     print(llm_query)
     
     docs = []
     if start_doc:
-        docs += retrievers.docs_from_ids([start_doc])
+        docs += retriever.docs_from_ids([start_doc])
     else:
-        for retriever_name in retriever_names:
-            retriever_context_str = retrievers.retriever_context_str(program_info, topic, retriever_name)
-            docs += await retrievers.get_documents(retriever_context_str, query, retriever_name)
+        docs += retriever.semantic_search(program_info, topic, query)
 
     docs_for_llms(docs)
     
