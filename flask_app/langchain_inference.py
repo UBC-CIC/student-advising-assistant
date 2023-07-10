@@ -137,7 +137,7 @@ def backoff_retrieval(retriever: Retriever, program_info: Dict, topic: str, quer
     - query: The text query
     - k: number of documents to return
     - threshold: relevance threshold, all returned documents must surpass the threshold
-                relevance is in the range [0,1] where 0 is dissimilar, and 1 is most similar
+                 the threshold range depends on the scoring function of the chosen retriever
     - do_filter: If true, performs an LLM filter step on returned documents
     """ 
     backoff_order = ['specialization','program','faculty'] # order of filter elements to remove

@@ -95,7 +95,7 @@ class Retriever(ABC):
         - query: the full query question
         - k: number of documents to return
         - threshold: relevance threshold, all returned documents must surpass the threshold
-                     relevance is in the range [0,1] where 0 is dissimilar, and 1 is most similar
+                     the threshold range depends on the scoring function of the chosen retriever
         """
         pass
     
@@ -217,7 +217,8 @@ class PineconeRetriever(Retriever):
         - query: the full query question
         - k: number of documents to return
         - threshold: relevance threshold, all returned documents must surpass the threshold
-                     relevance is in the range [0,1] where 0 is dissimilar, and 1 is most similar
+                     relevance is dot-product based, so not normalized
+                     larger scores indicate greater relevance
         """
         self.set_top_k(k)
         query_str, kwargs = self._query_converter(program_info,topic,query)
