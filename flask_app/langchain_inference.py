@@ -10,7 +10,7 @@ import llm_utils
 import doc_graph_utils
 from comparator import Comparator
 from numpy import isnan
-from retrievers import PineconeRetriever
+from retrievers import PineconeRetriever, Retriever
 
 load_dotenv()
 GRAPH_FILEPATH = os.path.join('data','documents','website_graph.txt')
@@ -44,7 +44,7 @@ def get_related_links_from_compressed(docs, compressed_docs):
         links = [(title,link,doc_id) for title,(link,doc_id) in doc.metadata['links'].items() if title in compressed.page_content]
         doc.metadata['related_links'] = links
 
-def get_related_links_from_sim(context, query, docs, score_threshold = 0.5):
+def get_related_links_from_sim(retriever: Retriever, context, query, docs, score_threshold = 0.5):
     """
     Searches through links in the given documents:
     - Computes similarity between the query and the link text
@@ -52,7 +52,7 @@ def get_related_links_from_sim(context, query, docs, score_threshold = 0.5):
     """
     titles = []
     spans = []
-    context_str = retrievers.retriever_context_str(context)
+    context_str = retriever.retriever_context_str(context)
 
     # Finding linked docs
     for doc in docs:
@@ -73,7 +73,7 @@ def get_related_links_from_sim(context, query, docs, score_threshold = 0.5):
         links = [(title,link,doc_id) for (title,(link,doc_id)),score in zip(doc.metadata['links'].items(),scores_span) if score >= score_threshold]
         doc.metadata['related_links'] = links
 
-def get_doc_children(docs: List[Document], retriever_name: str) -> List[Document]:
+def get_doc_children(retriever: Retriever, docs: List[Document]) -> List[Document]:
     
     # Finding child doc ids
     doc_ids = [doc.metadata['doc_id'] for doc in docs]
@@ -86,17 +86,17 @@ def get_doc_children(docs: List[Document], retriever_name: str) -> List[Document
         return []
     
     # Fetching related docs
-    child_docs = retrievers.docs_from_ids(child_doc_ids, retriever_name)
+    child_docs = retriever.docs_from_ids(child_doc_ids)
     
     return child_docs
 
-def combine_sib_docs(docs) -> List[Document]:
+def combine_sib_docs(retriever: Retriever, docs: List[Document]) -> List[Document]:
     """
     For each document, combine its context with all of its immediate siblings
     """
     for doc in docs:
         sib_ids = doc_graph_utils.get_split_sib_ids(graph, doc.metadata['doc_id'])
-        sib_docs = retrievers.docs_from_ids(sib_ids)
+        sib_docs = retriever.docs_from_ids(sib_ids)
         combined_content = ' '.join([sib_doc.page_content for sib_doc in sib_docs])
         doc.page_content = combined_content
         doc.metadata['titles'] = doc.metadata['titles'][:-1]
@@ -132,16 +132,17 @@ def docs_for_llms(docs: List[Document]):
         doc.metadata['original_page_content'] = doc.page_content
         doc.page_content = content
 
-def choose_retrievers(program_info: Dict):
+def format_docs_for_display(docs: List[Document]):
     """
-    Choose the appropriate retriever(s) given the program information dict
-    If more than one retriever should be included, returns multiple
+    Perform any processing steps to make documents suitable for display
     """
-    if 'faculty' in program_info and program_info['faculty'] == 'The Faculty of Science':
-        #return ['sc-triple','none-triple']
-        return ['sc-triple']
-    else:
-        return ['all-triple']
+    for doc in docs:
+        # Handle documents starting with a list item
+        doc.page_content = doc.page_content.strip()
+        if doc.page_content.startswith('*'): doc.page_content = '  ' + doc.page_content
+
+        # Replace any occurrence of 4 spaces, since it will be interepreted as a code block in markdown
+        doc.page_content = doc.page_content.replace('    ', '   ')
     
 async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=None, children:bool=False,
                     combine_with_sibs:bool=False, do_filter:bool=False, compress:bool=False, generate:bool=False):
@@ -159,10 +160,8 @@ async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=Non
     - generate: If true, generates a response for each final document
     """
 
-    retriever = PineconeRetriever()
+    retriever = PineconeRetriever(filter_params=['faculty'])
     llm_query = llm_utils.llm_query(program_info, topic, query)
-    
-    print(llm_query)
     
     docs = []
     if start_doc:
@@ -173,9 +172,9 @@ async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=Non
     docs_for_llms(docs)
     
     if children: 
-        docs += get_doc_children(docs, 'all-triple')
+        docs += get_doc_children(retriever, docs)
 
-    if combine_with_sibs: combine_sib_docs(docs)
+    if combine_with_sibs: combine_sib_docs(retriever, docs)
 
     if do_filter: docs = filter.compress_documents(docs, llm_query)
 
@@ -204,12 +203,6 @@ async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=Non
             doc.metadata['generated_response'] = 'Text generation is turned off'
         
         if highlighted_text: doc.page_content = highlighted_text
-        
-        # Handle documents starting with a list item
-        doc.page_content = doc.page_content.strip()
-        if doc.page_content.startswith('*'): doc.page_content = '  ' + doc.page_content
-
-        # Replace any occurrence of 4 spaces, since it will be interepreted as a code block in markdown
-        doc.page_content = doc.page_content.replace('    ', '   ')
     
+    format_docs_for_display(docs)
     return docs
