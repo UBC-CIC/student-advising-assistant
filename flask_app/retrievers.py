@@ -32,6 +32,10 @@ class MyPineconeRetriever(PineconeHybridSearchRetriever):
     Wrapper of LangChain PineconeHybridSearchRetriever
     that allows for additional parameters in query
     """
+    # Key for the original text in the pinecone document's metadata
+    _text_key: str = 'context'
+    # Key to place the document similarity score in metadata after retrieval
+    _score_key: str = 'score'
                     
     def _get_relevant_documents(
         self, 
@@ -40,10 +44,13 @@ class MyPineconeRetriever(PineconeHybridSearchRetriever):
     ) -> List[Document]:
         """
         Adapted from langchain.retrievers.pinecone_hybrid_search, with support for
-        additional keyword arguments
+        additional keyword arguments to the pinecone query.
+        Example keyword arguments
         - namespace: pinecone namespace to search in
         - filter: metadata filter to apply in the pinecone call, see
                            https://docs.pinecone.io/docs/metadata-filtering
+        The similarity score of each document is placed in the document metadata
+        under the 'score' key.
         """
         
         from pinecone_text.hybrid import hybrid_convex_scale
@@ -65,10 +72,10 @@ class MyPineconeRetriever(PineconeHybridSearchRetriever):
         )
         final_result = []
         for res in result["matches"]:
-            context = res["metadata"].pop("context")
-            final_result.append(
-                Document(page_content=context, metadata=res["metadata"])
-            )
+            context = res["metadata"].pop(self._text_key)
+            doc = Document(page_content=context, metadata=res["metadata"])
+            doc.metadata[self._score_key] = res["score"]
+            final_result.append(doc)
         # return search results as json
         return final_result
     
@@ -79,67 +86,16 @@ class Retriever(ABC):
     """
     retriever: BaseRetriever
     
-    def semantic_search(self, program_info: Dict, topic: str, query: str, k = 5) -> List[Document]:
+    @abstractmethod
+    def semantic_search(self, program_info: Dict, topic: str, query: str, k = 5, threshold = 0) -> List[Document]:
         """
         Return the documents from similarity search with the given context and query
         - program_info: Dict of program information
         - topic: keyword topic of the query
         - query: the full query question
         - k: number of documents to return
-        """
-        self.set_top_k(k)
-        query_str, kwargs = self.query_converter(program_info,topic,query)
-        docs = self.retriever.get_relevant_documents(query_str,**kwargs)
-        return self.response_converter(docs)
-
-    @classmethod
-    def load_base_embedding(cls, name: str):
-        if name in base_embeddings:
-            return base_embeddings[name]
-        else:
-            model = HuggingFaceEmbeddings(model_name=name, model_kwargs={'device': 'cpu'})
-            base_embeddings[name] = model
-        return base_embeddings[name]
-    
-    @classmethod
-    def embeddings_model_from_config(cls, index_config: Dict):
-        # Load the base embeddings model
-        base_embeddings = cls.load_base_embedding(index_config['base_embedding_model'])
-        
-        # Get the number of embeddings to concatenate
-        n = len(index_config['embeddings']) 
-        
-        # Create combined model if necessary
-        embedding_model = base_embeddings
-        if n > 1:
-            embedding_model = CombinedEmbeddings(base_embeddings, n)
-        
-        return embedding_model
-    
-    @classmethod
-    def retriever_combined_query(cls, args: List[str]):
-        """
-        Combine all args into a single query separated by the separation character
-        """
-        joined = CombinedEmbeddings.query_separator.join(args)
-        return joined
-
-    @abstractmethod
-    def query_converter(self, program_info: Dict, topic: str, query: str) -> Tuple[str,Dict]:
-        """
-        Generates a text query and keyword args for the retriever from the input
-        - program_info: Dict of program information
-        - topic: keyword topic of the query
-        - query: the full query question
-        Returns:
-        - Tuple of the query string, and Dict of metadata to pass to the retriever
-        """
-        pass
-    
-    @abstractmethod
-    def response_converter(self, response: List[Document]) -> List[Document]:
-        """
-        Performs any necessary postprocessing on the returned documents from the retriever
+        - threshold: relevance threshold, all returned documents must surpass the threshold
+                     relevance is in the range [0,1] where 0 is dissimilar, and 1 is most similar
         """
         pass
     
@@ -155,6 +111,57 @@ class Retriever(ABC):
         """
         Set the retriever's 'top k' parameter, determines how many
         documents to return from semantic search
+        """
+        pass
+
+    @classmethod
+    def _load_base_embedding(cls, name: str):
+        if name in base_embeddings:
+            return base_embeddings[name]
+        else:
+            model = HuggingFaceEmbeddings(model_name=name, model_kwargs={'device': 'cpu'})
+            base_embeddings[name] = model
+        return base_embeddings[name]
+    
+    @classmethod
+    def _embeddings_model_from_config(cls, index_config: Dict):
+        # Load the base embeddings model
+        base_embeddings = cls._load_base_embedding(index_config['base_embedding_model'])
+        
+        # Get the number of embeddings to concatenate
+        n = len(index_config['embeddings']) 
+        
+        # Create combined model if necessary
+        embedding_model = base_embeddings
+        if n > 1:
+            embedding_model = CombinedEmbeddings(base_embeddings, n)
+        
+        return embedding_model
+    
+    @classmethod
+    def _retriever_combined_query(cls, args: List[str]):
+        """
+        Combine all args into a single query separated by the separation character
+        """
+        joined = CombinedEmbeddings.query_separator.join(args)
+        return joined
+
+    @abstractmethod
+    def _query_converter(self, program_info: Dict, topic: str, query: str) -> Tuple[str,Dict]:
+        """
+        Generates a text query and keyword args for the retriever from the input
+        - program_info: Dict of program information
+        - topic: keyword topic of the query
+        - query: the full query question
+        Returns:
+        - Tuple of the query string, and Dict of metadata to pass to the retriever
+        """
+        pass
+    
+    @abstractmethod
+    def _response_converter(self, response: List[Document]) -> List[Document]:
+        """
+        Performs any necessary postprocessing on the returned documents from the retriever
         """
         pass
 
@@ -186,7 +193,7 @@ class PineconeRetriever(Retriever):
         bm25_encoder = BM25Encoder().load(self.bm25_weights_path)
         
         # Load the dense embedding model
-        embeddings_model = self.embeddings_model_from_config(index_config)
+        embeddings_model = self._embeddings_model_from_config(index_config)
         
         # Connect to the pinecone index
         pinecone.init(      
@@ -202,7 +209,36 @@ class PineconeRetriever(Retriever):
         hybrid_retriever.alpha = alpha
         self.retriever = hybrid_retriever
     
-    def query_converter(self, program_info: Dict, topic: str, query: str) -> Tuple[str,Dict]:
+    def semantic_search(self, program_info: Dict, topic: str, query: str, k = 5, threshold = 0) -> List[Document]:
+        """
+        Return the documents from similarity search with the given context and query
+        - program_info: Dict of program information
+        - topic: keyword topic of the query
+        - query: the full query question
+        - k: number of documents to return
+        - threshold: relevance threshold, all returned documents must surpass the threshold
+                     relevance is in the range [0,1] where 0 is dissimilar, and 1 is most similar
+        """
+        self.set_top_k(k)
+        query_str, kwargs = self._query_converter(program_info,topic,query)
+        docs = self.retriever.get_relevant_documents(query_str,**kwargs)
+        #docs = self._apply_score_threshold(docs, threshold)
+        return self._response_converter(docs)
+    
+    def docs_from_ids(self, doc_ids: List[int]) -> List[Document]:
+        """
+        Return a list of documents from a list of document indexes
+        """
+        raise NotImplementedError()
+    
+    def set_top_k(self, k: int):
+        """
+        Set the retriever's 'top k' parameter, determines how many
+        documents to return from semantic search
+        """
+        self.retriever.top_k = k
+        
+    def _query_converter(self, program_info: Dict, topic: str, query: str) -> Tuple[str,Dict]:
         """
         Generates a text query and keyword args for the retriever from the input
         - program_info: Dict of program information
@@ -220,9 +256,9 @@ class PineconeRetriever(Retriever):
                 program_info_copy.pop(param)
 
         query_str = ' : '.join(list(program_info_copy.values()) + [topic,query])
-        return self.retriever_combined_query([query_str, query_str, query_str]), {'filter': filter}
+        return self._retriever_combined_query([query_str, query_str, query_str]), {'filter': filter}
     
-    def response_converter(self, response: List[Document]) -> List[Document]:
+    def _response_converter(self, response: List[Document]) -> List[Document]:
         """
         Decode the document metadatas from pinecone
         Since pinecone requires primitive datatypes for metadatas,
@@ -236,18 +272,15 @@ class PineconeRetriever(Retriever):
 
         return response
     
-    def docs_from_ids(self, doc_ids: List[int]) -> List[Document]:
+    def _apply_score_threshold(self, docs: List[Document], threshold) -> List[Document]:
         """
-        Return a list of documents from a list of document indexes
+        Filters out documents that do not meet the similarity score threshold
+        Assumes the similarity score is in document metadata 'score' key
+        - docs: List of documents to filter
+        - threshold: relevance threshold, all returned documents must surpass the threshold
+                     relevance is in the range [0,1] where 0 is dissimilar, and 1 is most similar
         """
-        raise NotImplementedError()
-    
-    def set_top_k(self, k: int):
-        """
-        Set the retriever's 'top k' parameter, determines how many
-        documents to return from semantic search
-        """
-        self.retriever.top_k = k
+        return [doc for doc in docs if doc.metadata['score'] >= threshold]
     
 class FaissRetriever(Retriever):
     def __init__(self, path: str):
@@ -263,13 +296,46 @@ class FaissRetriever(Retriever):
         self.faculty = faculty
         
         # Load embedings model
-        embeddings_model = self.embeddings_model_from_config(index_config)
+        embeddings_model = self._embeddings_model_from_config(index_config)
         
         # Create the retriever
         faiss = FAISS.load_local(path, embeddings_model)
         self.retriever = VectorStoreRetriever(vectorstore=faiss)
 
-    def query_converter(self, program_info: Dict, topic: str, query: str) -> Tuple[str,Dict]:
+    def semantic_search(self, program_info: Dict, topic: str, query: str, k = 5, threshold = 0) -> List[Document]:
+        """
+        Return the documents from similarity search with the given context and query
+        - program_info: Dict of program information
+        - topic: keyword topic of the query
+        - query: the full query question
+        - k: number of documents to return
+        - threshold: relevance threshold, all returned documents must surpass the threshold
+                     relevance is in the range [0,1] where 0 is dissimilar, and 1 is most similar
+        """
+        self.set_top_k(k)
+        query_str, kwargs = self._query_converter(program_info,topic,query)
+        self.retriever.search_type = 'similarity_search_with_relevance_scores'
+        docs = self.retriever.get_relevant_documents(query_str,score_threshold=threshold,**kwargs)
+        return self._response_converter(docs)
+    
+    def docs_from_ids(self, doc_ids: List[int]) -> List[Document]:
+        """
+        Return a list of documents from a list of document indexes
+        """
+        docs = []
+        for doc_id in doc_ids:
+            id = self.retriever.vectorstore.index_to_docstore_id[doc_id]
+            docs.append(self.retriever.vectorstore.docstore.search(id))
+        return [copy.deepcopy(doc) for doc in docs]
+    
+    def set_top_k(self, k: int):
+        """
+        Set the retriever's 'top k' parameter, determines how many
+        documents to return from semantic search
+        """
+        self.retriever.search_kwargs = {'k':k}
+        
+    def _query_converter(self, program_info: Dict, topic: str, query: str) -> Tuple[str,Dict]:
         """
         Generates a text query and keyword args for the retriever from the input
         - program_info: Dict of program information
@@ -288,29 +354,12 @@ class FaissRetriever(Retriever):
         query_str = ' : '.join(list(program_info.values()) + [topic,query])
         return self.retriever_combined_query([query_str, query_str, query_str]), {}  
       
-    def response_converter(self, response: List[Document]) -> List[Document]:
+    def _response_converter(self, response: List[Document]) -> List[Document]:
         """
         Since FAISS is an in-memory vectorstore, deepcopy the documents so
         that they can be modified without modifying the docstore
         """
         return [copy.deepcopy(doc) for doc in response]
-    
-    def docs_from_ids(self, doc_ids: List[int]) -> List[Document]:
-        """
-        Return a list of documents from a list of document indexes
-        """
-        docs = []
-        for doc_id in doc_ids:
-            id = self.retriever.vectorstore.index_to_docstore_id[doc_id]
-            docs.append(self.retriever.vectorstore.docstore.search(id))
-        return [copy.deepcopy(doc) for doc in docs]
-    
-    def set_top_k(self, k: int):
-        """
-        Set the retriever's 'top k' parameter, determines how many
-        documents to return from semantic search
-        """
-        self.retriever.search_kwargs = {'k':k}
 
 def load_faculties():
     """

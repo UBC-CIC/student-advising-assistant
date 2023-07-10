@@ -11,6 +11,7 @@ import doc_graph_utils
 from comparator import Comparator
 from numpy import isnan
 from retrievers import PineconeRetriever, Retriever
+import copy 
 
 load_dotenv()
 GRAPH_FILEPATH = os.path.join('data','documents','website_graph.txt')
@@ -19,7 +20,7 @@ GRAPH_FILEPATH = os.path.join('data','documents','website_graph.txt')
 huggingface_model_names = ['google/flan-t5-xxl','google/flan-ul2','tiiuae/falcon-7b-instruct']
 llm, prompt = llm_utils.load_huggingface_endpoint(huggingface_model_names[0])
 llm_chain = LLMChain(prompt=prompt, llm=llm)
-filter = LLMChainFilter.from_llm(llm)
+filter = LLMChainFilter.from_llm(llm, verbose=True)
 compressor = LLMChainExtractor.from_llm(llm)
 graph = doc_graph_utils.read_graph(GRAPH_FILEPATH)
 download_all_dirs()
@@ -72,23 +73,6 @@ def get_related_links_from_sim(retriever: Retriever, context, query, docs, score
         scores_span = scores[span[0]:span[1]]
         links = [(title,link,doc_id) for (title,(link,doc_id)),score in zip(doc.metadata['links'].items(),scores_span) if score >= score_threshold]
         doc.metadata['related_links'] = links
-
-def get_doc_children(retriever: Retriever, docs: List[Document]) -> List[Document]:
-    
-    # Finding child doc ids
-    doc_ids = [doc.metadata['doc_id'] for doc in docs]
-    child_doc_ids = []
-    
-    for doc_id in doc_ids:
-        child_doc_ids.extend(doc_graph_utils.get_doc_child_extract_ids(graph, doc_id))
-
-    if len(child_doc_ids) == 0:
-        return []
-    
-    # Fetching related docs
-    child_docs = retriever.docs_from_ids(child_doc_ids)
-    
-    return child_docs
 
 def combine_sib_docs(retriever: Retriever, docs: List[Document]) -> List[Document]:
     """
@@ -143,9 +127,54 @@ def format_docs_for_display(docs: List[Document]):
 
         # Replace any occurrence of 4 spaces, since it will be interepreted as a code block in markdown
         doc.page_content = doc.page_content.replace('    ', '   ')
+
+def backoff_retrieval(retriever: Retriever, program_info: Dict, topic: str, query:str, k:int = 5, threshold = 0, do_filter: bool = False) -> List[Document]:
+    """
+    Perform a multistep retrieval where, if not enough documents are returned for the full
+    program_info filter, filters are progressively removed and attempts retrieval again.
+    - program_info: Dict of values describe the faculty, program, specialization, and/or year
+    - topic: Topic of the question
+    - query: The text query
+    - k: number of documents to return
+    - threshold: relevance threshold, all returned documents must surpass the threshold
+                relevance is in the range [0,1] where 0 is dissimilar, and 1 is most similar
+    - do_filter: If true, performs an LLM filter step on returned documents
+    """ 
+    backoff_order = ['specialization','program','faculty'] # order of filter elements to remove
+    llm_query = llm_utils.llm_query(program_info, topic, query)
+    program_info_copy = copy.copy(program_info) # copy the dict since elements will be popped
     
-async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=None, children:bool=False,
-                    combine_with_sibs:bool=False, do_filter:bool=False, compress:bool=False, generate:bool=False):
+    # Perform initial search
+    docs = retriever.semantic_search(program_info_copy, topic, query, k=k)
+    if do_filter: 
+            docs = filter.compress_documents(docs, llm_query)
+    
+    # Perform additional backoff searches as necessary
+    for key in backoff_order:
+        if len(docs) >= k: 
+            # Enough documents already retrieved
+            break
+        
+        if key not in program_info:
+            # This key isn't being filtered on, continue
+            continue
+        
+        # Remove the key from the filter and redo search
+        program_info_copy[key] = 'None'
+        result = retriever.semantic_search(program_info_copy, topic, query, k=k, threshold=threshold)
+        
+        if do_filter: 
+            result = filter.compress_documents(result, llm_query)
+            
+        # Ensure we don't include the same document twice
+        current_ids = [doc.metadata['doc_id'] for doc in docs]
+        for doc in result:
+            if doc.metadata['doc_id'] not in current_ids: docs.append(doc)
+            
+    return docs[:min(len(docs),k)] 
+    
+async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=None,
+                    combine_with_sibs:bool=False, do_filter:bool=True, compress:bool=False, generate:bool=False):
 
     """
     Run the question answering chain with the given context and query
@@ -153,30 +182,24 @@ async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=Non
     - topic: Topic of the question
     - query: The text query
     - start_doc: If provided, will start searching with the provided document index rather than performing similarity search
-    - children: If true, fetches child extracts of all retrieved documents
     - combine_with_sibs: If true, combines all documents with their immediate sibling documents
-    - filter: If true, applies a LLM filter step to the retrieved documents to remove irrelevant documents
+    - do_filter: If true, applies a LLM filter step to the retrieved documents to remove irrelevant documents
     - compress: If true, applies a LLM compres step to compress documents, extracting relevant sections
     - generate: If true, generates a response for each final document
     """
 
-    retriever = PineconeRetriever(filter_params=['faculty'])
+    retriever = PineconeRetriever(filter_params=['faculty','program'])
     llm_query = llm_utils.llm_query(program_info, topic, query)
     
     docs = []
     if start_doc:
         docs += retriever.docs_from_ids([start_doc])
     else:
-        docs += retriever.semantic_search(program_info, topic, query)
+        docs += backoff_retrieval(retriever, program_info, topic, query, k=5, do_filter=do_filter)
 
     docs_for_llms(docs)
-    
-    if children: 
-        docs += get_doc_children(retriever, docs)
 
     if combine_with_sibs: combine_sib_docs(retriever, docs)
-
-    if do_filter: docs = filter.compress_documents(docs, llm_query)
 
     compressed_docs = None
     if compress: 
