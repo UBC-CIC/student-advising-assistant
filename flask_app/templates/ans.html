@@ -57,6 +57,10 @@
           {% endfor %}
         </ul>
         {% endif %}
+        <h4>
+          Relevance Score
+        </h4>
+        <p>{{doc.metadata['score']}}</p>
       </aside>
       {% endfor %}
     </section>

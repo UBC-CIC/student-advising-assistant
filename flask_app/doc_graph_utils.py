@@ -6,10 +6,11 @@ class DocRelation(IntEnum):
     """
     Represents the possible relationships between documents
     """
-    PARENT = 1
-    LINK = 2
-    SIBLING_EXTRACT = 3
-    SIBLING_SPLIT_EXTRACT = 4
+    PARENT_PAGE = 1
+    PARENT_EXTRACT = 2
+    LINK = 3
+    SIBLING_EXTRACT = 4
+    SIBLING_SPLIT_EXTRACT = 5
 
 def read_graph(filepath) -> nx.DiGraph:
     """
@@ -61,9 +62,9 @@ def get_doc_sib_ids(graph: nx.DiGraph, doc_id: int) -> List[int]:
     """
     return get_doc_relation_ids(graph,doc_id,DocRelation.SIBLING_EXTRACT)
 
-def get_doc_child_ids(graph: nx.DiGraph, doc_id: int) -> List[int]:
+def get_doc_child_extract_ids(graph: nx.DiGraph, doc_id: int) -> List[int]:
     """
-    Return the ids of the given document's child documents
+    Return the ids of the given document's child extracts
     """
-    return get_doc_relation_ids(graph,doc_id,DocRelation.PARENT, out_only=True)
+    return get_doc_relation_ids(graph,doc_id,DocRelation.PARENT_EXTRACT, out_only=True)
 
