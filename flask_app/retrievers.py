@@ -172,6 +172,8 @@ class PineconeRetriever(Retriever):
     
     # Parameters from the program_info to use in the metadata filter for queries
     filter_params: List[str]
+    # Namespace to use for all queries to the pinecone index
+    namespace: Optional[str] 
     
     def __init__(self, alpha = 0.4, filter_params = []):
         """
@@ -201,6 +203,7 @@ class PineconeRetriever(Retriever):
             environment=os.environ.get('PINECONE_REGION')      
         )     
         index = pinecone.Index(index_config['name'])
+        self.namespace = index_config['namespace']
         
         # Create the retriever
         hybrid_retriever = MyPineconeRetriever(
@@ -222,6 +225,7 @@ class PineconeRetriever(Retriever):
         """
         self.set_top_k(k)
         query_str, kwargs = self._query_converter(program_info,topic,query)
+        if self.namespace: kwargs['namespace'] = self.namespace
         docs = self.retriever.get_relevant_documents(query_str,**kwargs)
         #docs = self._apply_score_threshold(docs, threshold)
         return self._response_converter(docs)
