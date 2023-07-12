@@ -36,4 +36,7 @@ To run the demo:
 # For huggingface token see https://huggingface.co/docs/hub/security-tokens
 HUGGINGFACEHUB_API_TOKEN= <insert huggingface api token>
 AWS_PROFILE_NAME=<insert AWS SSO profile name>
+# For Pinecone see https://docs.pinecone.io/docs/quickstart
+PINECONE_KEY=<insert pinecone api key>
+PINECONE_REGION=<insert pinecone api region>
 ```
