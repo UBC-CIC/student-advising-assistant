@@ -127,6 +127,11 @@ def format_docs_for_display(docs: List[Document]):
 
         # Replace any occurrence of 4 spaces, since it will be interepreted as a code block in markdown
         doc.page_content = doc.page_content.replace('    ', '   ')
+        
+        # Render links in markdown
+        for title,(link,_) in doc.metadata['links'].items():
+            doc.page_content = doc.page_content.replace(title, f'[{title}]({link})')
+            
 
 def backoff_retrieval(retriever: Retriever, program_info: Dict, topic: str, query:str, k:int = 5, threshold = 0, do_filter: bool = False) -> List[Document]:
     """
@@ -147,7 +152,8 @@ def backoff_retrieval(retriever: Retriever, program_info: Dict, topic: str, quer
     # Perform initial search
     docs = retriever.semantic_search(program_info_copy, topic, query, k=k)
     if do_filter: 
-            docs = filter.compress_documents(docs, llm_query)
+        print('filtered')
+        docs = filter.compress_documents(docs, llm_query)
     
     # Perform additional backoff searches as necessary
     for key in backoff_order:
@@ -164,6 +170,7 @@ def backoff_retrieval(retriever: Retriever, program_info: Dict, topic: str, quer
         result = retriever.semantic_search(program_info_copy, topic, query, k=k, threshold=threshold)
         
         if do_filter: 
+            print('filtered')
             result = filter.compress_documents(result, llm_query)
             
         # Ensure we don't include the same document twice
@@ -174,7 +181,7 @@ def backoff_retrieval(retriever: Retriever, program_info: Dict, topic: str, quer
     return docs[:min(len(docs),k)] 
     
 async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=None,
-                    combine_with_sibs:bool=False, do_filter:bool=True, compress:bool=False, generate:bool=False):
+                    combine_with_sibs:bool=False, do_filter:bool=True, compress:bool=True, generate:bool=False):
 
     """
     Run the question answering chain with the given context and query
