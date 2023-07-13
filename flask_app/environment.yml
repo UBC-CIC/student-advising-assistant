@@ -6,9 +6,11 @@ dependencies:
   - pip:
     - pandas
     - flask
-    - langchain
+    - langchain>=0.0.2
     - faiss-cpu
     - sentence-transformers
     - networkx
     - python-dotenv
     - flask[async]
+    - pinecone-client 
+    - pinecone-text
