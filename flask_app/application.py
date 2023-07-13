@@ -1,6 +1,6 @@
 
 """
-Simple flask app to demo model inference
+Simple flask application to demo model inference
 """
 
 from flask import Flask, request, render_template
@@ -8,16 +8,16 @@ import json
 from langchain_inference import run_chain
 import os 
 
-app = Flask(__name__)
+application = Flask(__name__)
 faculties = {}
 FACULTIES_PATH = os.path.join('data','documents','faculties.txt')
 
-@app.route('/', methods=['GET'])
+@application.route('/', methods=['GET'])
 def home():
     # Render the form template
     return render_template('index.html',faculties = faculties)
 
-@app.route('/answer', methods=['POST'])
+@application.route('/answer', methods=['POST'])
 async def answer():
     # Submission from the form template
     topic = request.form['topic']
