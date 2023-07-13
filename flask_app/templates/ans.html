@@ -22,13 +22,20 @@
         <p>{{question}}</p>
         <p><strong>Context: </strong>{% if context == '' %} None {% else %} {{context}}{% endif %}</p>
       </header>
+      {% if additional_response %}
+        <aside style="width: var(--width-card-wide);">
+          <zero-md>
+            <script type="text/markdown">{{additional_response}}</script>
+          </zero-md>
+        </aside>
+      {% endif %}
       {% for doc in answers%}
       <aside style="width: var(--width-card-wide);">
         <h3>
           Answer {{loop.index}}
         </h3>
-        <p><strong>Title: </strong>{{' -> '.join(doc.metadata['titles'])}}</p>
-        <p><strong>Url: </strong><a href="{{doc.metadata['url']}}">{{doc.metadata['url']}}</a></p>
+        <h4>Generated Response</h4>
+        <p>{{doc.metadata['generated_response']}}</p>
         <h4>Context</h4>
         <zero-md>
           <template>
@@ -42,8 +49,11 @@
           </template>
           <script type="text/markdown">{{doc.page_content}}</script>
         </zero-md>
-        <h4>Generated Response</h4>
-        <p>{{doc.metadata['generated_response']}}</p>
+        <h4>Source</h4>
+        {% if doc.metadata['source'] %}
+          <p> {{doc.metadata['source']}} </p>
+        {% endif %}
+        <p>Url: <a href="{{doc.metadata['url']}}">{{doc.metadata['url']}}</a></p>
         {% if 'related_links' in doc.metadata and doc.metadata['related_links']|length > 0 %}
         <h4>
           Relevant Links
@@ -52,15 +62,13 @@
           {% for title,link,doc_id in doc.metadata['related_links'] %}
             <li>
               <p>{{title}}: <a href="{{link}}">{{link}}</a></p>
-              <input id="ask" type="submit" value="Ask Cali" style="padding: 10px" onclick="post_form({{doc_id}})"/>
+              {% if doc_id %}
+                <input id="ask" type="submit" value="Ask Cali" style="padding: 10px" onclick="post_form({{doc_id}})"/>
+              {% endif %}
             </li>
           {% endfor %}
         </ul>
         {% endif %}
-        <h4>
-          Relevance Score
-        </h4>
-        <p>{{doc.metadata['score']}}</p>
       </aside>
       {% endfor %}
     </section>

@@ -12,9 +12,11 @@ from comparator import Comparator
 from numpy import isnan
 from retrievers import PineconeRetriever, Retriever
 import copy 
+import json
 
 load_dotenv()
 GRAPH_FILEPATH = os.path.join('data','documents','website_graph.txt')
+CONFIG_PATH = 'config'
 
 ### LOAD MODELS 
 huggingface_model_names = ['google/flan-t5-xxl','google/flan-ul2','tiiuae/falcon-7b-instruct']
@@ -22,8 +24,21 @@ llm, prompt = llm_utils.load_huggingface_endpoint(huggingface_model_names[0])
 llm_chain = LLMChain(prompt=prompt, llm=llm)
 filter = LLMChainFilter.from_llm(llm, verbose=True)
 compressor = LLMChainExtractor.from_llm(llm)
+
+### LOAD FILES
+def read_text(filename: str, as_json = False):
+    result = ''
+    with open(filename) as f:
+        if as_json: result = json.load(f)
+        else: result = f.read()
+    return result
+    
 graph = doc_graph_utils.read_graph(GRAPH_FILEPATH)
 download_all_dirs()
+backup_response = read_text(os.path.join(CONFIG_PATH,'backup_response.md'))
+data_source_annotations = read_text(os.path.join(CONFIG_PATH,'data_source_annotations.json'), as_json=True)
+
+### UTILITY FUNCTIONS
 
 def print_results(results: List[Document], print_content=False):
     """
@@ -109,7 +124,7 @@ def docs_for_llms(docs: List[Document]):
     - Adds the context sentence if provided
     """
     for doc in docs:
-        content = ' -> '.join(doc.metadata['parent_titles'] + doc.metadata['titles'])
+        content = ' -> '.join(doc.metadata['parent_titles'][:-1] + doc.metadata['titles'])
         if 'context' in doc.metadata and not isnan(doc.metadata['context']) and doc.metadata['context'] != '': 
             content += '\n\n' + doc.metadata['context']
         content += '\n\n' + doc.page_content
@@ -131,6 +146,12 @@ def format_docs_for_display(docs: List[Document]):
         # Render links in markdown
         for title,(link,_) in doc.metadata['links'].items():
             doc.page_content = doc.page_content.replace(title, f'[{title}]({link})')
+            
+        # Add data source annotation
+        for key, data in data_source_annotations.items():
+            if len(key) < 4: continue 
+            if key in doc.metadata['url']: 
+                doc.metadata['source'] = f"{data['name']}: {data['annotation']}"
             
 
 def backoff_retrieval(retriever: Retriever, program_info: Dict, topic: str, query:str, k:int = 5, threshold = 0, do_filter: bool = False) -> List[Document]:
@@ -181,7 +202,7 @@ def backoff_retrieval(retriever: Retriever, program_info: Dict, topic: str, quer
     return docs[:min(len(docs),k)] 
     
 async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=None,
-                    combine_with_sibs:bool=False, do_filter:bool=True, compress:bool=True, generate:bool=False):
+                    combine_with_sibs:bool=False, do_filter:bool=False, compress:bool=True, generate:bool=True):
 
     """
     Run the question answering chain with the given context and query
@@ -197,6 +218,7 @@ async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=Non
 
     retriever = PineconeRetriever(filter_params=['faculty','program'])
     llm_query = llm_utils.llm_query(program_info, topic, query)
+    additional_response = None # Additional info to display to user in response
     
     docs = []
     if start_doc:
@@ -235,4 +257,5 @@ async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=Non
         if highlighted_text: doc.page_content = highlighted_text
     
     format_docs_for_display(docs)
-    return docs
+    if len(docs) == 0: additional_response = backup_response
+    return docs, additional_response
