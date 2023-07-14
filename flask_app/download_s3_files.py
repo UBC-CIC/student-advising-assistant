@@ -40,12 +40,15 @@ def download_all_dirs():
     """
     Downloads the directories from s3 necessary for the app
     """
-    session = boto3.Session(profile_name=os.environ.get('AWS_PROFILE_NAME'))
-    s3 = session.client('s3')
+    if "AWS_PROFILE_NAME" in  os.environ:
+        session = boto3.Session(profile_name=os.environ.get("AWS_PROFILE_NAME"))
+    else:
+        session = boto3.Session()
+    s3_client = session.client('s3')
     dirs = ['indexes','documents']
     for dir in dirs:
-        download_s3_directory(s3, s3_config['directories'][dir],'data')
-    s3.close()
+        download_s3_directory(s3_client, s3_config['directories'][dir],'data')
+    s3_client.close()
         
 if __name__ == '__main__':
     download_all_dirs()

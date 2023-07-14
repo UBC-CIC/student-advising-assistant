@@ -6,3 +6,4 @@ html2text
 spacy
 lxml
 boto3
+python-dotenv
