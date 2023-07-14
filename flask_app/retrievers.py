@@ -190,9 +190,11 @@ class PineconeRetriever(Retriever):
     # Namespace to use for all queries to the pinecone index
     namespace: Optional[str] 
     
-    def __init__(self, alpha = 0.4, filter_params = []):
+    def __init__(self, pinecone_key: str, pinecone_region: str, alpha = 0.4, filter_params = []):
         """
         Initialize the pinecone retriever
+        - pinecone_key: API key for pinecone
+        - pinecone_region: region for the pinecone index
         - alpha: weighting of the sparse vs dense vectors
                  0 = pure semantic search (dense vectors)
                  1 = pure keyword search (sparse vectors)
@@ -214,8 +216,8 @@ class PineconeRetriever(Retriever):
         
         # Connect to the pinecone index
         pinecone.init(      
-            api_key=os.environ.get('PINECONE_KEY'),      
-            environment=os.environ.get('PINECONE_REGION')      
+            api_key=pinecone_key,      
+            environment=pinecone_region     
         )     
         index = pinecone.Index(index_config['name'])
         self.namespace = index_config['namespace']

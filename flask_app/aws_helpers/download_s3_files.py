@@ -1,16 +1,8 @@
-import boto3
-from dotenv import load_dotenv
 import os
-import json
+from .get_session import get_session
+from .param_manager import get_param_manager
 
-# Load session and settings
-def load_json_file(file: str):
-    with open(file,'r') as f: 
-        return json.load(f)
-    
-load_dotenv()
-s3_config = load_json_file('s3_config.json')
-bucket_name = s3_config['bucket-name']
+bucket_name = get_param_manager().get_parameter(['documents','S3_BUCKET_NAME'])
     
 def download_s3_directory(s3_client, directory: str, output_prefix: str, bucket_name: str = bucket_name):
     """
@@ -25,7 +17,7 @@ def download_s3_directory(s3_client, directory: str, output_prefix: str, bucket_
     
     for obj in s3_client.list_objects_v2(Bucket=bucket_name, StartAfter=f"{directory}/", Prefix=f"{directory}/")['Contents']:
         directory_list = obj['Key'].split(f"{directory}/")[-1].split('/')
-        out_path = os.path.join(output_prefix,directory,*directory_list)
+        out_path = os.path.join(output_prefix,*directory.split('/'),*directory_list)
         dirpath =  os.path.dirname(out_path)
         if os.path.exists(out_path):
             if os.path.getmtime(out_path) >= obj['LastModified'].timestamp():
@@ -43,7 +35,7 @@ def download_all_dirs(retriever: str):
                  Choices are 'faiss', 'pinecone'
     """
     # Login to s3
-    session = boto3.Session(profile_name=os.environ.get('AWS_PROFILE_NAME'))
+    session = get_session()
     s3 = session.client('s3')
     
     # Specify directories to download
@@ -54,7 +46,7 @@ def download_all_dirs(retriever: str):
         dirs.append('indexes/pinecone')
     
     for dir in dirs:
-        download_s3_directory(s3, dir,'data')
+        download_s3_directory(s3, dir, 'data')
     s3.close()
         
 if __name__ == '__main__':

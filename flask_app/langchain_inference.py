@@ -13,25 +13,27 @@ from numpy import isnan
 from retrievers import PineconeRetriever, Retriever
 import copy 
 import json
+from aws_helpers.param_manager import get_param_manager
 
 load_dotenv()
 GRAPH_FILEPATH = os.path.join('data','documents','website_graph.txt')
 CONFIG_PATH = 'config'
 
-### CONFIG
-retriever_name = 'pinecone'
-llm_type = 'sagemaker'
-llm_name = 'vicuna'
+### LOAD AWS CONFIG
+param_manager = get_param_manager()
+os.environ["HUGGINGFACEHUB_API_TOKEN"] = param_manager.get_secret('generator/HUGGINGFACE_API')['API_TOKEN']
+retriever_config = param_manager.get_parameter('retriever')
+generator_config = param_manager.get_parameter('generator')
 
 ### LOAD MODELS 
-
-llm, prompt = llm_utils.load_model_and_prompt(llm_type, llm_name)
+llm, prompt = llm_utils.load_model_and_prompt(generator_config['ENDPOINT_TYPE'], generator_config['ENDPOINT_NAME'], generator_config['MODEL_NAME'])
 llm_chain = LLMChain(prompt=prompt, llm=llm)
 filter = LLMChainFilter.from_llm(llm, verbose=True)
 compressor = LLMChainExtractor.from_llm(llm)
 
-if retriever_name == 'pinecone':
-    retriever = PineconeRetriever(filter_params=['faculty','program'])
+if retriever_config['RETRIEVER_NAME'] == 'pinecone':
+    pinecone_auth = param_manager.get_secret('retriever/PINECONE')
+    retriever = PineconeRetriever(pinecone_auth['PINECONE_KEY'], pinecone_auth['PINECONE_REGION'], filter_params=['faculty','program'])
     
 ### LOAD FILES
 def read_text(filename: str, as_json = False):
@@ -42,7 +44,7 @@ def read_text(filename: str, as_json = False):
     return result
     
 graph = doc_graph_utils.read_graph(GRAPH_FILEPATH)
-download_all_dirs(retriever_name)
+download_all_dirs(retriever_config['RETRIEVER_NAME'])
 backup_response = read_text(os.path.join(CONFIG_PATH,'backup_response.md'))
 data_source_annotations = read_text(os.path.join(CONFIG_PATH,'data_source_annotations.json'), as_json=True)
 

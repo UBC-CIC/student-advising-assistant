@@ -12,6 +12,7 @@ from typing import Tuple, Dict
 import prompts.prompts as prompts
 import os 
 from fastchat_adapter import FastChatLLM
+from aws_helpers.param_manager import get_param_manager
 
 ### HELPER CLASSES
 class ContentHandler(LLMContentHandler):
@@ -56,33 +57,24 @@ def llm_query(program_info: Dict, topic: str, query: str):
 
 ### MODEL LOADING FUNCTIONS
 
-huggingface_model_names = {
-    'flan-t5-xxl': 'google/flan-t5-xxl',
-    'distilbert': 'distilbert-base-uncased-distilled-squad'
-    }
-
-sagemaker_endpoint_names = {
-    'vicuna': ''
-}
-
 fastchat_models = {
     'vicuna': 'vicuna_v1.1'
 }
 
-def load_model_and_prompt(endpoint_type: str, model_name: str) -> Tuple[BaseLLM,Prompt]:
+def load_model_and_prompt(endpoint_type: str, endpoint_name: str, model_name: str) -> Tuple[BaseLLM,Prompt]:
     """
     Utility function loads a LLM of the given endpoint type and model name
     - endpoint_type: 'sagemaker', 'huggingface', or 'huggingface_qa'
-    - model_name: requires that the name is defined for the appropriate endpoint
-                  in the dicts above
+    - endpoint_name: huggingface model id, or sagemaker endpoint name
+    - model_name: display name of the model
     """
     llm = None
     if endpoint_type == 'sagemaker':
-        llm = load_sagemaker_endpoint(sagemaker_endpoint_names[model_name])
+        llm = load_sagemaker_endpoint(endpoint_name)
     elif endpoint_type == 'huggingface':
-        llm = load_huggingface_endpoint(huggingface_model_names[model_name])
+        llm = load_huggingface_endpoint(endpoint_name)
     elif endpoint_type == 'huggingface_qa':
-        llm = load_huggingface_qa_endpoint(huggingface_model_names[model_name])
+        llm = load_huggingface_qa_endpoint(endpoint_name)
     
     if model_name in fastchat_models:
         llm = FastChatLLM(llm, fastchat_models[model_name])
