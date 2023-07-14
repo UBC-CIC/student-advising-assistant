@@ -25,18 +25,13 @@ Prerequisites:
 - Requires an S3 bucket containing the processed documents in a 'documents' folder and the document indexes in a 'indexes' folder
 - More details on the index creation process will be uploaded soon
 
-To run the demo:
+To run the demo locally:
 - Create a conda env with the command `conda env create -f environment.yml` from the flask_app directory
 - Activate the environment with `conda activate flaskenv` (or whichever name you chose for the environment)
 - Ensure your AWS profile is logged in via `aws sso login --profile <profile name>`
 - Run `flask --app ask_cali --debug run` to run the app in debug mode
 
-**Note:** To work properly, the app will require a .env file under ./flask_app:
+**Note:** To run locally (not in AWS), the app will require a .env file under ./flask_app:
 ```
-# For huggingface token see https://huggingface.co/docs/hub/security-tokens
-HUGGINGFACEHUB_API_TOKEN= <insert huggingface api token>
 AWS_PROFILE_NAME=<insert AWS SSO profile name>
-# For Pinecone see https://docs.pinecone.io/docs/quickstart
-PINECONE_KEY=<insert pinecone api key>
-PINECONE_REGION=<insert pinecone api region>
 ```
