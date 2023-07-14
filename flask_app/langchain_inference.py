@@ -5,7 +5,7 @@ import regex as re
 from typing import List, Dict
 from dotenv import load_dotenv
 import os
-from download_s3_files import download_all_dirs
+from aws_helpers.download_s3_files import download_all_dirs
 import llm_utils
 import doc_graph_utils
 from comparator import Comparator
@@ -18,13 +18,21 @@ load_dotenv()
 GRAPH_FILEPATH = os.path.join('data','documents','website_graph.txt')
 CONFIG_PATH = 'config'
 
+### CONFIG
+retriever_name = 'pinecone'
+llm_type = 'sagemaker'
+llm_name = 'vicuna'
+
 ### LOAD MODELS 
-huggingface_model_names = ['google/flan-t5-xxl','google/flan-ul2','tiiuae/falcon-7b-instruct']
-llm, prompt = llm_utils.load_huggingface_endpoint(huggingface_model_names[0])
+
+llm, prompt = llm_utils.load_model_and_prompt(llm_type, llm_name)
 llm_chain = LLMChain(prompt=prompt, llm=llm)
 filter = LLMChainFilter.from_llm(llm, verbose=True)
 compressor = LLMChainExtractor.from_llm(llm)
 
+if retriever_name == 'pinecone':
+    retriever = PineconeRetriever(filter_params=['faculty','program'])
+    
 ### LOAD FILES
 def read_text(filename: str, as_json = False):
     result = ''
@@ -34,7 +42,7 @@ def read_text(filename: str, as_json = False):
     return result
     
 graph = doc_graph_utils.read_graph(GRAPH_FILEPATH)
-download_all_dirs()
+download_all_dirs(retriever_name)
 backup_response = read_text(os.path.join(CONFIG_PATH,'backup_response.md'))
 data_source_annotations = read_text(os.path.join(CONFIG_PATH,'data_source_annotations.json'), as_json=True)
 
@@ -216,7 +224,6 @@ async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=Non
     - generate: If true, generates a response for each final document
     """
 
-    retriever = PineconeRetriever(filter_params=['faculty','program'])
     llm_query = llm_utils.llm_query(program_info, topic, query)
     additional_response = None # Additional info to display to user in response
     
@@ -224,7 +231,7 @@ async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=Non
     if start_doc:
         docs += retriever.docs_from_ids([start_doc])
     else:
-        docs += backoff_retrieval(retriever, program_info, topic, query, k=5, do_filter=do_filter)
+        docs += backoff_retrieval(retriever, program_info, topic, query, k=1, do_filter=do_filter)
 
     docs_for_llms(docs)
 
