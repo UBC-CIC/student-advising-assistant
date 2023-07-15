@@ -40,7 +40,9 @@ def download_all_dirs():
     """
     Downloads the directories from s3 necessary for the app
     """
-    if "AWS_PROFILE_NAME" in  os.environ:
+
+    # check if the environment variable AWS_PROFILE_NAME exists and its value is not an empty string
+    if "AWS_PROFILE_NAME" in os.environ and os.environ["AWS_PROFILE_NAME"]:
         session = boto3.Session(profile_name=os.environ.get("AWS_PROFILE_NAME"))
     else:
         session = boto3.Session()

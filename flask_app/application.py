@@ -45,3 +45,8 @@ def setup():
         faculties = json.load(f)
 
 setup()
+
+# Run the application
+# must be like this to run from container
+if __name__ == "__main__":
+    application.run(host="0.0.0.0")
