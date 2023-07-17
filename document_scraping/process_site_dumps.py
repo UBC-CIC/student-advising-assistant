@@ -399,14 +399,14 @@ specialization_suffix_regex = f".+({'|'.join(specialization_suffixes)})"
 specialization_regex = re.compile(f"^({specialization_prefix_regex}|{specialization_suffix_regex})$")
 
 def calendar_extract_metadata(url: str, titles: List[str], parent_titles: List[str], text: str):
-    metadata = {}
+    metadata = {'specialization': []}
     for subtitle in parent_titles + titles:
         if 'faculty' not in metadata and re.match(faculty_regex, subtitle):
             metadata['faculty'] = subtitle
         if 'program' not in metadata and re.match(program_regex, subtitle):
             metadata['program'] = subtitle
-        if 'specialization' not in metadata and re.match(specialization_regex, subtitle):
-            metadata['specialization'] = subtitle
+        if re.match(specialization_regex, subtitle):
+            metadata['specialization'].append(subtitle)
 
     if re.search('\* \d+ credits of ', text):
         if 'specialization' in metadata:
@@ -416,10 +416,10 @@ def calendar_extract_metadata(url: str, titles: List[str], parent_titles: List[s
     return metadata
 
 def blog_extract_metadata(url: str, titles: List[str], parent_titles: List[str], text: str):
-    metadata = {'faculty': 'The Faculty of Science', 'program': 'Bachelor of Science'}
+    metadata = {'faculty': 'The Faculty of Science', 'program': 'Bachelor of Science', 'specialization': []}
     for subtitle in parent_titles + titles:
-        if 'specialization' not in metadata and re.match(specialization_regex, subtitle):
-            metadata['specialization'] = subtitle
+        if re.match(specialization_regex, subtitle):
+            metadata['specialization'].append(subtitle)
     return metadata
 
 calendar_is_new_format = True

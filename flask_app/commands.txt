@@ -1,2 +1,2 @@
-flask --app ask_cali run --host=0.0.0.0
-flask --app ask_cali --debug run
+flask --app application run --host=0.0.0.0
+flask --app application --debug run
