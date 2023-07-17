@@ -5,25 +5,57 @@ import regex as re
 from typing import List, Dict
 from dotenv import load_dotenv
 import os
-from download_s3_files import download_all_dirs
+from aws_helpers.download_s3_files import download_all_dirs
 import llm_utils
 import doc_graph_utils
 from comparator import Comparator
 from numpy import isnan
 from retrievers import PineconeRetriever, Retriever
 import copy 
+import json
+from aws_helpers.param_manager import get_param_manager
+from langchain.chains.combine_documents.refine import RefineDocumentsChain
+from langchain.chains.question_answering import load_qa_chain
+
+VERBOSE_LLMS = True
 
 load_dotenv()
 GRAPH_FILEPATH = os.path.join('data','documents','website_graph.txt')
+CONFIG_PATH = 'config'
+
+### LOAD AWS CONFIG
+param_manager = get_param_manager()
+os.environ["HUGGINGFACEHUB_API_TOKEN"] = param_manager.get_secret('generator/HUGGINGFACE_API')['API_TOKEN']
+retriever_config = param_manager.get_parameter('retriever')
+generator_config = param_manager.get_parameter('generator')
 
 ### LOAD MODELS 
-huggingface_model_names = ['google/flan-t5-xxl','google/flan-ul2','tiiuae/falcon-7b-instruct']
-llm, prompt = llm_utils.load_huggingface_endpoint(huggingface_model_names[0])
-llm_chain = LLMChain(prompt=prompt, llm=llm)
-filter = LLMChainFilter.from_llm(llm, verbose=True)
+#llm, prompt = llm_utils.load_model_and_prompt(generator_config['ENDPOINT_TYPE'], generator_config['ENDPOINT_NAME'], generator_config['MODEL_NAME'])
+#llm, prompt = llm_utils.load_model_and_prompt(generator_config['ENDPOINT_TYPE'], 'tiiuae/falcon-7b-instruct', 'falcon')
+llm, prompt = llm_utils.load_model_and_prompt(generator_config['ENDPOINT_TYPE'], 'google/flan-t5-xxl', 'flan')
+
+llm_chain = LLMChain(prompt=prompt, llm=llm, verbose=VERBOSE_LLMS)
+filter = LLMChainFilter.from_llm(llm)
 compressor = LLMChainExtractor.from_llm(llm)
+
+if retriever_config['RETRIEVER_NAME'] == 'pinecone':
+    pinecone_auth = param_manager.get_secret('retriever/PINECONE')
+    retriever = PineconeRetriever(pinecone_auth['PINECONE_KEY'], pinecone_auth['PINECONE_REGION'], filter_params=['faculty','program'])
+    
+### LOAD FILES
+def read_text(filename: str, as_json = False):
+    result = ''
+    with open(filename) as f:
+        if as_json: result = json.load(f)
+        else: result = f.read()
+    return result
+    
 graph = doc_graph_utils.read_graph(GRAPH_FILEPATH)
-download_all_dirs()
+download_all_dirs(retriever_config['RETRIEVER_NAME'])
+backup_response = read_text(os.path.join(CONFIG_PATH,'backup_response.md'))
+data_source_annotations = read_text(os.path.join(CONFIG_PATH,'data_source_annotations.json'), as_json=True)
+
+### UTILITY FUNCTIONS
 
 def print_results(results: List[Document], print_content=False):
     """
@@ -109,7 +141,7 @@ def docs_for_llms(docs: List[Document]):
     - Adds the context sentence if provided
     """
     for doc in docs:
-        content = ' -> '.join(doc.metadata['parent_titles'] + doc.metadata['titles'])
+        content = ' -> '.join(doc.metadata['parent_titles'][:-1] + doc.metadata['titles'])
         if 'context' in doc.metadata and not isnan(doc.metadata['context']) and doc.metadata['context'] != '': 
             content += '\n\n' + doc.metadata['context']
         content += '\n\n' + doc.page_content
@@ -132,6 +164,11 @@ def format_docs_for_display(docs: List[Document]):
         for title,(link,_) in doc.metadata['links'].items():
             doc.page_content = doc.page_content.replace(title, f'[{title}]({link})')
             
+        # Add data source annotation
+        for key, data in data_source_annotations.items():
+            if len(key) < 4: continue 
+            if key in doc.metadata['url']: 
+                doc.metadata['source'] = f"{data['name']}: {data['annotation']}"
 
 def backoff_retrieval(retriever: Retriever, program_info: Dict, topic: str, query:str, k:int = 5, threshold = 0, do_filter: bool = False) -> List[Document]:
     """
@@ -181,7 +218,9 @@ def backoff_retrieval(retriever: Retriever, program_info: Dict, topic: str, quer
     return docs[:min(len(docs),k)] 
     
 async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=None,
-                    combine_with_sibs:bool=False, do_filter:bool=True, compress:bool=True, generate:bool=False):
+                    combine_with_sibs:bool=False, do_filter:bool=False, compress:bool=True, 
+                    generate_by_document:bool=False,
+                    generate_combined:bool=True, k:int=2):
 
     """
     Run the question answering chain with the given context and query
@@ -192,47 +231,66 @@ async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=Non
     - combine_with_sibs: If true, combines all documents with their immediate sibling documents
     - do_filter: If true, applies a LLM filter step to the retrieved documents to remove irrelevant documents
     - compress: If true, applies a LLM compres step to compress documents, extracting relevant sections
-    - generate: If true, generates a response for each final document
+    - generate_by_document: If true, generates a response for each final document
+    - generate_combined: If true, generates a reponse using the combined documents
     """
 
-    retriever = PineconeRetriever(filter_params=['faculty','program'])
     llm_query = llm_utils.llm_query(program_info, topic, query)
+    additional_response = None # To store any additional info to display to user in response
     
     docs = []
     if start_doc:
+        # If given a document id to start with, retrieve that document
         docs += retriever.docs_from_ids([start_doc])
     else:
-        docs += backoff_retrieval(retriever, program_info, topic, query, k=5, do_filter=do_filter)
+        # Peform retrieval
+        docs += backoff_retrieval(retriever, program_info, topic, query, k=k, do_filter=do_filter)
 
+    # Prepare the documents for input to LLMs
     docs_for_llms(docs)
 
     if combine_with_sibs: combine_sib_docs(retriever, docs)
 
+    # Perform compression step if the option is turned on
     compressed_docs = None
     if compress: 
         compressed_docs = compressor.compress_documents(docs, llm_query)
         get_related_links_from_compressed(docs, compressed_docs)
 
+    # Perform a combined generation if the option is turned on
+    if generate_combined:
+        combine_documents_chain = load_qa_chain(llm=llm, chain_type="refine")
+        input_docs = compressed_docs if compressed_docs else docs
+        combined_answer = combine_documents_chain.run(input_documents=input_docs, question=llm_query)
+        additional_response = combined_answer
+    
     for doc in docs:
         highlighted_text = None
         
         if compress:
+            # Add markings to highlight the compressed section of the document in the UI
             compressed_content = [c_doc.page_content for c_doc in compressed_docs if c_doc.metadata['doc_id'] == doc.metadata['doc_id']]
             if len(compressed_content) > 0: 
                 compressed_content = compressed_content[0]
                 compressed_re = re.escape(compressed_content).replace('\ ','(\s|\n)*')
                 if match := re.search(compressed_re, doc.page_content):
-                    # Highlight the compressed section
+                    # Add italics markings as the indicator to highlight
                     new = add_italics(match.group())
                     highlighted_text = doc.page_content.replace(match.group(), new)
                     
-        if generate:
+        # Generate a response from this document only, if the option is turned on
+        if generate_by_document:
             generated = generate_answer(doc, llm_query)
             doc.metadata['generated_response'] = generated
-        else:
-            doc.metadata['generated_response'] = 'Text generation is turned off'
         
+        # Replace document content with the highlighted version, if it exists
+        # Done after generation so the markings are not present for generation
         if highlighted_text: doc.page_content = highlighted_text
-    
+
     format_docs_for_display(docs)
-    return docs
+    
+    if len(docs) == 0: 
+        # No documents were returned, display the backup response
+        additional_response = backup_response
+        
+    return docs, additional_response

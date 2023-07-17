@@ -8,14 +8,26 @@ import json
 from langchain_inference import run_chain
 import os 
 
+### Constants
+FACULTIES_PATH = os.path.join('data','documents','faculties.txt')
+INSTRUCTIONS_PATH = os.path.join('config','query_suggestions.md')
+
+### Globals (set upon load)
 application = Flask(__name__)
 faculties = {}
-FACULTIES_PATH = os.path.join('data','documents','faculties.txt')
+instructions = ''
+
+def read_text(filename: str, as_json = False):
+    result = ''
+    with open(filename) as f:
+        if as_json: result = json.load(f)
+        else: result = f.read()
+    return result
 
 @application.route('/', methods=['GET'])
 def home():
     # Render the form template
-    return render_template('index.html',faculties = faculties)
+    return render_template('index.html', faculties=faculties, instructions=instructions)
 
 @application.route('/answer', methods=['POST'])
 async def answer():
@@ -31,17 +43,17 @@ async def answer():
         start_doc = int(start_doc)
 
     # Run the model inference
-    docs = await run_chain(program_info,topic,question,start_doc=start_doc)
+    docs, additional_response = await run_chain(program_info,topic,question,start_doc=start_doc)
 
     # Render the results
     context_str = ' : '.join(list(program_info.values()) + [topic])
     return render_template('ans.html',question=question,context=context_str,answers=docs,
-                           form=request.form.to_dict())
+                           form=request.form.to_dict(), additional_response=additional_response)
 
 def setup():
     # Upon loading, load the available settings for the form
-    global faculties
-    with open(FACULTIES_PATH) as f:
-        faculties = json.load(f)
+    global faculties, instructions
+    faculties = read_text(FACULTIES_PATH,as_json=True)
+    instructions = read_text(INSTRUCTIONS_PATH)
 
 setup()
