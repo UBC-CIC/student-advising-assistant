@@ -14,6 +14,10 @@ from retrievers import PineconeRetriever, Retriever
 import copy 
 import json
 from aws_helpers.param_manager import get_param_manager
+from langchain.chains.combine_documents.refine import RefineDocumentsChain
+from langchain.chains.question_answering import load_qa_chain
+
+VERBOSE_LLMS = True
 
 load_dotenv()
 GRAPH_FILEPATH = os.path.join('data','documents','website_graph.txt')
@@ -26,9 +30,12 @@ retriever_config = param_manager.get_parameter('retriever')
 generator_config = param_manager.get_parameter('generator')
 
 ### LOAD MODELS 
-llm, prompt = llm_utils.load_model_and_prompt(generator_config['ENDPOINT_TYPE'], generator_config['ENDPOINT_NAME'], generator_config['MODEL_NAME'])
-llm_chain = LLMChain(prompt=prompt, llm=llm)
-filter = LLMChainFilter.from_llm(llm, verbose=True)
+#llm, prompt = llm_utils.load_model_and_prompt(generator_config['ENDPOINT_TYPE'], generator_config['ENDPOINT_NAME'], generator_config['MODEL_NAME'])
+#llm, prompt = llm_utils.load_model_and_prompt(generator_config['ENDPOINT_TYPE'], 'tiiuae/falcon-7b-instruct', 'falcon')
+llm, prompt = llm_utils.load_model_and_prompt(generator_config['ENDPOINT_TYPE'], 'google/flan-t5-xxl', 'flan')
+
+llm_chain = LLMChain(prompt=prompt, llm=llm, verbose=VERBOSE_LLMS)
+filter = LLMChainFilter.from_llm(llm)
 compressor = LLMChainExtractor.from_llm(llm)
 
 if retriever_config['RETRIEVER_NAME'] == 'pinecone':
@@ -162,7 +169,6 @@ def format_docs_for_display(docs: List[Document]):
             if len(key) < 4: continue 
             if key in doc.metadata['url']: 
                 doc.metadata['source'] = f"{data['name']}: {data['annotation']}"
-            
 
 def backoff_retrieval(retriever: Retriever, program_info: Dict, topic: str, query:str, k:int = 5, threshold = 0, do_filter: bool = False) -> List[Document]:
     """
@@ -212,7 +218,9 @@ def backoff_retrieval(retriever: Retriever, program_info: Dict, topic: str, quer
     return docs[:min(len(docs),k)] 
     
 async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=None,
-                    combine_with_sibs:bool=False, do_filter:bool=False, compress:bool=True, generate:bool=True):
+                    combine_with_sibs:bool=False, do_filter:bool=False, compress:bool=True, 
+                    generate_by_document:bool=False,
+                    generate_combined:bool=True, k:int=2):
 
     """
     Run the question answering chain with the given context and query
@@ -223,7 +231,8 @@ async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=Non
     - combine_with_sibs: If true, combines all documents with their immediate sibling documents
     - do_filter: If true, applies a LLM filter step to the retrieved documents to remove irrelevant documents
     - compress: If true, applies a LLM compres step to compress documents, extracting relevant sections
-    - generate: If true, generates a response for each final document
+    - generate_by_document: If true, generates a response for each final document
+    - generate_combined: If true, generates a reponse using the combined documents
     """
 
     llm_query = llm_utils.llm_query(program_info, topic, query)
@@ -233,7 +242,7 @@ async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=Non
     if start_doc:
         docs += retriever.docs_from_ids([start_doc])
     else:
-        docs += backoff_retrieval(retriever, program_info, topic, query, k=1, do_filter=do_filter)
+        docs += backoff_retrieval(retriever, program_info, topic, query, k=k, do_filter=do_filter)
 
     docs_for_llms(docs)
 
@@ -244,6 +253,12 @@ async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=Non
         compressed_docs = compressor.compress_documents(docs, llm_query)
         get_related_links_from_compressed(docs, compressed_docs)
 
+    if generate_combined:
+        combine_documents_chain = load_qa_chain(llm=llm, chain_type="refine")
+        input_docs = compressed_docs if compressed_docs else docs
+        combined_answer = combine_documents_chain.run(input_documents=input_docs, question=llm_query)
+        additional_response = combined_answer
+    
     for doc in docs:
         highlighted_text = None
         
@@ -257,14 +272,14 @@ async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=Non
                     new = add_italics(match.group())
                     highlighted_text = doc.page_content.replace(match.group(), new)
                     
-        if generate:
+        if generate_by_document:
             generated = generate_answer(doc, llm_query)
             doc.metadata['generated_response'] = generated
-        else:
-            doc.metadata['generated_response'] = 'Text generation is turned off'
+        #else:
+        #    doc.metadata['generated_response'] = 'Text generation is turned off'
         
         if highlighted_text: doc.page_content = highlighted_text
-    
+
     format_docs_for_display(docs)
     if len(docs) == 0: additional_response = backup_response
     return docs, additional_response
