@@ -236,23 +236,28 @@ async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=Non
     """
 
     llm_query = llm_utils.llm_query(program_info, topic, query)
-    additional_response = None # Additional info to display to user in response
+    additional_response = None # To store any additional info to display to user in response
     
     docs = []
     if start_doc:
+        # If given a document id to start with, retrieve that document
         docs += retriever.docs_from_ids([start_doc])
     else:
+        # Peform retrieval
         docs += backoff_retrieval(retriever, program_info, topic, query, k=k, do_filter=do_filter)
 
+    # Prepare the documents for input to LLMs
     docs_for_llms(docs)
 
     if combine_with_sibs: combine_sib_docs(retriever, docs)
 
+    # Perform compression step if the option is turned on
     compressed_docs = None
     if compress: 
         compressed_docs = compressor.compress_documents(docs, llm_query)
         get_related_links_from_compressed(docs, compressed_docs)
 
+    # Perform a combined generation if the option is turned on
     if generate_combined:
         combine_documents_chain = load_qa_chain(llm=llm, chain_type="refine")
         input_docs = compressed_docs if compressed_docs else docs
@@ -263,23 +268,29 @@ async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=Non
         highlighted_text = None
         
         if compress:
+            # Add markings to highlight the compressed section of the document in the UI
             compressed_content = [c_doc.page_content for c_doc in compressed_docs if c_doc.metadata['doc_id'] == doc.metadata['doc_id']]
             if len(compressed_content) > 0: 
                 compressed_content = compressed_content[0]
                 compressed_re = re.escape(compressed_content).replace('\ ','(\s|\n)*')
                 if match := re.search(compressed_re, doc.page_content):
-                    # Highlight the compressed section
+                    # Add italics markings as the indicator to highlight
                     new = add_italics(match.group())
                     highlighted_text = doc.page_content.replace(match.group(), new)
                     
+        # Generate a response from this document only, if the option is turned on
         if generate_by_document:
             generated = generate_answer(doc, llm_query)
             doc.metadata['generated_response'] = generated
-        #else:
-        #    doc.metadata['generated_response'] = 'Text generation is turned off'
         
+        # Replace document content with the highlighted version, if it exists
+        # Done after generation so the markings are not present for generation
         if highlighted_text: doc.page_content = highlighted_text
 
     format_docs_for_display(docs)
-    if len(docs) == 0: additional_response = backup_response
+    
+    if len(docs) == 0: 
+        # No documents were returned, display the backup response
+        additional_response = backup_response
+        
     return docs, additional_response
