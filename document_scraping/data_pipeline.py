@@ -10,13 +10,62 @@ from subprocess import check_call, STDOUT, CalledProcessError
 from tools import write_file
 import logging
 from process_site_dumps import process_site_dumps, BASE_DUMP_PATH
+import boto3
+from dotenv import load_dotenv
+from botocore.exceptions import ClientError
+from program_options_manager import find_program_options
 
 """
 Script to download the data sources using wget, and then split all pages into document extracts for 
 downstream tasks.
 """
 
+load_dotenv()
 redirect_log_re = re.compile('http[^\n]*(\n[^\n]*){2}301 Moved Permanently\nLocation:\s[^\n\s]*')
+
+def check_env_variables(envs: list[str]):
+    
+    """
+    Check for all the environment variables that are MANDATORY to have in order for the codes
+    to work
+
+    Arguments:
+        envs: the list of environment variable names
+    """
+
+    logging.info("Checking for environment variables")
+    for env in envs:
+        if env not in os.environ:
+            logging.error(f"Environment variable: {env} not found")
+            raise OSError(f"Environment variable: {env} not found")
+    logging.info("Finished checking for all necessary environment variables")
+
+def upload_to_s3(file_path: str, bucket_name: str, s3_file_path: str):
+
+    """
+    Upload a file to s3
+
+    Arguments:
+        file_path: the files' local path
+        bucket_name: the name of the bucket
+        s3_file_path: the path (key) of the file that will be created on s3
+    """
+
+    if "AWS_PROFILE_NAME" in  os.environ:
+        session = boto3.Session(profile_name=os.environ.get("AWS_PROFILE_NAME"))
+    else:
+        session = boto3.Session()
+
+    s3_client = session.client("s3")
+    try:
+        s3_client.upload_file(file_path, bucket_name, s3_file_path)
+        logging.info(f"Successfully upload file to S3")
+    except FileNotFoundError as e:
+        logging.error("The file you want to upload does not exist on your local directory")
+        logging.error("Make sure you are inside the document_scraping directory")
+    except ClientError as e:
+        logging.error(f"There was an error uploading the file to S3: {str(e)}")
+    
 
 def pull_sites(base_urls, names, system_os, regex_rules = {}, output_folder = './', additional_urls_file = None, wget_exe_path = './wget.exe', wget_config_path = './wget_config.txt'):
     """
@@ -68,8 +117,6 @@ def pull_sites(base_urls, names, system_os, regex_rules = {}, output_folder = '.
             else: 
                 logging.error('- Call to wget failed')
                 logging.error(f'- Error message: {exc.output}' if exc.output else 'No error message given')
-                logging.error(f'- Skipping pull for {base_url}')
-                continue
         
         total_num += get_redirects_from_log(log_file, redirects)
 
@@ -144,8 +191,18 @@ def get_redirects_from_log(log_file, redirects):
 
 ### Main
 
-def main():
+def main(recreate_faculties: bool = False):
+    """
+    - recreate_faculties: if True, recreates the faculties.txt file
+                be careful, because the results may have to be
+                manually pruned after (remove unnecessary specializations)
+    """
+    
     logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+
+    # check for all environment variables that are MANDATORY to have
+    envs = ["BUCKET_NAME"]
+    check_env_variables(envs)
 
     # check the system OS since Windows Machine requires a wget.exe
     # darwin (OS X) and Linux probably not
@@ -166,8 +223,17 @@ def main():
         'science_students': '.*science.ubc.ca/students.*'
     }
 
-    pull_sites(urls,names,system_os,regex_rules,output_folder = BASE_DUMP_PATH, wget_exe_path=wget_exe_path, wget_config_path=wget_config_path)
+    pull_sites(urls,names,system_os,regex_rules,output_folder = 'test2', wget_exe_path=wget_exe_path, wget_config_path=wget_config_path)
     process_site_dumps()
+
+    # Upload the website_extracts.csv and website_graph.txt
+    upload_to_s3(os.path.join("processed", "website_extracts.csv"), os.environ["BUCKET_NAME"],"documents/website_extracts.csv")
+    upload_to_s3(os.path.join("processed", "website_graph.txt"), os.environ["BUCKET_NAME"],"documents/website_graph.txt")
+    
+    if recreate_faculties:
+        find_program_options(os.path.join("processed", "website_extracts.csv"))
+        upload_to_s3(os.path.join("processed", "faculties.txt"), os.environ["BUCKET_NAME"],"documents/website_graph.txt")
 
 if __name__ == '__main__':
     main()
+ 

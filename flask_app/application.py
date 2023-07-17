@@ -1,6 +1,6 @@
 
 """
-Simple flask app to demo model inference
+Simple flask application to demo model inference
 """
 
 from flask import Flask, request, render_template
@@ -13,7 +13,7 @@ FACULTIES_PATH = os.path.join('data','documents','faculties.txt')
 INSTRUCTIONS_PATH = os.path.join('config','query_suggestions.md')
 
 ### Globals (set upon load)
-app = Flask(__name__)
+application = Flask(__name__)
 faculties = {}
 instructions = ''
 
@@ -24,12 +24,12 @@ def read_text(filename: str, as_json = False):
         else: result = f.read()
     return result
 
-@app.route('/', methods=['GET'])
+@application.route('/', methods=['GET'])
 def home():
     # Render the form template
     return render_template('index.html', faculties=faculties, instructions=instructions)
 
-@app.route('/answer', methods=['POST'])
+@application.route('/answer', methods=['POST'])
 async def answer():
     # Submission from the form template
     topic = request.form['topic']
