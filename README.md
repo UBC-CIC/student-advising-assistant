@@ -29,7 +29,7 @@ To run the demo locally:
 - Create a conda env with the command `conda env create -f environment.yml` from the flask_app directory
 - Activate the environment with `conda activate flaskenv` (or whichever name you chose for the environment)
 - Ensure your AWS profile is logged in via `aws sso login --profile <profile name>`
-- Run `flask --app application --debug run` to run the app in debug mode
+- Run `flask --app ask_cali --debug run` to run the app in debug mode
 
 **Note:** To run locally (not in AWS), the app will require a .env file under ./flask_app:
 ```

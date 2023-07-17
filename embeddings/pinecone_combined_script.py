@@ -68,6 +68,22 @@ titles = [title_sep.join(doc.metadata['titles']) for doc in docs]
 combined_titles = [f"{parent_title}{title_sep}{title}" for (title,parent_title) in zip(titles,parent_titles)]
 texts = [doc.page_content for doc in docs]
 
+# Get the names of faculties/programs/specializations
+import pandas as pd
+
+df = pd.DataFrame.from_dict(metadatas)
+faculties = {}
+faculty_groups = df.groupby('faculty')
+for group in faculty_groups:
+    programs = {}
+    program_groups = group[1].groupby('program')
+    for group2 in program_groups:
+        specializations = list(group2[1]['specialization'].dropna().unique())
+        programs[group2[0]] = {'specializations': {specialization: {} for specialization in specializations}}
+    faculties[group[0]] = {'programs': programs}
+
+with open(os.path.join(docs_dir,"faculties.txt"),'w') as f: json.dump(faculties, f, indent=4)
+
 ### CREATE EMBEDDINGS (DENSE VECTORS)
 
 index_dir = 'indexes'

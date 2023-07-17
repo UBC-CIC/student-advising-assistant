@@ -36,7 +36,7 @@ def download_all_dirs(retriever: str):
     """
     # Login to s3
     session = get_session()
-    s3_client = session.client('s3')
+    s3 = session.client('s3')
     
     # Specify directories to download
     dirs = ['documents']
@@ -46,8 +46,8 @@ def download_all_dirs(retriever: str):
         dirs.append('indexes/pinecone')
     
     for dir in dirs:
-        download_s3_directory(s3_client, dir, 'data')
-    s3_client.close()
+        download_s3_directory(s3, dir, 'data')
+    s3.close()
         
 if __name__ == '__main__':
     download_all_dirs('pinecone')

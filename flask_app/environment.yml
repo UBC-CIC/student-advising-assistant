@@ -14,4 +14,3 @@ dependencies:
     - flask[async]
     - pinecone-client 
     - pinecone-text
-    - boto3

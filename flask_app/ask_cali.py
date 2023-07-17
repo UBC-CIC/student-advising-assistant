@@ -13,7 +13,7 @@ FACULTIES_PATH = os.path.join('data','documents','faculties.txt')
 INSTRUCTIONS_PATH = os.path.join('config','query_suggestions.md')
 
 ### Globals (set upon load)
-application = Flask(__name__)
+app = Flask(__name__)
 faculties = {}
 instructions = ''
 
@@ -24,12 +24,12 @@ def read_text(filename: str, as_json = False):
         else: result = f.read()
     return result
 
-@application.route('/', methods=['GET'])
+@app.route('/', methods=['GET'])
 def home():
     # Render the form template
     return render_template('index.html', faculties=faculties, instructions=instructions)
 
-@application.route('/answer', methods=['POST'])
+@app.route('/answer', methods=['POST'])
 async def answer():
     # Submission from the form template
     topic = request.form['topic']
