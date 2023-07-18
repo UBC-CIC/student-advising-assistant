@@ -24,8 +24,8 @@
     <div class="accordion mb-3" id="info-accordion">
       <div class="accordion-item">
         <h2 class="accordion-header" id="headingOne">
-          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne"
-            aria-expanded="true" aria-controls="collapseOne">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+            data-bs-target="#collapseOne" aria-expanded="true" aria-controls="collapseOne">
             About
           </button>
         </h2>
@@ -37,8 +37,8 @@
         </div>
         <div class="accordion-item">
           <h2 class="accordion-header" id="headingTwo">
-            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTwo"
-              aria-expanded="true" aria-controls="collapseTwo">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+              data-bs-target="#collapseTwo" aria-expanded="true" aria-controls="collapseTwo">
               Instructions and Suggestions
             </button>
           </h2>
@@ -59,9 +59,9 @@
         <form action="/answer" method="post">
           <div class="col-12">
             <div class="input-group mb-3">
-              <span class="input-group-text" id="inputGroup-sizing-default">Faculty</span>
-              <input type="text" id="faculty" class="form-control" name="faculty" list="faculty_list"
-                placeholder="All Faculties" style="width: 50%;">
+              <span class="input-group-text">Faculty</span>
+              <input type="search" id="faculty" class="form-control" name="faculty" list="faculty_list"
+                placeholder="All Faculties" autocomplete="off">
               <datalist id="faculty_list">
                 {% for faculty in faculties.keys() %}
                 <option value="{{faculty}}">{{faculty}}</option>
@@ -70,9 +70,9 @@
             </div>
 
             <div class="input-group mb-3">
-              <span class="input-group-text" id="inputGroup-sizing-default">Program</span>
-              <input type="text" id="program" class="form-control" name="program" list="program_list"
-                placeholder="All Programs" style="width: 50%;">
+              <span class="input-group-text">Program</span>
+              <input type="search" id="program" class="form-control" name="program" list="program_list"
+                placeholder="All Programs" autocomplete="off">
               <datalist id="program_list">
                 {% for faculty in faculties.keys() %}
                 {% for program in faculties[faculty]['programs'].keys() %}
@@ -83,9 +83,9 @@
             </div>
 
             <div class="input-group mb-3">
-              <span class="input-group-text" id="inputGroup-sizing-default">Specialization</span>
-              <input type="text" id="specialization" class="form-control" name="specialization"
-                list="specialization_list" placeholder="All Specializations" style="width: 50%;">
+              <span class="input-group-text">Specialization</span>
+              <input type="search" id="specialization" class="form-control" name="specialization"
+                list="specialization_list" placeholder="All Specializations" autocomplete="off">
               <datalist id="specialization_list">
                 {% for faculty in faculties.keys() %}
                 {% for program in faculties[faculty]['programs'].keys() %}
@@ -99,9 +99,9 @@
             </div>
 
             <div class="input-group mb-3">
-              <span class="input-group-text" id="inputGroup-sizing-default">Year Level</span>
-              <input type="text" id="year" class="form-control" name="year" list="year_list" placeholder="All Years"
-                style="width: 50%;">
+              <span class="input-group-text">Year Level</span>
+              <input type="search" id="year" class="form-control" name="year" list="year_list" placeholder="All Years"
+                autocomplete="off">
               <datalist id="year_list">
                 {% for year in ["First Year","Second Year","Third Year","Fourth Year","Fifth Year"] %}
                 <option value="{{year}}">{{year}}</option>
@@ -178,6 +178,17 @@
 
       $("#program").val('Bachelor of Science');
       $('#program').trigger('change');
+
+      $('.has-clear input[type="text"]').on('input propertychange', function () {
+        var $this = $(this);
+        var visible = Boolean($this.val());
+        $this.siblings('.form-control-clear').toggleClass('hidden', !visible);
+      }).trigger('propertychange');
+
+      $('.form-control-clear').click(function () {
+        $(this).siblings('input[type="text"]').val('')
+          .trigger('propertychange').focus();
+      });
     }
 
     window.onload = preloader;
