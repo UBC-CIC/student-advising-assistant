@@ -3,80 +3,90 @@
 
 <head>
   <title>Ask Cali Demo</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
-  <script
-    type="module"
-    src="https://cdn.jsdelivr.net/gh/zerodevx/zero-md@2/dist/zero-md.min.js"
-  ></script>
+  <script type="module" src="https://cdn.jsdelivr.net/gh/zerodevx/zero-md@2/dist/zero-md.min.js"></script>
+  <!-- jQuery -->
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.4/jquery.min.js"></script>
+  <!-- Bootstrap 5 -->
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"
+    integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous">
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"
+    integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz"
+    crossorigin="anonymous"></script>
 </head>
 
 <body>
-  <header>
-    <h1>Ask Cali</h1>
-    <input id="ask" type="submit" value="Ask another question", style="padding: 10px" />
-  </header>
-  <div id="content" style="justify-content: center; display: flex;">
-    <section>
-      <header>
-        <h2>Answering question:</h2>
-        <p>{{question}}</p>
-        <p><strong>Context: </strong>{% if context == '' %} None {% else %} {{context}}{% endif %}</p>
-      </header>
-      {% if additional_response %}
-        <aside style="width: var(--width-card-wide);">
-          <zero-md>
-            <script type="text/markdown">{{additional_response}}</script>
-          </zero-md>
-        </aside>
-      {% endif %}
-      {% for doc in answers%}
-      <aside style="width: var(--width-card-wide);">
-        <h3>
-          Reference {{loop.index}}
-        </h3>
-        {% if 'generated_response' in doc.metadata%}
-          <h4>Generated Response</h4>
-          <p>{{doc.metadata['generated_response']}}</p>
+  <div class="container">
+    <header class="m-5" id="ask" role="button">
+      <h1 class="text-center">Ask Cali</h1>
+    </header>
+    <div id="content" style="justify-content: center; display: flex;">
+      <section>
+        <div class="text-center">
+          <p><strong>Answering question: </strong>{{question}}</p>
+          <p><strong>Context: </strong>{% if context == '' %} None {% else %} {{context}}{% endif %}</p>
+        </div>
+        {% if additional_response %}
+        <div class="card mb-3">
+          <div class="card-body">
+            <zero-md>
+              <script type="text/markdown">{{additional_response}}</script>
+            </zero-md>
+          </div>
+        </div>
         {% endif %}
-        <zero-md>
-          <template>
-            <!-- Define your own styles inside a `<style>` tag -->
-            <style>
-              em {
-                font-style: normal;
-                background: lightgoldenrodyellow;
-              }
-            </style>
-          </template>
-          <script type="text/markdown">{{doc.page_content}}</script>
-        </zero-md>
-        <h4>Source</h4>
-        {% if doc.metadata['source'] %}
-          <p> {{doc.metadata['source']}} </p>
-        {% endif %}
-        <p>Url: <a href="{{doc.metadata['url']}}">{{doc.metadata['url']}}</a></p>
-        {% if 'related_links' in doc.metadata and doc.metadata['related_links']|length > 0 %}
-        <h4>
-          Relevant Links
-        </h4>
-        <ul>
-          {% for title,link,doc_id in doc.metadata['related_links'] %}
-            <li>
-              <p>{{title}}: <a href="{{link}}">{{link}}</a></p>
-              {% if doc_id %}
-                <input id="ask" type="submit" value="Ask Cali" style="padding: 10px" onclick="post_form({{doc_id}})"/>
-              {% endif %}
-            </li>
-          {% endfor %}
-        </ul>
-        {% endif %}
-      </aside>
-      {% endfor %}
-    </section>
+        {% for doc in answers%}
+        <div class="card">
+          <div class="card-header">
+            Reference {{loop.index}}
+          </div>
+          <div class="card-body pt-0">
+            {% if 'generated_response' in doc.metadata%}
+            <strong>Generated Response</strong>
+            <p>{{doc.metadata['generated_response']}}</p>
+            {% endif %}
+            <zero-md>
+              <template>
+                <!-- Define your own styles inside a `<style>` tag -->
+                <style>
+                  em {
+                    font-style: normal;
+                    background: lightgoldenrodyellow;
+                  }
+                </style>
+              </template>
+              <script type="text/markdown">{{doc.page_content}}</script>
+            </zero-md>
+            <strong>Source</strong>
+            {% if doc.metadata['source'] %}
+            <p> {{doc.metadata['source']}} </p>
+            {% endif %}
+            <p>Url: <a href="{{doc.metadata['url']}}">{{doc.metadata['url']}}</a></p>
+            {% if 'related_links' in doc.metadata and doc.metadata['related_links']|length > 0 %}
+            <strong>
+              Relevant Links
+            </strong>
+            <ul>
+              {% for title,link,doc_id in doc.metadata['related_links'] %}
+              <li>
+                <p>{{title}}: <a href="{{link}}">{{link}}</a></p>
+                {% if doc_id %}
+                <button id="ask" type="submit" class="btn btn-outline-secondary" onclick="post_form({{doc_id}})">Ask Cali about this link</button>
+                {% endif %}
+              </li>
+              {% endfor %}
+            </ul>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </section>
+    </div>
 </body>
 
 <script type="text/javascript">
-  let form_params = {{form | tojson | safe}}
+  let form_params = {{ form | tojson | safe}}
 
   // <![CDATA[
   function post_form(doc_id) {
@@ -87,15 +97,15 @@
     form.setAttribute("method", "post");
     form.setAttribute("action", path);
 
-    for(var key in form_params) {
-        if(form_params.hasOwnProperty(key)) {
-            var hiddenField = document.createElement("input");
-            hiddenField.setAttribute("type", "hidden");
-            hiddenField.setAttribute("name", key);
-            hiddenField.setAttribute("value", form_params[key]);
+    for (var key in form_params) {
+      if (form_params.hasOwnProperty(key)) {
+        var hiddenField = document.createElement("input");
+        hiddenField.setAttribute("type", "hidden");
+        hiddenField.setAttribute("name", key);
+        hiddenField.setAttribute("value", form_params[key]);
 
-            form.appendChild(hiddenField);
-         }
+        form.appendChild(hiddenField);
+      }
     }
 
     document.body.appendChild(form);
@@ -103,7 +113,7 @@
   }
 
   document.getElementById("ask").onclick = function () {
-      location.href = "/";
+    location.href = "/";
   };
   // ]]>
 </script>
