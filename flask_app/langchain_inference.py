@@ -21,7 +21,6 @@ VERBOSE_LLMS = True
 
 load_dotenv()
 GRAPH_FILEPATH = os.path.join('data','documents','website_graph.txt')
-CONFIG_PATH = 'config'
 
 ### LOAD AWS CONFIG
 param_manager = get_param_manager()
@@ -30,9 +29,7 @@ retriever_config = param_manager.get_parameter('retriever')
 generator_config = param_manager.get_parameter('generator')
 
 ### LOAD MODELS 
-#llm, prompt = llm_utils.load_model_and_prompt(generator_config['ENDPOINT_TYPE'], generator_config['ENDPOINT_NAME'], generator_config['MODEL_NAME'])
-#llm, prompt = llm_utils.load_model_and_prompt(generator_config['ENDPOINT_TYPE'], 'tiiuae/falcon-7b-instruct', 'falcon')
-llm, prompt = llm_utils.load_model_and_prompt(generator_config['ENDPOINT_TYPE'], 'google/flan-t5-xxl', 'flan')
+llm, prompt = llm_utils.load_model_and_prompt(generator_config['ENDPOINT_TYPE'], generator_config['ENDPOINT_NAME'], generator_config['MODEL_NAME'])
 
 llm_chain = LLMChain(prompt=prompt, llm=llm, verbose=VERBOSE_LLMS)
 filter = LLMChainFilter.from_llm(llm)
@@ -52,7 +49,7 @@ def read_text(filename: str, as_json = False):
     
 graph = doc_graph_utils.read_graph(GRAPH_FILEPATH)
 download_all_dirs(retriever_config['RETRIEVER_NAME'])
-data_source_annotations = read_text(os.path.join(CONFIG_PATH,'data_source_annotations.json'), as_json=True)
+data_source_annotations = read_text(os.path.join('static','data_source_annotations.json'), as_json=True)
 
 ### UTILITY FUNCTIONS
 

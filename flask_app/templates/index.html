@@ -32,20 +32,7 @@
         <div id="collapseOne" class="accordion-collapse collapse" aria-labelledby="headingOne"
           data-bs-parent="#info-accordion">
           <div class="accordion-body">
-            <ul>
-              <li>
-                Ask Cali is a tool that leverages Large Language Models to search through the Academic Calendar for
-                sections relevant
-                to a query.
-              </li>
-              <li>
-                As an experimental feature, it also uses Generative AI to generate a response to your query, given the
-                sections of
-                the Calendar as context.
-              </li>
-              <li>There is the potential for bias and/or inaccuracy with the generative feature, so please use it with
-                caution.</li>
-            </ul>
+            <zero-md src="./static/about.md"></zero-md>
           </div>
         </div>
         <div class="accordion-item">
@@ -58,9 +45,7 @@
           <div id="collapseTwo" class="accordion-collapse collapse" aria-labelledby="headingTwo"
             data-bs-parent="#info-accordion">
             <div class="accordion-body">
-              <zero-md>
-                <script type="text/markdown">{{instructions}}</script>
-              </zero-md>
+              <zero-md src="./static/query_suggestions.md"></zero-md>
             </div>
           </div>
         </div>

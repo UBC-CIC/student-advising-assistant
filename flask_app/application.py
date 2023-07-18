@@ -11,7 +11,6 @@ import csv
 
 ### Constants
 FACULTIES_PATH = os.path.join('data','documents','faculties.txt')
-INSTRUCTIONS_PATH = os.path.join('config','query_suggestions.md')
 FEEDBACK_CSV_PATH = os.path.join('data','feedback.csv')
 
 ### Globals (set upon load)
@@ -29,7 +28,7 @@ def read_text(filename: str, as_json = False):
 @application.route('/', methods=['GET'])
 def home():
     # Render the form template
-    return render_template('index.html', faculties=faculties, instructions=instructions)
+    return render_template('index.html', faculties=faculties)
 
 @application.route('/answer', methods=['POST'])
 async def answer():
@@ -70,6 +69,5 @@ def setup():
     # Upon loading, load the available settings for the form
     global faculties, instructions
     faculties = read_text(FACULTIES_PATH,as_json=True)
-    instructions = read_text(INSTRUCTIONS_PATH)
 
 setup()
