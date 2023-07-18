@@ -12,7 +12,6 @@ from typing import Tuple, Dict
 import prompts.prompts as prompts
 import os 
 from fastchat_adapter import FastChatLLM
-from aws_helpers.param_manager import get_param_manager
 
 ### HELPER CLASSES
 class ContentHandler(LLMContentHandler):
