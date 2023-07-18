@@ -52,7 +52,6 @@ def read_text(filename: str, as_json = False):
     
 graph = doc_graph_utils.read_graph(GRAPH_FILEPATH)
 download_all_dirs(retriever_config['RETRIEVER_NAME'])
-backup_response = read_text(os.path.join(CONFIG_PATH,'backup_response.md'))
 data_source_annotations = read_text(os.path.join(CONFIG_PATH,'data_source_annotations.json'), as_json=True)
 
 ### UTILITY FUNCTIONS
@@ -236,7 +235,7 @@ async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=Non
     """
 
     llm_query = llm_utils.llm_query(program_info, topic, query)
-    additional_response = None # To store any additional info to display to user in response
+    main_response: str = None
     
     docs = []
     if start_doc:
@@ -262,7 +261,7 @@ async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=Non
         combine_documents_chain = load_qa_chain(llm=llm, chain_type="refine")
         input_docs = compressed_docs if compressed_docs else docs
         combined_answer = combine_documents_chain.run(input_documents=input_docs, question=llm_query)
-        additional_response = combined_answer
+        main_response = combined_answer
     
     for doc in docs:
         highlighted_text = None
@@ -288,9 +287,5 @@ async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=Non
         if highlighted_text: doc.page_content = highlighted_text
 
     format_docs_for_display(docs)
-    
-    if len(docs) == 0: 
-        # No documents were returned, display the backup response
-        additional_response = backup_response
         
-    return docs, additional_response
+    return docs, main_response

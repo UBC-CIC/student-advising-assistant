@@ -27,16 +27,91 @@
           <p><strong>Answering question: </strong>{{question}}</p>
           <p><strong>Context: </strong>{% if context == '' %} None {% else %} {{context}}{% endif %}</p>
         </div>
-        {% if additional_response %}
-        <div class="card mb-3">
+        <div class="card border-primary mb-3">
           <div class="card-body">
+            {% if main_response %}
             <zero-md>
-              <script type="text/markdown">{{additional_response}}</script>
+              <script type="text/markdown">{{main_response}}</script>
             </zero-md>
+            {% else %}
+            <zero-md src="./static/backup_response.md"></zero-md>
+            {% endif %}
+            <hr>
+            <label for="feedback-toggle" class="me-3">Was this response helpful?</label>
+            <div id="feedback-toggle" class="btn-group">
+              <input type="radio" class="btn-check" name="feedback-toggle" id="feedback-yes" autocomplete="off" value="yes">
+              <label for="feedback-yes" class="btn btn-outline-success" type="button" data-bs-toggle="collapse" data-bs-target="#blank" aria-expanded="true" aria-controls="blank">Yes</label>
+              <input type="radio" class="btn-check" name="feedback-toggle" id="feedback-no" autocomplete="off" value="no">
+              <label for="feedback-no" class="btn btn-outline-danger" type="button" data-bs-toggle="collapse" data-bs-target="#backup-response" aria-expanded="true" aria-controls="backup-response">No</label>
+            </div>
           </div>
         </div>
-        {% endif %}
-        {% for doc in answers%}
+
+        <div id="feedback-accordion" class="accordion accordion-flush">
+          <div class="accordion-item border-0">
+            <div class="accordion-collapse collapse" data-bs-parent="#feedback-accordion" id="backup-response">
+              <div class="card mb-3 accordion-body">
+                <div class="card-body">
+                  <zero-md src="./static/backup_response.md"></zero-md>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="accordion-item">
+            <div class="accordion-collapse collapse" data-bs-parent="#feedback-accordion" id="blank">
+              <div class="card mb-3 accordion-body">
+                <div class="card-body">
+                  I'm glad that I could help! If you would like to submit some feedback, it will help improve the system.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="feedback-form" class="card mb-3">
+          <div class="card-header">
+            Feedback Form
+          </div>
+          <div class="card-body">
+            <div class="alert alert-light" role="alert">
+              Submitting feedback is optional, but will help improve the system. 
+              If you submit feedback, your question and the system response will be anonymously recorded.
+            </div>
+            <form action="/feedback" method="post">
+              <input type="hidden" id="feedback-hidden-helpful" name="feedback-hidden-helpful">
+              <input type="hidden" name="feedback-hidden-question" value="{{question}}">
+              <input type="hidden" name="feedback-hidden-context" value="{{context}}">
+              <input 
+              type="hidden" 
+              name="feedback-hidden-reference-ids" 
+              value="{% for doc in answers %}{{doc.metadata['doc_id']}},{% endfor %}">
+              <input type="hidden" name="feedback-hidden-response" value="{{main_response}}">
+
+              <div class="mt-3">
+                <div class="input-group mb-3">
+                  <span class="input-group-text" id="inputGroup-sizing-default">Which reference is the most relevant?</span>
+                  <select class="form-select" name="feedback-reference-select" aria-label="Reference Select">
+                    <option selected>None</option>
+                    {% for i in range(answers|length) %}
+                      <option value="{{i+1}}">Reference {{i+1}}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+
+                <div class="mb-3">
+                  <label for="feedback-comments" class="form-label">Include any additional comments:</label>
+                  <textarea id="feedback-comments" class="form-control" name="feedback-comments" cols="40" rows="3"></textarea>
+                </div>
+      
+                <div class="col-12">
+                  <button id="feedback-submit" type="submit" class="btn btn-primary">Submit</button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        {% for doc in answers %}
         <div class="card mb-3">
           <div class="card-header">
             Reference {{loop.index}}
@@ -72,7 +147,8 @@
               <li>
                 <p>{{title}}: <a href="{{link}}">{{link}}</a></p>
                 {% if doc_id %}
-                <button id="ask" type="submit" class="btn btn-outline-secondary" onclick="post_form({{doc_id}})">Ask Cali about this link</button>
+                <button id="ask" type="submit" class="btn btn-outline-secondary" onclick="post_form({{doc_id}})">Ask
+                  Cali about this link</button>
                 {% endif %}
               </li>
               {% endfor %}
@@ -115,6 +191,18 @@
   document.getElementById("ask").onclick = function () {
     location.href = "/";
   };
+
+  $(document).ready(function() {
+    $("#feedback-form").hide()
+
+    $("#feedback-toggle").change(function() {
+      // Show the feedback form if a feedback toggle selection is made
+      $("#feedback-form").show()
+      let feedbackToggleVal = $("input[name='feedback-toggle']:checked").val();
+      $("#feedback-hidden-helpful").val(feedbackToggleVal)
+    });
+   });
+  
   // ]]>
 </script>
 

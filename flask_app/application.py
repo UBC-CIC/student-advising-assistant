@@ -7,10 +7,12 @@ from flask import Flask, request, render_template
 import json
 from langchain_inference import run_chain
 import os 
+import csv
 
 ### Constants
 FACULTIES_PATH = os.path.join('data','documents','faculties.txt')
 INSTRUCTIONS_PATH = os.path.join('config','query_suggestions.md')
+FEEDBACK_CSV_PATH = os.path.join('data','feedback.csv')
 
 ### Globals (set upon load)
 application = Flask(__name__)
@@ -43,13 +45,27 @@ async def answer():
         start_doc = int(start_doc)
 
     # Run the model inference
-    docs, additional_response = await run_chain(program_info,topic,question,start_doc=start_doc)
+    docs, main_response = await run_chain(program_info,topic,question,start_doc=start_doc)
 
     # Render the results
     context_str = ' : '.join(list(program_info.values()) + [topic])
     return render_template('ans.html',question=question,context=context_str,answers=docs,
-                           form=request.form.to_dict(), additional_response=additional_response)
+                           form=request.form.to_dict(), main_response=main_response)
 
+@application.route('/feedback', methods=['POST'])
+async def feedback():
+    # Save submitted feedback
+    fields = ['feedback-hidden-helpful','feedback-hidden-question','feedback-hidden-context',
+              'feedback-hidden-reference-ids','feedback-hidden-response','feedback-reference-select','feedback-comments']
+    data = [request.form[field] for field in fields]
+
+    with open(FEEDBACK_CSV_PATH, "w") as csv_file:
+        writer = csv.writer(csv_file, delimiter=',')
+        writer.writerow(data)
+            
+    # Render the results
+    return render_template('feedback.html')
+    
 def setup():
     # Upon loading, load the available settings for the form
     global faculties, instructions
