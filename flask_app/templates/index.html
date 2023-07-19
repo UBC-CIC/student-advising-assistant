@@ -1,97 +1,135 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
   <title>Ask Cali Demo</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
-  <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
-  <script
-    type="module"
-    src="https://cdn.jsdelivr.net/gh/zerodevx/zero-md@2/dist/zero-md.min.js"
-  ></script>
+  <script type="module" src="https://cdn.jsdelivr.net/gh/zerodevx/zero-md@2/dist/zero-md.min.js"></script>
+  <!-- jQuery -->
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.4/jquery.min.js"></script>
+  <!-- Bootstrap 5 -->
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"
+    integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous">
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"
+    integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz"
+    crossorigin="anonymous"></script>
 </head>
 
 <body>
-  <header>
-    <h1>Ask Cali</h1>
-  </header>
-  <section>
-    <aside style="width: var(--width-card-wide); cursor: pointer;" id="description_slide">
-      <p><strong>About</strong> (click to show/hide)</p>
-      <ul id="description" style="display: none;">
-        <li>
-        Ask Cali is a tool that leverages Large Language Models to search through the Academic Calendar for sections relevant
-        to a query.
-        </li>
-        <li>
-        As an experimental feature, it also uses Generative AI to generate a response to your query, given the sections of
-        the Calendar as context.
-        </li>
-        <li>There is the potential for bias and/or inaccuracy with the generative feature, so please use it with caution.</li>
-      </ul>
-    </aside>
-  </section>
-  <section>
-    <aside style="width: var(--width-card-wide); cursor: pointer;" id="instructions_slide">
-      <p><strong>Instructions and Suggestions</strong> (click to show/hide)</p>
-      <div id="instructions" style="display: none;">
-        <zero-md>
-          <script type="text/markdown">{{instructions}}</script>
-        </zero-md>
-      </ul>
-    </aside>
-  </section>
-  <div id="content" style="justify-content: center; display: flex;">
-    <form action="/answer" method="post">
-      <p><strong>Note:</strong> Do not submit any personal or sensitive information through this form </p>
+  <div class="container mb-5">
+    <header>
+      <h1 class="m-5 text-center">Ask Cali</h1>
+    </header>
+    <div class="accordion mb-3" id="info-accordion">
+      <div class="accordion-item">
+        <h2 class="accordion-header" id="headingOne">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+            data-bs-target="#collapseOne" aria-expanded="true" aria-controls="collapseOne">
+            About
+          </button>
+        </h2>
+        <div id="collapseOne" class="accordion-collapse collapse" aria-labelledby="headingOne"
+          data-bs-parent="#info-accordion">
+          <div class="accordion-body">
+            <zero-md src="./static/about.md"></zero-md>
+          </div>
+        </div>
+        <div class="accordion-item">
+          <h2 class="accordion-header" id="headingTwo">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+              data-bs-target="#collapseTwo" aria-expanded="true" aria-controls="collapseTwo">
+              Instructions and Suggestions
+            </button>
+          </h2>
+          <div id="collapseTwo" class="accordion-collapse collapse" aria-labelledby="headingTwo"
+            data-bs-parent="#info-accordion">
+            <div class="accordion-body">
+              <zero-md src="./static/query_suggestions.md"></zero-md>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="content" class="card" style="justify-content: center; display: flex;">
+      <div class="card-header primary">
+        Ask a Question
+      </div>
+      <div class="card-body">
+        <form action="/answer" method="post">
+          <div class="col-12">
+            <div class="input-group mb-3">
+              <span class="input-group-text">Faculty</span>
+              <input type="search" id="faculty" class="form-control" name="faculty" list="faculty_list"
+                placeholder="All Faculties" autocomplete="off">
+              <datalist id="faculty_list">
+                {% for faculty in faculties.keys() %}
+                <option value="{{faculty}}">{{faculty}}</option>
+                {% endfor %}
+              </datalist>
+            </div>
 
-      <input type="text" id="faculty" name="faculty" list="faculty_list" placeholder="All Faculties" style="width: 50%;">
-      <datalist id="faculty_list">
-        {% for faculty in faculties.keys() %}
-        <option value="{{faculty}}">{{faculty}}</option>
-        {% endfor %}
-      </datalist>
+            <div class="input-group mb-3">
+              <span class="input-group-text">Program</span>
+              <input type="search" id="program" class="form-control" name="program" list="program_list"
+                placeholder="All Programs" autocomplete="off">
+              <datalist id="program_list">
+                {% for faculty in faculties.keys() %}
+                {% for program in faculties[faculty]['programs'].keys() %}
+                <option value="{{program}}" data-faculty="{{faculty}}" disabled hidden>{{program}}</option>
+                {% endfor %}
+                {% endfor %}
+              </datalist>
+            </div>
 
-      <input type="text" id="program" name="program" list="program_list" placeholder="All Programs" style="width: 50%;">
-      <datalist id="program_list">
-        {% for faculty in faculties.keys() %}
-        {% for program in faculties[faculty]['programs'].keys() %}
-        <option value="{{program}}" data-faculty="{{faculty}}" disabled hidden>{{program}}</option>
-        {% endfor %}
-        {% endfor %}
-      </datalist>
+            <div class="input-group mb-3">
+              <span class="input-group-text">Specialization</span>
+              <input type="search" id="specialization" class="form-control" name="specialization"
+                list="specialization_list" placeholder="All Specializations" autocomplete="off">
+              <datalist id="specialization_list">
+                {% for faculty in faculties.keys() %}
+                {% for program in faculties[faculty]['programs'].keys() %}
+                {% for specialization in faculties[faculty]['programs'][program]['specializations'].keys() %}
+                <option value="{{specialization}}" data-program="{{program}}" disabled hidden>{{specialization}}
+                </option>
+                {% endfor %}
+                {% endfor %}
+                {% endfor %}
+              </datalist>
+            </div>
 
-      <input type="text" id="specialization" name="specialization" list="specialization_list" placeholder="All Specializations" style="width: 50%;">
-      <datalist id="specialization_list">
-        {% for faculty in faculties.keys() %}
-        {% for program in faculties[faculty]['programs'].keys() %}
-        {% for specialization in faculties[faculty]['programs'][program]['specializations'].keys() %}
-        <option value="{{specialization}}" data-program="{{program}}" disabled hidden>{{specialization}}</option>
-        {% endfor %}
-        {% endfor %}
-        {% endfor %}
-      </datalist>
+            <div class="input-group mb-3">
+              <span class="input-group-text">Year Level</span>
+              <input type="search" id="year" class="form-control" name="year" list="year_list" placeholder="All Years"
+                autocomplete="off">
+              <datalist id="year_list">
+                {% for year in ["First Year","Second Year","Third Year","Fourth Year","Fifth Year"] %}
+                <option value="{{year}}">{{year}}</option>
+                {% endfor %}
+              </datalist>
+            </div>
+          </div>
 
-      <input type="text" id="year" name="year" list="year_list" placeholder="All Years" style="width: 50%;">
-      <datalist id="year_list">
-        {% for year in ["First Year","Second Year","Third Year","Fourth Year","Fifth Year"] %}
-        <option value="{{year}}">{{year}}</option>
-        {% endfor %}
-      </datalist>
+          <div class="mb-3">
+            <label for="topic" class="form-label"
+              title="Eg. 'Second year specialization application', 'academic concessions', etc.">
+              What is the topic of your question?
+              <i class="fa fa-question-circle" style="font-size:18px"></i>
+            </label>
+            <textarea id="topic" class="form-control" name="topic" cols="40" rows="1"></textarea>
+          </div>
 
-      <label 
-        for="topic" 
-        title="Eg. 'Second year specialization application', 'academic concessions', etc.">
-        What is the topic of your question?
-        <i class="fa fa-question-circle" style="font-size:18px"></i>
-        </label>
-      <textarea id="topic" name="topic" cols="40" rows="1"></textarea>
+          <div class="mb-3">
+            <label for="question" class="form-label">Enter your question:</label>
+            <textarea id="question" class="form-control" name="question" cols="40" rows="5" required></textarea>
+          </div>
 
-      <label for="question">Enter your question:</label>
-      <textarea id="question" name="question" cols="40" rows="5"></textarea>
-      <input id="submit" type="submit" value="Submit" , style="padding: 10px" />
-    </form>
+          <div class="col-12">
+            <button id="submit" type="submit" class="btn btn-primary">Submit</button>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
   <script type="text/javascript">
     // <![CDATA[
@@ -140,18 +178,20 @@
 
       $("#program").val('Bachelor of Science');
       $('#program').trigger('change');
+
+      $('.has-clear input[type="text"]').on('input propertychange', function () {
+        var $this = $(this);
+        var visible = Boolean($this.val());
+        $this.siblings('.form-control-clear').toggleClass('hidden', !visible);
+      }).trigger('propertychange');
+
+      $('.form-control-clear').click(function () {
+        $(this).siblings('input[type="text"]').val('')
+          .trigger('propertychange').focus();
+      });
     }
 
     window.onload = preloader;
-    $(document).ready(function () {
-      $('#description_slide').click(function () {
-        $('#description').slideToggle(1000);
-      });
-      $('#instructions_slide').click(function () {
-        $('#instructions').slideToggle(1000);
-      });
-    });
-
     // ]]>
   </script>
 </body>

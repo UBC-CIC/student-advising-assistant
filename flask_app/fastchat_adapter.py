@@ -3,6 +3,10 @@ from langchain.callbacks.manager import CallbackManagerForLLMRun
 from fastchat.model import get_conversation_template
 from typing import Optional, List, Any
 
+default_system_instruction = """
+A chat between a University of British Columbia (UBC) student and an artificial intelligence assistant. 
+The assistant gives helpful, detailed, and polite answers to the user's questions."""
+
 class FastChatLLM(LLM):
     # Adapter to use any supported LLM with fastchat prompting tools
     # Adapted from https://github.com/lm-sys/FastChat/blob/main/fastchat/serve/huggingface_api.py
@@ -12,13 +16,18 @@ class FastChatLLM(LLM):
     llm_type: str = 'fastchat-adapter'
     
     @classmethod
-    def from_base_llm(cls, base_llm: BaseLLM, model_name: str):
+    def from_base_llm(cls, base_llm: BaseLLM, model_name: str, system_instruction:str = None):
         """
         - base_llm: The langchain LLM model that will be called
         - model_name: The name of the base llm, used to get conversation templates from fastchat
              See https://github.com/lm-sys/FastChat/blob/main/fastchat/conversation.py for options
         """
-        return cls(base_llm=base_llm, template=get_conversation_template(model_name))
+        template=get_conversation_template(model_name)
+        if system_instruction:
+            template.system = system_instruction
+        else:
+            template.system = default_system_instruction
+        return cls(base_llm=base_llm, template=template)
 
     def _call(
         self,
