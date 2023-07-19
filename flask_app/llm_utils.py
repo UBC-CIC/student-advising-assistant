@@ -46,7 +46,7 @@ def llm_program_str(program_info: Dict):
     if 'specialization' in program_info:
         context_str += f", {program_info['specialization']}"
     if 'year' in program_info:
-        context_str += f"in {program_info['year']}"
+        context_str += f" in {program_info['year']}"
     return context_str if context_str == '' else context_str + '.'
 
 def llm_query(program_info: Dict, topic: str, query: str):
@@ -77,7 +77,7 @@ def load_model_and_prompt(endpoint_type: str, endpoint_name: str, model_name: st
         llm = load_huggingface_qa_endpoint(endpoint_name)
     
     if model_name in fastchat_models:
-        llm = FastChatLLM(llm, fastchat_models[model_name])
+        llm = FastChatLLM.from_base_llm(llm, fastchat_models[model_name])
         
     return llm, load_prompt(endpoint_type, model_name)
     

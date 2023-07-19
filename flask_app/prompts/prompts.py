@@ -17,6 +17,14 @@ llm_query_prompt = PromptTemplate(template=llm_query_template, input_variables=[
 default_qa_template = "Context: {doc}\n\nQuestion: {query} If you don't know the answer, just say 'I don't know'. \n\nAnswer:"
 default_qa_prompt = PromptTemplate(template=default_qa_template, input_variables=["doc","query"])
 
+# Template for Vicuna question answering
+vicuna_qa_template = """
+    Please answer the question based on the context below. Only use information present in the context. If you don't have
+    enough information to answer, say 'There is not enough information to answer'.\n
+    Context:{doc}\n
+    Question:{query}""".strip()
+vicuna_qa_prompt = PromptTemplate(template=default_qa_template, input_variables=["doc","query"])
+
 # Template for question answering with Falcon-Instruct model
 falcon_qa_template = """
     Answer the question based on the context below. Explain your answer. Respond "Unsure about answer" if not sure about the answer.
