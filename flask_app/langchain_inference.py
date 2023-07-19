@@ -36,7 +36,7 @@ base_llm, prompt = llm_utils.load_model_and_prompt(generator_config['ENDPOINT_TY
 
 concise_llm = llm_utils.load_fastchat_adapter(base_llm, generator_config['MODEL_NAME'], prompts.fastchat_system_concise)
 detailed_llm = llm_utils.load_fastchat_adapter(base_llm, generator_config['MODEL_NAME'], prompts.fastchat_system_concise)
-
+spell_correct_chain = LLMChain(llm=concise_llm,prompt=prompts.spelling_correction_prompt)
 combine_documents_chain = load_qa_chain(llm=detailed_llm, chain_type="refine")
 
 def title_filter_get_input(context: str, doc: Document):
@@ -258,7 +258,7 @@ def backoff_retrieval(retriever: Retriever, program_info: Dict, topic: str, quer
     return docs[:min(len(docs),k)] 
     
 async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=None,
-                    combine_with_sibs:bool=False, do_filter:bool=True, compress:bool=False, 
+                    combine_with_sibs:bool=False, spell_correct:bool=True, do_filter:bool=False, compress:bool=False, 
                     generate_by_document:bool=False,
                     generate_combined:bool=True, k:int=2):
 
@@ -269,12 +269,17 @@ async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=Non
     - query: The text query
     - start_doc: If provided, will start searching with the provided document index rather than performing similarity search
     - combine_with_sibs: If true, combines all documents with their immediate sibling documents
+    - spell_correct: If true, prompts a LLM to fix spelling and grammar of the prompt
     - do_filter: If true, applies a LLM filter step to the retrieved documents to remove irrelevant documents
     - compress: If true, applies a LLM compres step to compress documents, extracting relevant sections
     - generate_by_document: If true, generates a response for each final document
     - generate_combined: If true, generates a reponse using the combined documents
     """
 
+    # Spell correct the query if the option is turned on
+    if spell_correct:
+        query = spell_correct_chain.run(query)
+        
     llm_query = llm_utils.llm_query(program_info, topic, query)
     main_response: str = None
     

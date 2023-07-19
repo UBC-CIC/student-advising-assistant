@@ -22,7 +22,8 @@ The assistant follows instructions precisely and gives concise answers."""
 
 fastchat_system_detailed = """
 A chat between a University of British Columbia (UBC) student and an artificial intelligence assistant. 
-The assistant gives helpful, detailed, and polite answers to the user's questions."""
+The assistant gives helpful, detailed, and polite answers to the user's questions.
+The assistant only uses the context provided in each message to answer questions, and no other information."""
 
 ### FILTER PROMPTS
 
@@ -83,7 +84,7 @@ title_filter_template = """
 Is the following document title about {context}? Return YES or NO.
 > Title: {title}
 """
-title_filter_prompt = PromptTemplate(template=title_filter_template, input_variables=["context","title"], output_parser=FlexibleBooleanOutputParser)
+title_filter_prompt = PromptTemplate(template=title_filter_template, input_variables=["context","title"], output_parser=FlexibleBooleanOutputParser())
 
 ### QA PROMPTS
 
@@ -120,3 +121,12 @@ few_shot_prompt = FewShotPromptTemplate(
     suffix="Evidence:{doc}\nQuestion:{query}\nAnswer:", 
     input_variables=["doc","query"]
 )
+
+### OTHER PROMPTS
+
+spelling_correction_template = """
+Please correct the grammar and spelling errors in the following text. Do not respond to the question, only return the corrected version of the text.
+
+{text}
+"""
+spelling_correction_prompt = PromptTemplate(template=spelling_correction_template, input_variables=["text"])
