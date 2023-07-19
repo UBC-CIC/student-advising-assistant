@@ -14,7 +14,6 @@ from retrievers import PineconeRetriever, Retriever
 import copy 
 import json
 from aws_helpers.param_manager import get_param_manager
-from langchain.chains.combine_documents.refine import RefineDocumentsChain
 from langchain.chains.question_answering import load_qa_chain
 
 VERBOSE_LLMS = True
@@ -29,7 +28,8 @@ retriever_config = param_manager.get_parameter('retriever')
 generator_config = param_manager.get_parameter('generator')
 
 ### LOAD MODELS 
-llm, prompt = llm_utils.load_model_and_prompt(generator_config['ENDPOINT_TYPE'], generator_config['ENDPOINT_NAME'], generator_config['MODEL_NAME'])
+#llm, prompt = llm_utils.load_model_and_prompt(generator_config['ENDPOINT_TYPE'], generator_config['ENDPOINT_NAME'], generator_config['MODEL_NAME'])
+llm, prompt = llm_utils.load_model_and_prompt('huggingface', 'google/flan-t5-xxl', 'flan-t5')
 
 llm_chain = LLMChain(prompt=prompt, llm=llm, verbose=VERBOSE_LLMS)
 filter = LLMChainFilter.from_llm(llm)
@@ -113,6 +113,36 @@ def combine_sib_docs(retriever: Retriever, docs: List[Document]) -> List[Documen
         doc.page_content = combined_content
         doc.metadata['titles'] = doc.metadata['titles'][:-1]
 
+def highlight_compressed_sections(original_text: str, compressed_text: str):
+    """
+    Places italics markings around the sections of the original text that are referenced in the compressed text
+    - original_text: the original text
+    - compressed_text: a response from an LLM asked to extract relevant sections of the original text
+    """
+    highlighted_text = original_text
+    
+    compressed_sentences = compressed_text.split('\n')
+    
+    # Vicuna likes to add numbers to each returned sentence, this removes t he numbers
+    compressed_sentences = [re.sub('\d(\.)\s','',sent.strip()) for sent in compressed_sentences]
+    
+    for sent in compressed_sentences:
+        if len(sent) == 0: continue 
+        
+        # Remove quotations around the sentence, if applicable
+        if sent[0] == '"': sent = sent[1:]
+        if sent[-1] == '"': sent = sent[:-1]
+        
+        # Vicuna likes to add numbers to each returned sentence, this removes the numbers
+        sent = re.sub('\d(\.)\s','',sent)
+        
+        if match := re.search(sent, original_text):
+            # Add italics markings as the indicator to highlight
+            highlighted_section = add_italics(match.group())
+            highlighted_text = highlighted_text.replace(match.group(), highlighted_section)
+            
+    return highlighted_text
+
 def add_italics(text):
     """
     Add italics markings around every line of the text
@@ -158,6 +188,7 @@ def format_docs_for_display(docs: List[Document]):
         
         # Render links in markdown
         for title,(link,_) in doc.metadata['links'].items():
+            if len(title) < 4: continue # Don't display links of only a few characters
             doc.page_content = doc.page_content.replace(title, f'[{title}]({link})')
             
         # Add data source annotation
@@ -260,28 +291,18 @@ async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=Non
         combined_answer = combine_documents_chain.run(input_documents=input_docs, question=llm_query)
         main_response = combined_answer
     
-    for doc in docs:
-        highlighted_text = None
-        
+    for doc in docs:    
+        # Generate a response from this document only, if the option is turned on
+        if generate_by_document:
+            generated = generate_answer(doc, llm_query)
+            doc.metadata['generated_response'] = generated
+    
         if compress:
             # Add markings to highlight the compressed section of the document in the UI
             compressed_content = [c_doc.page_content for c_doc in compressed_docs if c_doc.metadata['doc_id'] == doc.metadata['doc_id']]
             if len(compressed_content) > 0: 
                 compressed_content = compressed_content[0]
-                compressed_re = re.escape(compressed_content).replace('\ ','(\s|\n)*')
-                if match := re.search(compressed_re, doc.page_content):
-                    # Add italics markings as the indicator to highlight
-                    new = add_italics(match.group())
-                    highlighted_text = doc.page_content.replace(match.group(), new)
-                    
-        # Generate a response from this document only, if the option is turned on
-        if generate_by_document:
-            generated = generate_answer(doc, llm_query)
-            doc.metadata['generated_response'] = generated
-        
-        # Replace document content with the highlighted version, if it exists
-        # Done after generation so the markings are not present for generation
-        if highlighted_text: doc.page_content = highlighted_text
+                doc.page_content = highlight_compressed_sections(doc.page_content, compressed_content)
 
     format_docs_for_display(docs)
         
