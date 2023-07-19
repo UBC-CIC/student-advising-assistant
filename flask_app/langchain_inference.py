@@ -5,7 +5,6 @@ import regex as re
 from typing import List, Dict
 from dotenv import load_dotenv
 import os
-from aws_helpers.download_s3_files import download_all_dirs
 import llm_utils
 import doc_graph_utils
 from comparator import Comparator
@@ -13,8 +12,11 @@ from numpy import isnan
 from retrievers import PineconeRetriever, Retriever
 import copy 
 import json
-from aws_helpers.param_manager import get_param_manager
 from langchain.chains.question_answering import load_qa_chain
+import sys
+sys.path.append('..')
+from aws_helpers.param_manager import get_param_manager
+from aws_helpers.download_s3_files import download_all_dirs
 
 VERBOSE_LLMS = True
 
