@@ -32,6 +32,7 @@ class ContentHandler(LLMContentHandler):
         return response_json[0]["generated_text"]
     
 ### LLM INPUT FUNCTIONS
+
 def llm_program_str(program_info: Dict):
     """
     Generate a text string from a dict of program info, for 
@@ -60,9 +61,19 @@ fastchat_models = {
     'vicuna': 'vicuna_v1.1'
 }
 
+def load_fastchat_adapter(base_llm: BaseLLM, model_name: str, system_instruction: str) -> BaseLLM:
+    """
+    Loads a fastchat adapter for the given base model, with the provided system instruction
+    """
+    
+    if model_name not in fastchat_models:
+        raise Exception(f'{model_name} is not supported for FastChat')
+
+    return FastChatLLM.from_base_llm(base_llm, fastchat_models[model_name], system_instruction=system_instruction)
+    
 def load_model_and_prompt(endpoint_type: str, endpoint_name: str, model_name: str) -> Tuple[BaseLLM,Prompt]:
     """
-    Utility function loads a LLM of the given endpoint type and model name
+    Utility function loads a LLM of the given endpoint type and model name, and the QA Prompt
     - endpoint_type: 'sagemaker', 'huggingface', or 'huggingface_qa'
     - endpoint_name: huggingface model id, or sagemaker endpoint name
     - model_name: display name of the model
@@ -74,9 +85,6 @@ def load_model_and_prompt(endpoint_type: str, endpoint_name: str, model_name: st
         llm = load_huggingface_endpoint(endpoint_name)
     elif endpoint_type == 'huggingface_qa':
         llm = load_huggingface_qa_endpoint(endpoint_name)
-    
-    if model_name in fastchat_models:
-        llm = FastChatLLM.from_base_llm(llm, fastchat_models[model_name])
         
     return llm, load_prompt(endpoint_type, model_name)
     

@@ -13,6 +13,7 @@ from retrievers import PineconeRetriever, Retriever
 import copy 
 import json
 from langchain.chains.question_answering import load_qa_chain
+from prompts import prompts 
 import sys
 sys.path.append('..')
 from aws_helpers.param_manager import get_param_manager
@@ -30,12 +31,24 @@ retriever_config = param_manager.get_parameter('retriever')
 generator_config = param_manager.get_parameter('generator')
 
 ### LOAD MODELS 
-#llm, prompt = llm_utils.load_model_and_prompt(generator_config['ENDPOINT_TYPE'], generator_config['ENDPOINT_NAME'], generator_config['MODEL_NAME'])
-llm, prompt = llm_utils.load_model_and_prompt('huggingface', 'google/flan-t5-xxl', 'flan-t5')
+base_llm, prompt = llm_utils.load_model_and_prompt(generator_config['ENDPOINT_TYPE'], generator_config['ENDPOINT_NAME'], generator_config['MODEL_NAME'])
+#llm, prompt = llm_utils.load_model_and_prompt('huggingface', 'google/flan-t5-xxl', 'flan-t5')
 
-llm_chain = LLMChain(prompt=prompt, llm=llm, verbose=VERBOSE_LLMS)
-filter = LLMChainFilter.from_llm(llm)
-compressor = LLMChainExtractor.from_llm(llm)
+concise_llm = llm_utils.load_fastchat_adapter(base_llm, generator_config['MODEL_NAME'], prompts.fastchat_system_concise)
+detailed_llm = llm_utils.load_fastchat_adapter(base_llm, generator_config['MODEL_NAME'], prompts.fastchat_system_concise)
+
+combine_documents_chain = load_qa_chain(llm=detailed_llm, chain_type="refine")
+
+def title_filter_get_input(context: str, doc: Document):
+    """Return the compression chain input."""
+    return {"context": context, "title": doc_display_title(doc)}
+
+title_filter = LLMChainFilter.from_llm(concise_llm,prompt=prompts.title_filter_prompt)
+title_filter.get_input = title_filter_get_input
+
+#filter = LLMChainFilter.from_llm(llm)
+filter = title_filter
+compressor = LLMChainExtractor.from_llm(concise_llm)
 
 if retriever_config['RETRIEVER_NAME'] == 'pinecone':
     pinecone_auth = param_manager.get_secret('retriever/PINECONE')
@@ -153,13 +166,11 @@ def add_italics(text):
         text = text.replace(match.group(),f"*{match.group()}*")
     return text
 
-def generate_answer(doc, query):
+def doc_display_title(doc: Document):
     """
-    Generate an answer based on the given document, plus additional context if defined for the document
+    Return a display formatted title for a document
     """
-    titles = ' -> '.join(doc.metadata['parent_titles'] + doc.metadata['titles'])
-    content = titles + '\n\n' + doc.page_content
-    return llm_chain.run(doc=content,query=query)
+    return ' -> '.join(doc.metadata['parent_titles'][:-1] + doc.metadata['titles'])
 
 def docs_for_llms(docs: List[Document]):
     """
@@ -169,7 +180,7 @@ def docs_for_llms(docs: List[Document]):
     - Adds the context sentence if provided
     """
     for doc in docs:
-        content = ' -> '.join(doc.metadata['parent_titles'][:-1] + doc.metadata['titles'])
+        content = doc_display_title(doc)
         if 'context' in doc.metadata and not isnan(doc.metadata['context']) and doc.metadata['context'] != '': 
             content += '\n\n' + doc.metadata['context']
         content += '\n\n' + doc.page_content
@@ -212,14 +223,14 @@ def backoff_retrieval(retriever: Retriever, program_info: Dict, topic: str, quer
     - do_filter: If true, performs an LLM filter step on returned documents
     """ 
     backoff_order = ['specialization','program','faculty'] # order of filter elements to remove
-    llm_query = llm_utils.llm_query(program_info, topic, query)
+    filter_context = prompts.title_filter_context_str(program_info, topic)
     program_info_copy = copy.copy(program_info) # copy the dict since elements will be popped
     
     # Perform initial search
     docs = retriever.semantic_search(program_info_copy, topic, query, k=k)
     if do_filter: 
         print('filtered')
-        docs = filter.compress_documents(docs, llm_query)
+        docs = filter.compress_documents(docs, filter_context)
     
     # Perform additional backoff searches as necessary
     for key in backoff_order:
@@ -237,7 +248,7 @@ def backoff_retrieval(retriever: Retriever, program_info: Dict, topic: str, quer
         
         if do_filter: 
             print('filtered')
-            result = filter.compress_documents(result, llm_query)
+            result = filter.compress_documents(result, filter_context)
             
         # Ensure we don't include the same document twice
         current_ids = [doc.metadata['doc_id'] for doc in docs]
@@ -247,7 +258,7 @@ def backoff_retrieval(retriever: Retriever, program_info: Dict, topic: str, quer
     return docs[:min(len(docs),k)] 
     
 async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=None,
-                    combine_with_sibs:bool=False, do_filter:bool=False, compress:bool=True, 
+                    combine_with_sibs:bool=False, do_filter:bool=True, compress:bool=False, 
                     generate_by_document:bool=False,
                     generate_combined:bool=True, k:int=2):
 
@@ -288,7 +299,6 @@ async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=Non
 
     # Perform a combined generation if the option is turned on
     if generate_combined:
-        combine_documents_chain = load_qa_chain(llm=llm, chain_type="refine")
         input_docs = compressed_docs if compressed_docs else docs
         combined_answer = combine_documents_chain.run(input_documents=input_docs, question=llm_query)
         main_response = combined_answer
@@ -296,7 +306,7 @@ async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=Non
     for doc in docs:    
         # Generate a response from this document only, if the option is turned on
         if generate_by_document:
-            generated = generate_answer(doc, llm_query)
+            generated = detailed_llm.run(doc=doc,query=query)
             doc.metadata['generated_response'] = generated
     
         if compress:
