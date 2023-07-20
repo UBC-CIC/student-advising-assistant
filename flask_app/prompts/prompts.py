@@ -8,10 +8,30 @@ from langchain.output_parsers import BooleanOutputParser
 
 ### GENERAL QUERY TRANSORMATIONS
 
-retriever_context_template = "{program_info} : {topic}"
-
 llm_query_template = "{program_info} On the topic of {topic}: {query}"
 llm_query_prompt = PromptTemplate(template=llm_query_template, input_variables=["program_info","topic","query"])
+
+def llm_program_str(program_info: Dict):
+    """
+    Generate a text string from a dict of program info, for 
+    input to an LLM
+    """
+    context_str = ''
+    if 'faculty' in program_info:
+        context_str += f"I am in {program_info['faculty']}"
+    if 'program' in program_info:
+        context_str += f", {program_info['program']}"
+    if 'specialization' in program_info:
+        context_str += f", {program_info['specialization']}"
+    if 'year' in program_info:
+        context_str += f" in {program_info['year']}"
+    return context_str if context_str == '' else context_str + '.'
+
+def llm_query(program_info: Dict, topic: str, query: str):
+    """
+    Combine a context string with a query for use as input to LLM
+    """
+    return llm_query_prompt.format(program_info=llm_program_str(program_info), topic=topic, query=query)
 
 ### FASTCHAT SYSTEM PROMPT
 # These are prompts to tell the system 'who it is' when using fastchat adapter
@@ -58,33 +78,86 @@ class FlexibleBooleanOutputParser(BooleanOutputParser):
                 f"BooleanOutputParser expected output value to either be "
                 f"{self.true_val} or {self.false_val}. Received {cleaned_text}."
             )
+            
+class VerboseFlexibleBooleanOutputParser(FlexibleBooleanOutputParser):
+    """
+    Boolean output parser that only requires the output to contain
+    the boolean value, not to exactly match.
+    Preferences towards the first mentioned value.
+    """
+    def parse(self, text: str) -> bool:
+        """Parse the output of an LLM call to a boolean.
+
+        Args:
+            text: output of a language model
+
+        Returns:
+            Tuple of boolean, and the original text (boolean)
+        """
+        
+        return super(self.__class__,self).parse(text), text
+
+title_filter_template = """
+Given the following question and document title, return YES if the document is relevant to the question and NO if it isn't.
+> Question: {question}
+> Title: {title}
+"""
+title_filter_prompt = PromptTemplate(template=title_filter_template, input_variables=["question","title"], output_parser=FlexibleBooleanOutputParser())
 
 def title_filter_context_str(program_info: Dict, topic: str) -> str:
     """
-    Generate a context string for input to the title_filter_template
+    Generate a context string for input to the title_filter_context_template
     """
     context_str = ''
-    if topic:
+    if topic and topic != '':
         context_str = topic
-    if 'specialization' in program_info:
+    if 'specialization' in program_info and program_info['specialization'] != '':
         if context_str != '': context_str += ' for '
         context_str += program_info['specialization']
-    if 'year' in program_info:
+    if 'year' in program_info and program_info['year'] != '':
         if context_str != '': context_str += ' in '
         context_str += program_info['year']
     return context_str if context_str != '' else None
 
-title_filter_template_2 = """
-Given the following question and document title, return YES if the document is relevant to the question and NO if it isn't.
-> Question: {question}
-> Title: {title}
-> Relevant (YES / NO):"""
-
-title_filter_template = """
+title_filter_context_template = """
 Is the following document title about {context}? Return YES or NO.
 > Title: {title}
 """
-title_filter_prompt = PromptTemplate(template=title_filter_template, input_variables=["context","title"], output_parser=FlexibleBooleanOutputParser())
+
+def basic_filter_question_str(program_info: Dict, topic: str, query: str) -> str:
+    """
+    Generate a filter question string
+    """
+    return llm_query(program_info, topic, query)
+
+filter_template = """
+Given the following question and document, return YES if the document contains the answer to the question, and NO otherwise.
+If the question and the document refer to different programs or year levels, answer NO.
+> Question: {question}
+> Document: {context}
+"""
+filter_prompt = PromptTemplate(template=filter_template, input_variables=["question","context"], output_parser=FlexibleBooleanOutputParser())
+
+def vicuna_filter_question_str(program_info: Dict, topic: str, query: str) -> str:
+    """
+    Generate a filter question string for Vicuna filter template
+    """
+    question_str = ''
+    context_str = title_filter_context_str(program_info, topic)
+    
+    if context_str:
+        question_str += f'If the document is not about {context_str}, say NO.'
+        
+    question_str += f'\n> Question: {query}\n'
+    return question_str
+
+vicuna_filter_template = """
+Does the document below contain the answer to the following question? 
+If the document is empty or contains no information, say NO.
+{question}
+> Document: {context}
+"""
+vicuna_filter_prompt = PromptTemplate(template=vicuna_filter_template, input_variables=["question","context"], output_parser=VerboseFlexibleBooleanOutputParser())
 
 ### QA PROMPTS
 

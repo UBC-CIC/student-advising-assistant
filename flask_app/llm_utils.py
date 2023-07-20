@@ -6,12 +6,14 @@ Utility functions for loading LLMs and associated prompts
 from langchain import HuggingFaceHub, SagemakerEndpoint, Prompt
 from langchain.llms import BaseLLM
 from langchain.llms.sagemaker_endpoint import LLMContentHandler
+from langchain.retrievers.document_compressors import LLMChainFilter
 from huggingface_qa import HuggingFaceQAEndpoint
 import json
-from typing import Tuple, Dict
+from typing import Tuple, Dict, Callable
 import prompts.prompts as prompts
 import os 
 from fastchat_adapter import FastChatLLM
+from filters import VerboseFilter
 
 ### HELPER CLASSES
 class ContentHandler(LLMContentHandler):
@@ -31,30 +33,6 @@ class ContentHandler(LLMContentHandler):
         print(response_json)
         return response_json[0]["generated_text"]
     
-### LLM INPUT FUNCTIONS
-
-def llm_program_str(program_info: Dict):
-    """
-    Generate a text string from a dict of program info, for 
-    input to an LLM
-    """
-    context_str = ''
-    if 'faculty' in program_info:
-        context_str += f"I am in {program_info['faculty']}"
-    if 'program' in program_info:
-        context_str += f", {program_info['program']}"
-    if 'specialization' in program_info:
-        context_str += f", {program_info['specialization']}"
-    if 'year' in program_info:
-        context_str += f" in {program_info['year']}"
-    return context_str if context_str == '' else context_str + '.'
-
-def llm_query(program_info: Dict, topic: str, query: str):
-    """
-    Combine a context string with a query for use as input to LLM
-    """
-    return prompts.llm_query_prompt.format(program_info=llm_program_str(program_info), topic=topic, query=query)
-
 ### MODEL LOADING FUNCTIONS
 
 fastchat_models = {
@@ -131,3 +109,15 @@ def load_huggingface_qa_endpoint(name: str) -> BaseLLM:
     """
     llm = HuggingFaceQAEndpoint(repo_id=name)
     return llm
+
+def load_chain_filter(base_llm: BaseLLM, model_name: str) -> Tuple[LLMChainFilter, Callable[[Dict,str,str],str]]:
+    """
+    Loads a chain filter using the given base llm for the given model name
+    Returns: a tuple of the filter, and a function to generate a question string
+        - The function should be called to generate the query to pass to the filter chain
+        - Function inputs are: program_info: Dict, topic: str, query: str
+    """
+    if model_name == 'vicuna':
+        return VerboseFilter.from_llm(base_llm,prompt=prompts.vicuna_filter_prompt), prompts.vicuna_filter_question_str
+    else:
+        return LLMChainFilter.from_llm(base_llm,prompt=prompts.filter_prompt), prompts.basic_filter_question_str
