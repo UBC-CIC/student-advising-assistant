@@ -1,16 +1,8 @@
-import boto3
-from dotenv import load_dotenv
 import os
-import json
+from .get_session import get_session
+from .param_manager import get_param_manager
 
-# Load session and settings
-def load_json_file(file: str):
-    with open(file,'r') as f: 
-        return json.load(f)
-    
-load_dotenv()
-s3_config = load_json_file('s3_config.json')
-bucket_name = s3_config['bucket-name']
+bucket_name = get_param_manager().get_parameter(['documents','S3_BUCKET_NAME'])
     
 def download_s3_directory(s3_client, directory: str, output_prefix: str, bucket_name: str = bucket_name):
     """
@@ -25,7 +17,7 @@ def download_s3_directory(s3_client, directory: str, output_prefix: str, bucket_
     
     for obj in s3_client.list_objects_v2(Bucket=bucket_name, StartAfter=f"{directory}/", Prefix=f"{directory}/")['Contents']:
         directory_list = obj['Key'].split(f"{directory}/")[-1].split('/')
-        out_path = os.path.join(output_prefix,directory,*directory_list)
+        out_path = os.path.join(output_prefix,*directory.split('/'),*directory_list)
         dirpath =  os.path.dirname(out_path)
         if os.path.exists(out_path):
             if os.path.getmtime(out_path) >= obj['LastModified'].timestamp():
@@ -36,21 +28,26 @@ def download_s3_directory(s3_client, directory: str, output_prefix: str, bucket_
         print(f"Downloading '{obj['Key']}' to '{out_path}'")
         s3_client.download_file(bucket_name, obj['Key'], out_path)
 
-def download_all_dirs():
+def download_all_dirs(retriever: str):
     """
     Downloads the directories from s3 necessary for the app
+    - retriever: Specify the retriever so the appropriate documents can be downloaded
+                 Choices are 'faiss', 'pinecone'
     """
-
-    # check if the environment variable AWS_PROFILE_NAME exists and its value is not an empty string
-    if "AWS_PROFILE_NAME" in os.environ and os.environ["AWS_PROFILE_NAME"]:
-        session = boto3.Session(profile_name=os.environ.get("AWS_PROFILE_NAME"))
-    else:
-        session = boto3.Session()
+    # Login to s3
+    session = get_session()
     s3_client = session.client('s3')
-    dirs = ['indexes','documents']
+    
+    # Specify directories to download
+    dirs = ['documents']
+    if retriever == 'faiss':
+        dirs.append('indexes/faiss')
+    else:
+        dirs.append('indexes/pinecone')
+    
     for dir in dirs:
-        download_s3_directory(s3_client, s3_config['directories'][dir],'data')
+        download_s3_directory(s3_client, dir, 'data')
     s3_client.close()
         
 if __name__ == '__main__':
-    download_all_dirs()
+    download_all_dirs('pinecone')

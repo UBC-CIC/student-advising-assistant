@@ -2,16 +2,12 @@ from typing import Any
 import requests
 from langchain.llms.huggingface_endpoint import HuggingFaceEndpoint
 
-API_URL = "https://api-inference.huggingface.co/models/deepset/deberta-v3-large-squad2"
-headers = {"Authorization": "Bearer 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"}
-
 query_context_split: str = '|'
 
 class HuggingFaceQAEndpoint(HuggingFaceEndpoint):
-
     base_url: str = "https://api-inference.huggingface.co/models/"
     task: str = 'question-answering'
-    query_context_split: str = '|'
+    query_context_split: str = query_context_split
     repo_id: str
 
     def _call(

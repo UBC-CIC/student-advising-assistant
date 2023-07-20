@@ -11,8 +11,10 @@ from tools import write_file
 import logging
 from process_site_dumps import process_site_dumps, BASE_DUMP_PATH
 import boto3
-from dotenv import load_dotenv, find_dotenv
+from dotenv import load_dotenv
 from botocore.exceptions import ClientError
+from program_options_manager import find_program_options
+
 """
 Script to download the data sources using wget, and then split all pages into document extracts for 
 downstream tasks.
@@ -115,8 +117,6 @@ def pull_sites(base_urls, names, system_os, regex_rules = {}, output_folder = '.
             else: 
                 logging.error('- Call to wget failed')
                 logging.error(f'- Error message: {exc.output}' if exc.output else 'No error message given')
-                logging.error(f'- Skipping pull for {base_url}')
-                continue
         
         total_num += get_redirects_from_log(log_file, redirects)
 
@@ -191,9 +191,14 @@ def get_redirects_from_log(log_file, redirects):
 
 ### Main
 
-def main():
+def main(recreate_faculties: bool = False):
+    """
+    - recreate_faculties: if True, recreates the faculties.txt file
+                be careful, because the results may have to be
+                manually pruned after (remove unnecessary specializations)
+    """
+    
     logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
-
 
     # check for all environment variables that are MANDATORY to have
     envs = ["BUCKET_NAME"]
@@ -218,12 +223,16 @@ def main():
         'science_students': '.*science.ubc.ca/students.*'
     }
 
-    pull_sites(urls,names,system_os,regex_rules,output_folder = BASE_DUMP_PATH, wget_exe_path=wget_exe_path, wget_config_path=wget_config_path)
+    pull_sites(urls,names,system_os,regex_rules,output_folder = 'test2', wget_exe_path=wget_exe_path, wget_config_path=wget_config_path)
     process_site_dumps()
 
     # Upload the website_extracts.csv and website_graph.txt
     upload_to_s3(os.path.join("processed", "website_extracts.csv"), os.environ["BUCKET_NAME"],"documents/website_extracts.csv")
     upload_to_s3(os.path.join("processed", "website_graph.txt"), os.environ["BUCKET_NAME"],"documents/website_graph.txt")
+    
+    if recreate_faculties:
+        find_program_options(os.path.join("processed", "website_extracts.csv"))
+        upload_to_s3(os.path.join("processed", "faculties.txt"), os.environ["BUCKET_NAME"],"documents/website_graph.txt")
 
 if __name__ == '__main__':
     main()

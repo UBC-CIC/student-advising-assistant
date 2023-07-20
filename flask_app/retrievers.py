@@ -30,13 +30,27 @@ retrievers: Dict = {}
 class MyPineconeRetriever(PineconeHybridSearchRetriever):
     """
     Wrapper of LangChain PineconeHybridSearchRetriever
-    that allows for additional parameters in query
+    that allows for additional parameters in query,
+    and fetching documents by ID
     """
     # Key for the original text in the pinecone document's metadata
     _text_key: str = 'context'
     # Key to place the document similarity score in metadata after retrieval
     _score_key: str = 'score'
-                    
+    
+    def _handle_pinecone_docs(self, vectors: List[dict]) -> List[Document]:
+        """
+        Convert a list of vectors from a pinecone query or fetch to a list
+        of Langchain documents
+        """                
+        docs = []
+        for res in vectors:
+            context = res["metadata"].pop(self._text_key)
+            doc = Document(page_content=context, metadata=res["metadata"])
+            if self._score_key in res: doc.metadata[self._score_key] = res["score"]
+            docs.append(doc)
+        return docs
+        
     def _get_relevant_documents(
         self, 
         query: str, 
@@ -63,21 +77,22 @@ class MyPineconeRetriever(PineconeHybridSearchRetriever):
         sparse_vec["values"] = [float(s1) for s1 in sparse_vec["values"]]
         # query pinecone with the query parameters
         print(kwargs['filter'])
-        result = self.index.query(
+        response = self.index.query(
             vector=dense_vec,
             sparse_vector=sparse_vec,
             top_k=self.top_k,
             include_metadata=True,
             **kwargs
         )
-        final_result = []
-        for res in result["matches"]:
-            context = res["metadata"].pop(self._text_key)
-            doc = Document(page_content=context, metadata=res["metadata"])
-            doc.metadata[self._score_key] = res["score"]
-            final_result.append(doc)
-        # return search results as json
-        return final_result
+        return self._handle_pinecone_docs(response["matches"])
+    
+    def fetch_by_id(self, ids: List[int], namespace: Optional[str] = None):
+        """
+        Fetch a set of documents by ids
+        """
+        ids = [str(id) for id in ids]
+        response = self.index.fetch(ids=ids, namespace=namespace)
+        return self._handle_pinecone_docs(response['vectors'].values())
     
 class Retriever(ABC):
     """
@@ -175,9 +190,11 @@ class PineconeRetriever(Retriever):
     # Namespace to use for all queries to the pinecone index
     namespace: Optional[str] 
     
-    def __init__(self, alpha = 0.4, filter_params = []):
+    def __init__(self, pinecone_key: str, pinecone_region: str, alpha = 0.4, filter_params = []):
         """
         Initialize the pinecone retriever
+        - pinecone_key: API key for pinecone
+        - pinecone_region: region for the pinecone index
         - alpha: weighting of the sparse vs dense vectors
                  0 = pure semantic search (dense vectors)
                  1 = pure keyword search (sparse vectors)
@@ -199,8 +216,8 @@ class PineconeRetriever(Retriever):
         
         # Connect to the pinecone index
         pinecone.init(      
-            api_key=os.environ.get('PINECONE_KEY'),      
-            environment=os.environ.get('PINECONE_REGION')      
+            api_key=pinecone_key,      
+            environment=pinecone_region     
         )     
         index = pinecone.Index(index_config['name'])
         self.namespace = index_config['namespace']
@@ -234,7 +251,8 @@ class PineconeRetriever(Retriever):
         """
         Return a list of documents from a list of document indexes
         """
-        raise NotImplementedError()
+        docs = self.retriever.fetch_by_id(doc_ids, self.namespace)
+        return self._response_converter(docs)
     
     def set_top_k(self, k: int):
         """

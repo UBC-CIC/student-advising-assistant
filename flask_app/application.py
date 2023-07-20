@@ -7,15 +7,28 @@ from flask import Flask, request, render_template
 import json
 from langchain_inference import run_chain
 import os 
+import csv
 
+### Constants
+FACULTIES_PATH = os.path.join('data','documents','faculties.txt')
+FEEDBACK_CSV_PATH = os.path.join('data','feedback.csv')
+
+### Globals (set upon load)
 application = Flask(__name__)
 faculties = {}
-FACULTIES_PATH = os.path.join('data','documents','faculties.txt')
+instructions = ''
+
+def read_text(filename: str, as_json = False):
+    result = ''
+    with open(filename) as f:
+        if as_json: result = json.load(f)
+        else: result = f.read()
+    return result
 
 @application.route('/', methods=['GET'])
 def home():
     # Render the form template
-    return render_template('index.html',faculties = faculties)
+    return render_template('index.html', faculties=faculties)
 
 @application.route('/answer', methods=['POST'])
 async def answer():
@@ -31,18 +44,32 @@ async def answer():
         start_doc = int(start_doc)
 
     # Run the model inference
-    docs = await run_chain(program_info,topic,question,start_doc=start_doc)
+    docs, main_response, alerts, removed_docs = await run_chain(program_info,topic,question,start_doc=start_doc)
 
     # Render the results
     context_str = ' : '.join(list(program_info.values()) + [topic])
-    return render_template('ans.html',question=question,context=context_str,answers=docs,
-                           form=request.form.to_dict())
+    return render_template('ans.html',question=question,context=context_str,docs=docs,
+                           form=request.form.to_dict(), main_response=main_response, alerts=alerts,
+                           removed_docs=removed_docs)
 
+@application.route('/feedback', methods=['POST'])
+async def feedback():
+    # Save submitted feedback
+    fields = ['feedback-hidden-helpful','feedback-hidden-question','feedback-hidden-context',
+              'feedback-hidden-reference-ids','feedback-hidden-response','feedback-reference-select','feedback-comments']
+    data = [request.form[field] for field in fields]
+
+    with open(FEEDBACK_CSV_PATH, "w") as csv_file:
+        writer = csv.writer(csv_file, delimiter=',')
+        writer.writerow(data)
+            
+    # Render the results
+    return render_template('feedback.html')
+    
 def setup():
     # Upon loading, load the available settings for the form
-    global faculties
-    with open(FACULTIES_PATH) as f:
-        faculties = json.load(f)
+    global faculties, instructions
+    faculties = read_text(FACULTIES_PATH,as_json=True)
 
 setup()
 
