@@ -2,6 +2,7 @@
 import 'source-map-support/register';
 import * as cdk from 'aws-cdk-lib';
 import { VpcStack } from '../lib/vpc-stack';
+import { DatabaseStack } from '../lib/database-stack';
 
 const app = new cdk.App();
   /* If you don't specify 'env', this stack will be environment-agnostic.
@@ -26,3 +27,11 @@ const vpcStack = new VpcStack(app, `${identifier}-VpcStack`, {
     region: process.env.CDK_DEFAULT_REGION,
   },
 });
+
+const databaseStack = new DatabaseStack(app, "student-advising-DatabaseStack", vpcStack, {
+  env: {
+    account: process.env.CDK_DEFAULT_ACCOUNT,
+    region: process.env.CDK_DEFAULT_REGION
+  },
+}); 
+databaseStack.addDependency(vpcStack)
