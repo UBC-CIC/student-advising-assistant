@@ -44,12 +44,13 @@ async def answer():
         start_doc = int(start_doc)
 
     # Run the model inference
-    docs, main_response = await run_chain(program_info,topic,question,start_doc=start_doc)
+    docs, main_response, alerts, removed_docs = await run_chain(program_info,topic,question,start_doc=start_doc)
 
     # Render the results
     context_str = ' : '.join(list(program_info.values()) + [topic])
-    return render_template('ans.html',question=question,context=context_str,answers=docs,
-                           form=request.form.to_dict(), main_response=main_response)
+    return render_template('ans.html',question=question,context=context_str,docs=docs,
+                           form=request.form.to_dict(), main_response=main_response, alerts=alerts,
+                           removed_docs=removed_docs)
 
 @application.route('/feedback', methods=['POST'])
 async def feedback():

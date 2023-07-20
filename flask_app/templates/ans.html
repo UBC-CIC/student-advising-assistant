@@ -17,7 +17,7 @@
 </head>
 
 <body>
-  <div class="container">
+  <div class="container mb-5">
     <header class="m-5" id="ask" role="button">
       <h1 class="text-center">Ask Cali</h1>
     </header>
@@ -27,6 +27,9 @@
           <p><strong>Answering question: </strong>{{question}}</p>
           <p><strong>Context: </strong>{% if context == '' %} None {% else %} {{context}}{% endif %}</p>
         </div>
+        {% for alert in alerts %}
+        <div class="alert alert-warning alert-dismissible fade show" role="alert">{{alert}}</div>
+        {% endfor %}
         <div class="card border-primary mb-3">
           <div class="card-body">
             {% if main_response %}
@@ -92,7 +95,7 @@
                   <span class="input-group-text" id="inputGroup-sizing-default">Which reference is the most relevant?</span>
                   <select class="form-select" name="feedback-reference-select" aria-label="Reference Select">
                     <option selected>None</option>
-                    {% for i in range(answers|length) %}
+                    {% for i in range(docs|length + removed_docs|length) %}
                       <option value="{{i+1}}">Reference {{i+1}}</option>
                     {% endfor %}
                   </select>
@@ -111,7 +114,7 @@
           </div>
         </div>
 
-        {% for doc in answers %}
+        {% for doc in docs %}
         <div class="card mb-3">
           <div class="card-header">
             Reference {{loop.index}}
@@ -133,8 +136,12 @@
               </template>
               <script type="text/markdown">{{doc.page_content}}</script>
             </zero-md>
+            {% if 'keep_reason' in doc.metadata %}
+            <strong>Is this document relevant?</strong>
+            <p> {{doc.metadata['keep_reason']}} </p>
+            {% endif %}
             <strong>Source</strong>
-            {% if doc.metadata['source'] %}
+            {% if 'source' in doc.metadata %}
             <p> {{doc.metadata['source']}} </p>
             {% endif %}
             <p>Url: <a href="{{doc.metadata['url']}}">{{doc.metadata['url']}}</a></p>
@@ -157,6 +164,44 @@
           </div>
         </div>
         {% endfor %}
+
+        <h3 class='mt-5'>Additional References</h3>
+        <p>These references were filtered out and ignored for answer generation, but may still contain relevant information.</p>
+        <div id="removed-docs-accordion" class="accordion">
+          {% for doc in removed_docs %}
+          <div class="accordion-item">
+            <h2 class="accordion-header" id="filtered-heading{{loop.index}}">
+              <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#filtered-collapse{{loop.index}}" aria-expanded="true" aria-controls="filtered-collapse{{loop.index}}">
+                Reference {{docs|length + loop.index}}
+              </button>
+            </h2>
+            <div id="filtered-collapse{{loop.index}}" class="accordion-collapse collapse" aria-labelledby="filtered-heading{{loop.index}}" data-bs-parent="#removed-docs-accordion">
+              <div class="accordion-body">
+                <zero-md>
+                  <template>
+                    <style>
+                      em {
+                        font-style: normal;
+                        background: lightgoldenrodyellow;
+                      }
+                    </style>
+                  </template>
+                  <script type="text/markdown">{{doc.page_content}}</script>
+                </zero-md>
+                {% if 'keep_reason' in doc.metadata %}
+                <strong>Is this document relevant?</strong>
+                <p> {{doc.metadata['keep_reason']}} </p>
+                {% endif %}
+                <strong>Source</strong>
+                {% if 'source' in doc.metadata %}
+                <p> {{doc.metadata['source']}} </p>
+                {% endif %}
+                <p>Url: <a href="{{doc.metadata['url']}}">{{doc.metadata['url']}}</a></p>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
       </section>
     </div>
 </body>

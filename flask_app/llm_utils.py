@@ -6,12 +6,14 @@ Utility functions for loading LLMs and associated prompts
 from langchain import HuggingFaceHub, SagemakerEndpoint, Prompt
 from langchain.llms import BaseLLM
 from langchain.llms.sagemaker_endpoint import LLMContentHandler
+from langchain.retrievers.document_compressors import LLMChainFilter
 from huggingface_qa import HuggingFaceQAEndpoint
 import json
-from typing import Tuple, Dict
+from typing import Tuple, Dict, Callable
 import prompts.prompts as prompts
 import os 
 from fastchat_adapter import FastChatLLM
+from filters import VerboseFilter
 
 ### HELPER CLASSES
 class ContentHandler(LLMContentHandler):
@@ -31,38 +33,25 @@ class ContentHandler(LLMContentHandler):
         print(response_json)
         return response_json[0]["generated_text"]
     
-### LLM INPUT FUNCTIONS
-def llm_program_str(program_info: Dict):
-    """
-    Generate a text string from a dict of program info, for 
-    input to an LLM
-    """
-    context_str = ''
-    if 'faculty' in program_info:
-        context_str += f"I am in {program_info['faculty']}"
-    if 'program' in program_info:
-        context_str += f", {program_info['program']}"
-    if 'specialization' in program_info:
-        context_str += f", {program_info['specialization']}"
-    if 'year' in program_info:
-        context_str += f" in {program_info['year']}"
-    return context_str if context_str == '' else context_str + '.'
-
-def llm_query(program_info: Dict, topic: str, query: str):
-    """
-    Combine a context string with a query for use as input to LLM
-    """
-    return prompts.llm_query_prompt.format(program_info=llm_program_str(program_info), topic=topic, query=query)
-
 ### MODEL LOADING FUNCTIONS
 
 fastchat_models = {
     'vicuna': 'vicuna_v1.1'
 }
 
+def load_fastchat_adapter(base_llm: BaseLLM, model_name: str, system_instruction: str) -> BaseLLM:
+    """
+    Loads a fastchat adapter for the given base model, with the provided system instruction
+    """
+    
+    if model_name not in fastchat_models:
+        raise Exception(f'{model_name} is not supported for FastChat')
+
+    return FastChatLLM.from_base_llm(base_llm, fastchat_models[model_name], system_instruction=system_instruction)
+    
 def load_model_and_prompt(endpoint_type: str, endpoint_name: str, model_name: str) -> Tuple[BaseLLM,Prompt]:
     """
-    Utility function loads a LLM of the given endpoint type and model name
+    Utility function loads a LLM of the given endpoint type and model name, and the QA Prompt
     - endpoint_type: 'sagemaker', 'huggingface', or 'huggingface_qa'
     - endpoint_name: huggingface model id, or sagemaker endpoint name
     - model_name: display name of the model
@@ -74,9 +63,6 @@ def load_model_and_prompt(endpoint_type: str, endpoint_name: str, model_name: st
         llm = load_huggingface_endpoint(endpoint_name)
     elif endpoint_type == 'huggingface_qa':
         llm = load_huggingface_qa_endpoint(endpoint_name)
-    
-    if model_name in fastchat_models:
-        llm = FastChatLLM.from_base_llm(llm, fastchat_models[model_name])
         
     return llm, load_prompt(endpoint_type, model_name)
     
@@ -123,3 +109,15 @@ def load_huggingface_qa_endpoint(name: str) -> BaseLLM:
     """
     llm = HuggingFaceQAEndpoint(repo_id=name)
     return llm
+
+def load_chain_filter(base_llm: BaseLLM, model_name: str) -> Tuple[LLMChainFilter, Callable[[Dict,str,str],str]]:
+    """
+    Loads a chain filter using the given base llm for the given model name
+    Returns: a tuple of the filter, and a function to generate a question string
+        - The function should be called to generate the query to pass to the filter chain
+        - Function inputs are: program_info: Dict, topic: str, query: str
+    """
+    if model_name == 'vicuna':
+        return VerboseFilter.from_llm(base_llm,prompt=prompts.vicuna_filter_prompt), prompts.vicuna_filter_question_str
+    else:
+        return LLMChainFilter.from_llm(base_llm,prompt=prompts.filter_prompt), prompts.basic_filter_question_str

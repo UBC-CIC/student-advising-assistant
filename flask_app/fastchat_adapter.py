@@ -2,10 +2,9 @@ from langchain.llms.base import BaseLLM, LLM
 from langchain.callbacks.manager import CallbackManagerForLLMRun
 from fastchat.model import get_conversation_template
 from typing import Optional, List, Any
+from prompts.prompts import fastchat_system_detailed
 
-default_system_instruction = """
-A chat between a University of British Columbia (UBC) student and an artificial intelligence assistant. 
-The assistant gives helpful, detailed, and polite answers to the user's questions."""
+default_system_instruction = fastchat_system_detailed
 
 class FastChatLLM(LLM):
     # Adapter to use any supported LLM with fastchat prompting tools
