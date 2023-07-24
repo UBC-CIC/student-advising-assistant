@@ -17,7 +17,7 @@ from prompts import prompts
 import sys
 sys.path.append('..')
 from aws_helpers.param_manager import get_param_manager
-from aws_helpers.download_s3_files import download_all_dirs
+from aws_helpers.s3_tools import download_s3_directory
 
 VERBOSE_LLMS = True
 
@@ -60,7 +60,24 @@ def read_text(filename: str, as_json = False):
     return result
     
 graph = doc_graph_utils.read_graph(GRAPH_FILEPATH)
+
+def download_all_dirs(retriever: str):
+    """
+    Downloads the directories from s3 necessary for the flask app
+    - retriever: Specify the retriever so the appropriate documents can be downloaded
+                 Choices are 'faiss', 'pinecone'
+    """
+    # Specify directories to download
+    dirs = ['documents']
+    if retriever == 'faiss':
+        dirs.append('indexes/faiss')
+    else:
+        dirs.append('indexes/pinecone')
+    
+    for dir in dirs:
+        download_s3_directory(dir, output_prefix='data')
 download_all_dirs(retriever_config['RETRIEVER_NAME'])
+
 data_source_annotations = read_text(os.path.join('static','data_source_annotations.json'), as_json=True)
 
 ### UTILITY FUNCTIONS

@@ -68,23 +68,3 @@ def upload_file_to_s3(file_path: str, s3_file_path: str, s3_client = default_cli
         log.error("Make sure you are inside the document_scraping directory")
     except ClientError as e:
         log.error(f"There was an error uploading the file to S3: {str(e)}")
-        
-def download_all_dirs(retriever: str, s3_client = default_client):
-    """
-    Downloads the directories from s3 necessary for the flask app
-    - retriever: Specify the retriever so the appropriate documents can be downloaded
-                 Choices are 'faiss', 'pinecone'
-    """
-    # Specify directories to download
-    dirs = ['documents']
-    if retriever == 'faiss':
-        dirs.append('indexes/faiss')
-    else:
-        dirs.append('indexes/pinecone')
-    
-    for dir in dirs:
-        download_s3_directory(s3_client, dir, 'data')
-    s3_client.close()
-        
-if __name__ == '__main__':
-    download_all_dirs('pinecone')
