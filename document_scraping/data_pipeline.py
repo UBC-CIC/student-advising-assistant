@@ -1,18 +1,18 @@
 import subprocess
 import platform
-from os.path import join
-from os import makedirs
 import os
 import sys
 import regex as re
-import json
+import pyjson5 as json
 from subprocess import check_call, STDOUT, CalledProcessError
-from tools import write_file
 import logging
-from process_site_dumps import process_site_dumps, BASE_DUMP_PATH
-import boto3
+from typing import Dict, List, Tuple, Any
+from tools import write_file
+import process_site_dumps
+from website_dump_doc_extractor import DumpConfig, DocExtractor
 from program_options_manager import find_program_options
-
+from dotenv import load_dotenv
+load_dotenv()
 sys.path.append('..')
 from aws_helpers.s3_tools import upload_file_to_s3
 
@@ -21,49 +21,159 @@ Script to download the data sources using wget, and then split all pages into do
 downstream tasks.
 """
 
+### CONSTANTS
+# Input files
+CONFIG_FILEPATH = 'dump_config.json5' # Filepath to the dump config file
+WGET_EXE_PATH = "wget.exe" # Wget executable used on non-unix systems
+WGET_CONFIG_PATH = 'wget_config.txt' # Config file for wget calls
+
+# Output files
+BASE_DUMP_PATH = 'site_dumps' # Directory where site dump files are saved
+OUTPUT_PROCESSED_PATH = 'processed' # Directory where processed extracts are saved
+REDIRECT_FILEPATH = os.path.join(BASE_DUMP_PATH,'redirects.txt') # Filepath for dict of redirects
+
+# Other constants
 redirect_log_re = re.compile('http[^\n]*(\n[^\n]*){2}301 Moved Permanently\nLocation:\s[^\n\s]*')
+# ^ regex matches entries in the wget logs that indicate a redirect
+function_refs_file = process_site_dumps
+# ^ file to search in for functions referenced by name in the config file
+
+### Functions to load configuration from json file
+
+def replace_function_refs(item: Any) -> Any:
+    """
+    Used to handle function references in the config json
+    Recursively replace any function names in the dictionary values 
+    with the corresponding function reference.
+    Assumes all functions are in the function_refs_file
+    - item: A dict or list to recursively search
     
-def pull_sites(base_urls, names, system_os, regex_rules = {}, output_folder = './', additional_urls_file = None, wget_exe_path = './wget.exe', wget_config_path = './wget_config.txt'):
+    Returns the modified dictionary
+    """
+    # Keys where the value is a function name
+    function_keys = ['function','metadata_extractor','parent_context_extractor']
+    
+    if type(item) == dict:
+        for key, val in item.items():
+            if key in function_keys:
+                # val should be the name of a function
+                # replace val with the associated function reference
+                try:
+                    item[key] = getattr(function_refs_file, val)
+                except:
+                    logging.error(f'Could not find the function {val} in {function_refs_file.__name__}')
+                    raise ValueError(f'Invalid function name "{val}" specified in the config.')
+            else: 
+                item[key] = replace_function_refs(val)
+        return item
+    elif type(item) == list:
+        return [replace_function_refs(entry) for entry in item]
+    else:
+        return item
+    
+def dict_to_class(dict: Dict, object: Any) -> Any:
+    """
+    For all attributes in the dict, sets the corresponding attribute of the object
+    """
+    for key,val in dict.items():
+        setattr(object, key, val)
+    
+required_keys = ['base_url','main_content_attrs']
+def validate_dump_config(name: str, dump_config_json: Dict):
+    """
+    Verifies that a config for a site dump from the dump config file
+    contains all necessary values
+    """
+    if not all([key in dump_config_json for key in required_keys]):
+        raise KeyError(f'Missing required key in the dump config for {name}. Required keys are {required_keys}.')
+
+def load_general_config(general_config_json: Dict) -> DocExtractor:
+    """
+    Create a DocExtractor from the given config json
+    """
+    doc_extractor = DocExtractor()
+    dict_to_class(general_config_json,doc_extractor)
+    return doc_extractor
+
+def load_dump_config(dump_config_json: Dict) -> DumpConfig:
+    """
+    Create a DumpConfig from the given config json
+    """
+    dump_config = DumpConfig()
+    dict_to_class(dump_config_json,dump_config)
+    
+    # Create the dump path from the url
+    base_url_elems = [segment for segment in dump_config.base_url.split('/') 
+                        if len(segment) > 0 and not segment.startswith('http')]
+    dump_config.dump_path = os.path.join(BASE_DUMP_PATH, *base_url_elems)
+    
+    return dump_config
+        
+def load_config(config_filepath: str) -> Tuple[DocExtractor, List[DumpConfig]]:
+    """
+    Loads the dump configurations from a json file
+    """
+    config_json = None
+    with open(config_filepath,'r') as f:
+        config_json = json.load(f)
+        
+    doc_extractor = load_general_config(config_json['general_config'])
+    dump_configs = []
+    for name, dump_json in config_json['dump_configs'].items():
+        if name == "example_config": 
+            continue # Ignore the example dump config in the file
+        validate_dump_config(name, dump_json)
+        dump_json = replace_function_refs(dump_json)
+        dump_config = load_dump_config(dump_json)
+        dump_config.name = name
+        dump_configs.append(dump_config)
+    
+    return doc_extractor, dump_configs
+
+def site_regex_rule(base_url: str) -> str:
+    """
+    Generates a regex string to match only sub urls of the given
+    base url. Used in wget calls to fetch child pages of sites.
+    """
+    url_segments = [segment for segment in base_url.split('/') 
+                        if len(segment) > 0 and not segment.startswith('http')]
+    return f".*{re.escape('/'.join(url_segments))}.*"
+    
+### Main function to pull websites and process
+def pull_sites(dump_configs: List[DumpConfig], system_os, output_folder = './', wget_exe_path = './wget.exe', wget_config_path = './wget_config.txt'):
     """
     Uses wget to pull the indicated websites, and processes
     the files into one combined csv of documents for use in the UBC Science 
     Advising question answering system.
-    - base_urls: base urls to begin recursively searching from. Will grab all child pages.
-    - names: list of names for each base url, used as a short form in logs
-    - regex_rules: dict of names to regex rules to use to identify pages to include
-                   if no entry specified for a name, pulls all child pages
-    - output_folder: folder for output site dumps
-    - additional_urls_file: .txt list of additional urls to pull (non recursively)
+    - dump_configs: Config objects for the sites to pull
+    - system_os: 
+    - output_folder: directory for the output site dumps
     - wget_exe_path: path to the wget.exe file
     - wget_config_path: path to the wget config file (aka .wgetrc)
     """
     # create the output dir if not exists, otherwise do nothing
-    makedirs(output_folder, exist_ok=True)
+    os.makedirs(output_folder, exist_ok=True)
     redirects = {}
     total_num = 0
-    for base_url, name in zip(base_urls,names):
-        logging.info(name)
-        log_file = join(output_folder,f'wget_log_{name}.txt')
-        rule_arg = None
-        if name in regex_rules:
-            rule_arg = f'--accept-regex=({regex_rules[name]})'
-        else:
-            rule_arg = '--no-parent'
+    for dump_config in dump_configs:
+        logging.info(dump_config)
+        log_file = os.path.join(output_folder,f'wget_log_{dump_config.name}.txt')
+        regex_rule_arg = f'--accept-regex=({site_regex_rule(dump_config.base_url)})'
             
         try:
-            logging.info(f'- Beginning pull from {base_url}, making call to wget')
+            logging.info(f'- Beginning pull from {dump_config.base_url}, making call to wget')
             logging.info(f'    - ** This may take a long time')
             logging.info(f'    - Check the log file {log_file} for updates')
             if system_os == "Windows":
                 check_call([wget_exe_path, f'--config={wget_config_path}', f'--output-file={log_file}', '--recursive', 
-                            f'--directory-prefix={output_folder}', rule_arg, base_url], stderr=STDOUT)
+                            f'--directory-prefix={output_folder}', regex_rule_arg, dump_config.base_url], stderr=STDOUT)
             elif system_os in ["Darwin", "Linux"]:
                 check_call(["wget", f'--config={wget_config_path}', f'--output-file={log_file}', '--recursive', 
-                            f'--directory-prefix={output_folder}', rule_arg, base_url], stderr=STDOUT)
+                            f'--directory-prefix={output_folder}', regex_rule_arg, dump_config.base_url], stderr=STDOUT)
             else:
                 logging.error(f"OS {system_os} is not currently supported. Currently supported OS are Windows, Darwin and Linux")
                 raise OSError(f"OS {system_os} is not currently supported")
-            logging.info(f'- Successfully pulled from {base_url}')
+            logging.info(f'- Successfully pulled from {dump_config.base_url}')
         except CalledProcessError as exc:
             if exc.returncode == 8:
                 # Server error return code
@@ -75,31 +185,14 @@ def pull_sites(base_urls, names, system_os, regex_rules = {}, output_folder = '.
                 logging.error(f'- Error message: {exc.output}' if exc.output else 'No error message given')
         
         total_num += get_redirects_from_log(log_file, redirects)
-
-    if additional_urls_file:
-        logging.info('Additional urls')
-        log_file = f'wget_log_additional.txt'
-        logging.info(f'- Beginning pull for additional urls listed in {additional_urls_file}, making call to wget')
-        if system_os == "Windows":
-            subprocess.check_call([wget_exe_path, f'--config={wget_config_path}', f'--output-file={log_file}', 
-                                f'--input-file={additional_urls_file}', f'--directory-prefix={output_folder}'])
-        elif system_os in ["Darwin", "Linux"]:
-            subprocess.check_call(["wget", f'--config={wget_config_path}', f'--output-file={log_file}', 
-                                f'--input-file={additional_urls_file}', f'--directory-prefix={output_folder}'])
-        else:
-            logging.error(f"OS {system_os} is not currently supported. Currently supported OS are Windows, Darwin and Linux")
-            raise OSError(f"OS {system_os} is not currently supported")
-        logging.info(f'- Completed pull for additional urls')
-        get_redirects_from_log(log_file, redirects)
     
     # Cleanup copied files
     logging.info("Cleanup any duplicated files from wget")
     cleanup_copy_files(output_folder)
     
-    redirects_path = join(output_folder,'redirects.txt')
     def writer(): 
-        makedirs(output_folder, exist_ok=True)
-        with open(redirects_path,'w') as f: json.dump(redirects,f)
+        os.makedirs(output_folder, exist_ok=True)
+        with open(REDIRECT_FILEPATH,'w') as f: json.dump(redirects,f)
     
     write_file(writer)
     print(f'Completed pulling sites, downloaded {total_num} pages')
@@ -160,31 +253,18 @@ def main(recreate_faculties: bool = False):
     # darwin (OS X) and Linux probably not
     system_os = platform.system()
     logging.info(f"System OS: {system_os}")
-    wget_exe_path = "wget.exe"
-    wget_config_path = 'wget_config.txt'
 
-    urls = [
-        'https://vancouver.calendar.ubc.ca/',
-        'https://science.ubc.ca/students/'
-    ]
-    names = [
-        'academic_calendar',
-        'science_students'
-    ]
-    regex_rules = {
-        'science_students': '.*science.ubc.ca/students.*'
-    }
-
-    pull_sites(urls,names,system_os,regex_rules,output_folder = BASE_DUMP_PATH, wget_exe_path=wget_exe_path, wget_config_path=wget_config_path)
-    process_site_dumps()
+    doc_extractor, dump_configs = load_config(CONFIG_FILEPATH)
+    pull_sites(dump_configs, system_os=system_os, output_folder = BASE_DUMP_PATH, wget_exe_path=WGET_EXE_PATH, wget_config_path=WGET_CONFIG_PATH)
+    process_site_dumps.process_site_dumps(doc_extractor, dump_configs, redirect_map_path=REDIRECT_FILEPATH, out_path=OUTPUT_PROCESSED_PATH)
 
     # Upload the website_extracts.csv and website_graph.txt
-    upload_file_to_s3(os.path.join("processed", "website_extracts.csv"), "documents/website_extracts.csv")
-    upload_file_to_s3(os.path.join("processed", "website_graph.txt"), "documents/website_graph.txt")
+    upload_file_to_s3(os.path.join(OUTPUT_PROCESSED_PATH, "website_extracts.csv"), "documents/website_extracts.csv")
+    upload_file_to_s3(os.path.join(OUTPUT_PROCESSED_PATH, "website_graph.txt"), "documents/website_graph.txt")
     
     if recreate_faculties:
-        find_program_options(os.path.join("processed", "website_extracts.csv"))
-        upload_file_to_s3(os.path.join("processed", "faculties.txt"), "documents/website_graph.txt")
+        find_program_options(os.path.join(OUTPUT_PROCESSED_PATH, "website_extracts.csv"))
+        upload_file_to_s3(os.path.join(OUTPUT_PROCESSED_PATH, "faculties.txt"), "documents/website_graph.txt")
 
 if __name__ == '__main__':
     main()
