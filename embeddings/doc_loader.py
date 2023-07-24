@@ -14,7 +14,6 @@ def load_docs(docs_path, eval_strings=False) -> List[Document]:
     - eval_strings: if true, evaluates fields from strings to lists/dicts
     """
     docs_df = pd.read_csv(docs_path,index_col=0,encoding=ENCODING)
-    docs_df[['faculty','program','specialization']] = docs_df[['faculty','program','specialization']].replace(nan, 'None')
     docs_df = docs_df.replace(nan, '')
     
     docs = []

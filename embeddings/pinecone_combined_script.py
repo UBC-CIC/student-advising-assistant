@@ -10,33 +10,34 @@ import os
 import shutil
 import pathlib
 import ast
-from s3_helpers import download_s3_directory, upload_s3_directory
 import doc_loader
 import batcher
 from combined_embeddings import concat_embeddings
+import sys
+sys.path.append('..')
+from aws_helpers.param_manager import get_param_manager
+from aws_helpers.s3_tools import download_s3_directory, upload_directory_to_s3
 
 ### CONFIGURATION
 
 # AWS Secrets Manager config for the Pinecone secret API key and region
-secret_name = "dev/PineconeIndex"
-region_name = "us-west-2"
+secret_name = "retriever/PINECONE"
+param_manager = get_param_manager()
     
 # If true, loads previously computed embeddings from s3 rather than computing new embeddings
-embeddings_precomputed = False
+embeddings_precomputed = True
 
 # If true, recreates the pinecone index from scratch before inserting vectors
 should_clear_index = True
 
 # If true, tries to use GPU for embeddings
-gpu_available = True
+gpu_available = False
 
 # Config for the pinecone index
 index_config = {
     "name": "langchain-hybrid-index",
     "namespace": "all-mpnet-base-v2",
-    #"namespace": "multi-qa-mpnet-base-dot-v1",
     "pod-type": "p1",
-    #"base_embedding_model": "sentence-transformers/multi-qa-mpnet-base-dot-v1", # can be changed to any huggingface model name
     "base_embedding_model": "sentence-transformers/all-mpnet-base-v2", # can be changed to any huggingface model name
     "sparse_vector_model": "bm25", # changing this value not change the sparse model used
     "base_embedding_dimension": 768, # depends on the base embedding model
@@ -71,6 +72,8 @@ texts = [doc.page_content for doc in docs]
 ### CREATE EMBEDDINGS (DENSE VECTORS)
 
 index_dir = 'indexes'
+pinecone_dir = os.path.join(index_dir,'pinecone')
+os.makedirs(pinecone_dir,exist_ok=True)
 
 # Load the base embedding model from huggingface
 device = 'cuda' if gpu_available else 'cpu'
@@ -124,33 +127,11 @@ else:
 ### CREATE PINECONE INDEX
 
 # Save index config to json
-pinecone_dir = os.path.join(index_dir,'pinecone')
-os.makedirs(pinecone_dir,exist_ok=True)
 with open(os.path.join(pinecone_dir,'index_config.json'),'w') as f:
     json.dump(index_config,f)
 
-# Load the API key from AWS secrets
-def get_pinecone_secret():
-    # Create a Secrets Manager client
-    session = boto3.session.Session()
-    client = session.client(
-        service_name='secretsmanager',
-        region_name=region_name
-    )
-
-    try:
-        get_secret_value_response = client.get_secret_value(
-            SecretId=secret_name
-        )
-    except ClientError as e:
-        raise e
-
-    # Decrypts secret using the associated KMS key.
-    secret = ast.literal_eval(get_secret_value_response['SecretString'])
-    return secret
-
 # Connect to pinecone API
-secret = get_pinecone_secret()
+secret = param_manager.get_secret(secret_name)
 pinecone.init(      
 	api_key=secret['PINECONE_KEY'],      
 	environment=secret['PINECONE_REGION']    
@@ -243,9 +224,9 @@ print('Completed upsert to pinecone index')
 ### UPLOAD TO S3 & CLEANUP
     
 # Upload documents to s3
-upload_s3_directory(embed_dir)
-upload_s3_directory(docs_dir)
-upload_s3_directory(index_dir)
+upload_directory_to_s3(embed_dir)
+upload_directory_to_s3(docs_dir)
+upload_directory_to_s3(index_dir)
 
 # Delete directories from disk
 shutil.rmtree(docs_dir)
