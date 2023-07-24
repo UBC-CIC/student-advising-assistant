@@ -13,7 +13,7 @@ from spacy.language import Language
 import tools
 from tqdm.auto import tqdm
 import logging
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 
 """
 DocExtractor class:
@@ -22,8 +22,10 @@ DocExtractor class:
 - Pass in configurations via the DumpConfig class
 """
 
-### CONSTANTS
+# Generic soup is used to create new tags
 generic_soup = BeautifulSoup()
+
+### SPACY SETUP
 nlp = spacy.load("en_core_web_sm",exclude=['tagger','attribute_ruler', 'lemmatizer', 'ner'])
 custom_sent_boundaries = [
     '(\n|^)\s*\d+\.', # matches to an item in an enumerated list
@@ -52,35 +54,24 @@ def set_custom_boundaries(doc):
 nlp.add_pipe('custom_boundaries', before='parser')
 nlp.add_pipe('custom_merge', before='custom_boundaries')
 
-### DEFAULT VALUES
-
-DEFAULT_TITLE_TAGS = ['h1','h2','h3','h4']
-
-def strong_tag_title(tag: BeautifulSoup) -> bool:
-    """
-    Identifier of titles indicated by <strong> tags
-    """
-    if tag.name != 'strong': return False
-    if not tag.string: return False
-    tag_text_len = len(tag.string)
-    if tag_text_len > 1 and tag_text_len < 80:
-        next_sib = tag.next_sibling
-        parents = tag.parents
-        for parent in parents:
-            if parent.name in (DEFAULT_TITLE_TAGS + ['table','ul']): return False
-        return next_sib == None
-    return False
-
-DEFAULT_SPLIT_CLASS = 'extractor-split'
-DEFAULT_SPLIT_ATTRS = [{'name': tag} for tag in DEFAULT_TITLE_TAGS] + [{'class':DEFAULT_SPLIT_CLASS},{'function': strong_tag_title}]
-DEFAULT_IGNORE_EMPTY_SPLIT_TAGS = True
-DEFAULT_MANDATORY_SPLITS = 3
-DEFAULT_NO_TITLE_SPLITS = []
+### DEFAULT GENERAL VALUES
 DEFAULT_MAX_LEN = 1000
 DEFAULT_ENCODING = 'utf-8-sig'
-DEFAULT_WINDOW_OVERLAP = 200
 DEFAULT_LINK_IGNORE_REGEX = r'mailto:.*'
+
+### DEFAULT DUMP CONFIG VALUES
+DEFAULT_TITLE_TAGS = ['h1','h2','h3','h4']
+DEFAULT_TITLE_ATTRS = {'name': 'h1'}
+DEFAULT_REMOVE_TAG_ATTRS = []
+DEFAULT_REPLACEMENTS = []
+DEFAULT_SPLIT_CLASS = 'extractor-split'
+DEFAULT_SPLIT_ATTRS = [{'name': tag} for tag in DEFAULT_TITLE_TAGS] + [{'class':DEFAULT_SPLIT_CLASS}]
+DEFAULT_MANDATORY_SPLITS = 3
+DEFAULT_IGNORE_EMPTY_SPLIT_TAGS = True
 DEFAULT_ALLOW_LINK_SPLITS = False
+DEFAULT_NO_TITLE_SPLITS = []
+DEFAULT_METADATA_EXTRACTOR = None
+DEFAULT_PARENT_CONTEXT_EXTRACTOR = None
 
 ### CLASS DEFINITIONS
 
@@ -98,25 +89,28 @@ class DumpConfig:
     """
     Data class containing the configuration details for a particular site dump
     """
+    # display name for the dump, used in logs
+    name: str
     # root directory of the dump files
     dump_path: str
     # base url corresponding to the root directory
     base_url: str
     # dict of attributes describing the page's title tag
-    title_attrs: dict
+    title_attrs: Dict
     # dict of attributes describing the main content html tag
-    main_content_attrs: dict
+    main_content_attrs: Dict
     # list of dicts of attributes describing tags to remove
     # as the first step of processing a page
-    remove_tag_attrs: List[dict]
-    # list of tuples: (dict,function) where the dict describes the attributes of a
-    # tag to replace, and the function returns a tag to replace it with
-    # - The function inputs are the BeautifulSoup tag and the site url, and it 
-    #   should output the replacement BeautifulSoup tag
-    replacements: List[Tuple[dict,Callable[[BeautifulSoup,str],BeautifulSoup]]]
+    remove_tag_attrs: List[Dict]
+    # list of dicts with the keys 'attrs' and 'function'
+    # - attrs: a dict of attributes to match a tag against
+    # - function: a function that consumes the tag and site url,
+    #             and returns a tag to replace the original tag with
+    #             type: Callable[[BeautifulSoup,str],BeautifulSoup]
+    replacements: List[Dict]
     # function that will return any additional metadata to be added to a document
     # inputs: page url, page titles. titles of parent pages, text content for the document
-    metadata_extractor: Callable[[str,List[str],List[str],str],dict]
+    metadata_extractor: Callable[[str,List[str],List[str],str],Dict]
     # Function that, given the contents of a 'parent' document extract, returns any context that 
     # will be included in the 'context' column for child pages
     # Eg. if the parent extract describes the purpose of a table, that purpose should be
@@ -136,18 +130,24 @@ class DumpConfig:
     mandatory_splits: int
     # Indexes of split attrs where the text of the tag should not be used as a new title
     # An integer index will be used instead
-    no_title_splits: list[int]
+    no_title_splits: List[int]
     # If true, allows splitting on a tag that contains a link tag
     # Otherwise, doesn't split on tags containing a link
     # Setting this to false could be useful for, eg., a newsfeed page or blog that links to articles
     allow_link_splits: bool
     
     def __init__(self):
+        self.name = ''
+        self.title_attrs = DEFAULT_TITLE_ATTRS
+        self.remove_tag_attrs = DEFAULT_REMOVE_TAG_ATTRS
+        self.replacements = DEFAULT_REPLACEMENTS
         self.split_attrs = DEFAULT_SPLIT_ATTRS
-        self.ignore_empty_split_tags = DEFAULT_IGNORE_EMPTY_SPLIT_TAGS
         self.mandatory_splits = DEFAULT_MANDATORY_SPLITS
-        self.no_title_splits = DEFAULT_NO_TITLE_SPLITS
+        self.ignore_empty_split_tags = DEFAULT_IGNORE_EMPTY_SPLIT_TAGS
         self.allow_link_splits = DEFAULT_ALLOW_LINK_SPLITS
+        self.no_title_splits = DEFAULT_NO_TITLE_SPLITS
+        self.metadata_extractor = DEFAULT_METADATA_EXTRACTOR
+        self.parent_context_extractor = DEFAULT_PARENT_CONTEXT_EXTRACTOR
 
 class DocIndex:
     """
@@ -245,25 +245,19 @@ class DocIndex:
         return path in self.path_to_idx
 
 class DocExtractor:
-    # When the document needs to be split beyond the split attributes, number of
-    # characters of overlap to use in the rough splits
-    # Note that a token is usually 3-4 characters
-    # NOT CURRENTLY IMPLEMENTED
-    overlap_window: int
-    # Maximum extract length in characters - longer extracts will be further split into parts
-    # Note that a token is usually 3-4 characters
-    max_len: int
     # Dict of urls that redirect to other urls 
     # - hrefs in links will be replaced with their redirects
     link_redirects: dict
-    # Regex to match links that should be ignored
-    link_ignore_regex: str
+    # Maximum extract length in characters - longer extracts will be further split into parts
+    # Note that a token is usually 3-4 characters
+    max_extract_len: int
     # Encoding type to use for the input html files and the output csv
     encoding: str
+    # Regex to match links that should be ignored
+    link_ignore_regex: str
 
     def __init__(self) -> None:
-        self.overlap_window = DEFAULT_WINDOW_OVERLAP
-        self.max_len = DEFAULT_MAX_LEN
+        self.max_extract_len = DEFAULT_MAX_LEN
         self.link_redirects = {}
         self.link_ignore_regex = DEFAULT_LINK_IGNORE_REGEX
         self.encoding = DEFAULT_ENCODING
@@ -347,6 +341,7 @@ class DocExtractor:
                         log.error(f"Failed to parse page {filepath}: {str(e)}")
                         if dirpath in directories:
                             log.error(f"Also skipping associated directory {dirpath}")
+                        raise e
 
         df = pd.DataFrame.from_dict(df_list)
         df.set_index('doc_id')
@@ -405,10 +400,10 @@ class DocExtractor:
             for tag in tags: tag.decompose()
 
         # Apply replacement functions
-        for (tag_attrs, replacement_fn) in dump_config.replacements:
-            tag = mainContent.find(**tag_attrs)
+        for replacement_config in dump_config.replacements:
+            tag = mainContent.find(**replacement_config['attrs'])
             while tag:
-                replacement = replacement_fn(tag, url)
+                replacement = replacement_config['function'](tag, url)
                 tag.replace_with(replacement)
                 tag = replacement.find_next(**tag_attrs)
 
@@ -466,7 +461,7 @@ class DocExtractor:
                 tokens.append('')
 
         for token in tokens:
-            if len(extracts[-1]) + len(token) > self.max_len:
+            if len(extracts[-1]) + len(token) > self.max_extract_len:
                 extracts.append(token)
             else:
                 extracts[-1] += ' ' + token
@@ -481,10 +476,10 @@ class DocExtractor:
         doc = nlp(text)
         for sent in doc.sents:
             sentlen = len(sent.text)
-            if sentlen > self.max_len:
+            if sentlen > self.max_extract_len:
                 splits = self.split_sent(sent)
                 extracts.extend(splits)
-            elif len(extracts[-1]) + sentlen > self.max_len:
+            elif len(extracts[-1]) + sentlen > self.max_extract_len:
                 extracts.append(sent.text)
             else:
                 extracts[-1] += ' ' + sent.text
@@ -497,7 +492,7 @@ class DocExtractor:
         - split_tag_index: index of the split_attrs list to begin splitting the document on
         """
         
-        if (split_tag_index > dump_config.mandatory_splits and len(self.html_to_text(soup_orig)) <= self.max_len) or split_tag_index >= len(dump_config.split_attrs):
+        if (split_tag_index > dump_config.mandatory_splits and len(self.html_to_text(soup_orig)) <= self.max_extract_len) or split_tag_index >= len(dump_config.split_attrs):
             # if document is already below the maximum length, and all mandatory splits completed, return extract 
             # or there are no more tags to split on
             return [{
@@ -660,7 +655,7 @@ class DocExtractor:
                 continue # skip empty extract with no children
 
             first_page_idx = None
-            split_texts = self.split_extract_by_sentence(text) if len(text) > self.max_len else [text]
+            split_texts = self.split_extract_by_sentence(text) if len(text) > self.max_extract_len else [text]
             for split_idx, text in enumerate(split_texts):
                 links = extract['links']
                 if len(split_texts) > 1:

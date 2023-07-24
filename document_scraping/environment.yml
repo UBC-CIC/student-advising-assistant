@@ -9,3 +9,6 @@ dependencies:
   - html2text
   - spacy
   - lxml
+  - boto3
+  - pyjson5
+  - python-dotenv
