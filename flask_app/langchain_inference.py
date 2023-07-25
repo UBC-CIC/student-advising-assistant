@@ -9,7 +9,8 @@ import llm_utils
 import doc_graph_utils
 from comparator import Comparator
 from numpy import isnan
-from retrievers import PineconeRetriever, Retriever
+import retrievers
+from retrievers import Retriever
 import copy 
 import json
 from langchain.chains.question_answering import load_qa_chain
@@ -30,27 +31,7 @@ os.environ["HUGGINGFACEHUB_API_TOKEN"] = param_manager.get_secret('generator/HUG
 retriever_config = param_manager.get_parameter('retriever')
 generator_config = param_manager.get_parameter('generator')
 
-### LOAD MODELS 
 
-# LLMs
-base_llm, prompt = llm_utils.load_model_and_prompt(generator_config['ENDPOINT_TYPE'], generator_config['ENDPOINT_NAME'], generator_config['MODEL_NAME'])
-#llm, prompt = llm_utils.load_model_and_prompt('huggingface', 'google/flan-t5-xxl', 'flan-t5')
-concise_llm = llm_utils.load_fastchat_adapter(base_llm, generator_config['MODEL_NAME'], prompts.fastchat_system_concise)
-detailed_llm = llm_utils.load_fastchat_adapter(base_llm, generator_config['MODEL_NAME'], prompts.fastchat_system_detailed)
-
-# Chains
-spell_correct_chain = LLMChain(llm=concise_llm,prompt=prompts.spelling_correction_prompt)
-combine_documents_chain = load_qa_chain(llm=detailed_llm, chain_type="stuff")
-
-# Document compressors
-filter, filter_question_fn = llm_utils.load_chain_filter(concise_llm, generator_config['MODEL_NAME'])
-compressor = LLMChainExtractor.from_llm(concise_llm)
-
-# Retriever
-if retriever_config['RETRIEVER_NAME'] == 'pinecone':
-    pinecone_auth = param_manager.get_secret('retriever/PINECONE')
-    retriever = PineconeRetriever(pinecone_auth['PINECONE_KEY'], pinecone_auth['PINECONE_REGION'], filter_params=['faculty','program'])
-    
 ### LOAD FILES
 def read_text(filename: str, as_json = False):
     result = ''
@@ -69,16 +50,31 @@ def download_all_dirs(retriever: str):
     """
     # Specify directories to download
     dirs = ['documents']
-    if retriever == 'faiss':
-        dirs.append('indexes/faiss')
-    else:
-        dirs.append('indexes/pinecone')
-    
+    dirs.append(f'indexes/{retriever}')
     for dir in dirs:
         download_s3_directory(dir, output_prefix='data')
+        
 download_all_dirs(retriever_config['RETRIEVER_NAME'])
 
 data_source_annotations = read_text(os.path.join('static','data_source_annotations.json'), as_json=True)
+
+### LOAD MODELS 
+
+# LLMs
+base_llm, prompt = llm_utils.load_model_and_prompt(generator_config['ENDPOINT_TYPE'], generator_config['ENDPOINT_NAME'], generator_config['MODEL_NAME'])
+concise_llm = llm_utils.load_fastchat_adapter(base_llm, generator_config['MODEL_NAME'], prompts.fastchat_system_concise)
+detailed_llm = llm_utils.load_fastchat_adapter(base_llm, generator_config['MODEL_NAME'], prompts.fastchat_system_detailed)
+
+# Chains
+spell_correct_chain = LLMChain(llm=concise_llm,prompt=prompts.spelling_correction_prompt)
+combine_documents_chain = load_qa_chain(llm=detailed_llm, chain_type="stuff")
+
+# Document compressors
+filter, filter_question_fn = llm_utils.load_chain_filter(concise_llm, generator_config['MODEL_NAME'])
+compressor = LLMChainExtractor.from_llm(concise_llm)
+
+# Retriever
+retriever: retrievers.Retriever = retrievers.load_retriever(retriever_config['RETRIEVER_NAME'], filter_params=['faculty','program'])
 
 ### UTILITY FUNCTIONS
 
