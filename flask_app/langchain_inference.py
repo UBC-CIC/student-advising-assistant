@@ -24,6 +24,10 @@ VERBOSE_LLMS = True
 load_dotenv()
 GRAPH_FILEPATH = os.path.join('data','documents','website_graph.txt')
 
+### CONSTANTS
+# Remove documents below a certain character length - helps with some LLM hallucinations
+min_doc_length = 100
+
 ### LOAD AWS CONFIG
 param_manager = get_param_manager()
 os.environ["HUGGINGFACEHUB_API_TOKEN"] = param_manager.get_secret('generator/HUGGINGFACE_API')['API_TOKEN']
@@ -265,8 +269,7 @@ def backoff_retrieval(retriever: Retriever, program_info: Dict, topic: str, quer
         
         # Prefilter documents that are too short
         # Some LLMs will hallucinate if the document content is empty
-        min_length = 50
-        docs = [doc for doc in docs if len(doc.page_content) > min_length]
+        docs = [doc for doc in docs if len(doc.page_content) >= min_doc_length]
         
         # Filter docs
         docs_for_llms(docs)
