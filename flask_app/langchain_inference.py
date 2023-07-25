@@ -9,7 +9,8 @@ import llm_utils
 import doc_graph_utils
 from comparator import Comparator
 from numpy import isnan
-from retrievers import PineconeRetriever, Retriever
+import retrievers
+from retrievers import Retriever
 import copy 
 import json
 from langchain.chains.question_answering import load_qa_chain
@@ -34,7 +35,6 @@ generator_config = param_manager.get_parameter('generator')
 
 # LLMs
 base_llm, prompt = llm_utils.load_model_and_prompt(generator_config['ENDPOINT_TYPE'], generator_config['ENDPOINT_NAME'], generator_config['MODEL_NAME'])
-#llm, prompt = llm_utils.load_model_and_prompt('huggingface', 'google/flan-t5-xxl', 'flan-t5')
 concise_llm = llm_utils.load_fastchat_adapter(base_llm, generator_config['MODEL_NAME'], prompts.fastchat_system_concise)
 detailed_llm = llm_utils.load_fastchat_adapter(base_llm, generator_config['MODEL_NAME'], prompts.fastchat_system_detailed)
 
@@ -47,9 +47,7 @@ filter, filter_question_fn = llm_utils.load_chain_filter(concise_llm, generator_
 compressor = LLMChainExtractor.from_llm(concise_llm)
 
 # Retriever
-if retriever_config['RETRIEVER_NAME'] == 'pinecone':
-    pinecone_auth = param_manager.get_secret('retriever/PINECONE')
-    retriever = PineconeRetriever(pinecone_auth['PINECONE_KEY'], pinecone_auth['PINECONE_REGION'], filter_params=['faculty','program'])
+retriever: retrievers.Retriever = retrievers.load_retriever(retriever_config['RETRIEVER_NAME'], filter_params=['faculty','program'])
     
 ### LOAD FILES
 def read_text(filename: str, as_json = False):
