@@ -37,14 +37,14 @@ generator_config = param_manager.get_parameter('generator')
 ### LOAD MODELS 
 
 # LLMs
-base_llm, prompt = llm_utils.load_model_and_prompt(generator_config['ENDPOINT_TYPE'], generator_config['ENDPOINT_NAME'], generator_config['MODEL_NAME'])
-#llm, prompt = llm_utils.load_model_and_prompt('huggingface', 'google/flan-t5-xxl', 'flan-t5')
+base_llm, qa_prompt = llm_utils.load_model_and_prompt(generator_config['ENDPOINT_TYPE'], generator_config['ENDPOINT_NAME'], generator_config['MODEL_NAME'])
+#base_llm, qa_prompt = llm_utils.load_model_and_prompt(generator_config['ENDPOINT_TYPE'], 'vicuna7b2xlarge2', generator_config['MODEL_NAME'])
 concise_llm = llm_utils.load_fastchat_adapter(base_llm, generator_config['MODEL_NAME'], prompts.fastchat_system_concise)
 detailed_llm = llm_utils.load_fastchat_adapter(base_llm, generator_config['MODEL_NAME'], prompts.fastchat_system_detailed)
 
 # Chains
 spell_correct_chain = LLMChain(llm=concise_llm,prompt=prompts.spelling_correction_prompt)
-combine_documents_chain = load_qa_chain(llm=detailed_llm, chain_type="stuff")
+combine_documents_chain = load_qa_chain(llm=detailed_llm, chain_type="stuff", prompt=qa_prompt)
 
 # Document compressors
 filter, filter_question_fn = llm_utils.load_chain_filter(concise_llm, generator_config['MODEL_NAME'])
@@ -302,7 +302,7 @@ def backoff_retrieval(retriever: Retriever, program_info: Dict, topic: str, quer
 async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=None,
                     combine_with_sibs:bool=False, spell_correct:bool=True, do_filter:bool=True, compress:bool=False, 
                     generate_by_document:bool=False,
-                    generate_combined:bool=True, k:int=5):
+                    generate_combined:bool=True, k:int=3):
 
     """
     Run the question answering chain with the given context and query
