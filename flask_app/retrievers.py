@@ -329,14 +329,11 @@ class PGVectorRetriever(Retriever):
     # Maximum number of documents to return
     k: int
     
-    def __init__(self, connection_string: str, alpha = 0.4, filter_params = []):
+    def __init__(self, connection_string: str, filter_params = []):
         """
         Initialize the RDS PGvector retriever
         - connection_string: connection string for the pgvector DB
                              can be created using PGVector.connection_string_from_db_params
-        - alpha: weighting of the sparse vs dense vectors
-                 0 = pure semantic search (dense vectors)
-                 1 = pure keyword search (sparse vectors)
         - filter_params:
                  keys of entries in the program_info dict passed
                  to semantic_search that should be used as a metadata
@@ -352,7 +349,8 @@ class PGVectorRetriever(Retriever):
         self.num_embed_concats = len(index_config['embeddings'])
         
         # Connect to the pgvector db
-        self.retriever = PGVector.from_existing_index(embeddings_model, index_config['name'], connection_string=connection_string)
+        db = PGVector.from_existing_index(embeddings_model, index_config['name'], connection_string=connection_string)
+        self.retriever = VectorStoreRetriever(vectorstore=db)
     
     def semantic_search(self, program_info: Dict, topic: str, query: str, k = 5, threshold = 0) -> List[Document]:
         """
@@ -411,6 +409,12 @@ class PGVectorRetriever(Retriever):
         query_str = ' : '.join(list(program_info_copy.values()) + [topic,query])
         return self._retriever_combined_query(query_str), {'filter': filter, 'k': self.k}
     
+    def _response_converter(self, response: List[Document]) -> List[Document]:
+        """
+        No conversion needed
+        """
+        return response
+    
 class FaissRetriever(Retriever):
     def __init__(self, path: str):
         """
@@ -451,11 +455,7 @@ class FaissRetriever(Retriever):
         """
         Return a list of documents from a list of document indexes
         """
-        docs = []
-        for doc_id in doc_ids:
-            id = self.retriever.vectorstore.index_to_docstore_id[doc_id]
-            docs.append(self.retriever.vectorstore.docstore.search(id))
-        return [copy.deepcopy(doc) for doc in docs]
+        raise NotImplemented()
     
     def set_top_k(self, k: int):
         """
