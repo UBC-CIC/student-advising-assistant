@@ -23,15 +23,6 @@ from aws_helpers.s3_tools import download_s3_directory, upload_directory_to_s3
 # AWS Secrets Manager config for the Pinecone secret API key and region
 secret_name = "retriever/PINECONE"
 param_manager = get_param_manager()
-    
-# If true, loads previously computed embeddings from s3 rather than computing new embeddings
-embeddings_precomputed = True
-
-# If true, recreates the pinecone index from scratch before inserting vectors
-should_clear_index = True
-
-# If true, tries to use GPU for embeddings
-gpu_available = False
 
 # Config for the pinecone index
 index_config = {
@@ -48,6 +39,19 @@ index_config = {
     ]
 }
 
+### ARG CONFIG
+parser = argparse.ArgumentParser()
+parser.add_argument('--compute_embeddings', dest='compute_embeddings', action='store_true')
+parser.add_argument('--no-compute_embeddings', dest='compute_embeddings', action='store_false')
+parser.set_defaults(compute_embeddings=True)
+parser.add_argument('--clear_index', dest='clear_index', action='store_true')
+parser.add_argument('--no-clear_index', dest='clear_index', action='store_false')
+parser.set_defaults(clear_index=True)
+parser.add_argument('--gpu_available', dest='gpu_available', action='store_true')
+parser.add_argument('--no-gpu_available', dest='gpu_available', action='store_false')
+parser.set_defaults(gpu_available=True)
+args = parser.parse_args()
+
 ### DOCUMENT LOADING 
 
 # Load the csv of documents from s3
@@ -59,7 +63,7 @@ ids = [doc.metadata['doc_id'] for doc in docs]
 
 # Load precomputed embeddings
 embed_dir = f"embeddings-{index_config['namespace']}"
-if embeddings_precomputed: 
+if not args.compute_embeddings: 
     download_s3_directory(embed_dir)
 
 # Create the different lists of texts for embedding
@@ -76,7 +80,7 @@ pinecone_dir = os.path.join(index_dir,'pinecone')
 os.makedirs(pinecone_dir,exist_ok=True)
 
 # Load the base embedding model from huggingface
-device = 'cuda' if gpu_available else 'cpu'
+device = 'cuda' if args.gpu_available else 'cpu'
 base_embeddings = HuggingFaceEmbeddings(model_name=index_config['base_embedding_model'], model_kwargs={'device': device})
 
 # Lists of embeddings to compute
@@ -85,7 +89,7 @@ embedding_texts = [parent_titles,titles,combined_titles,texts]
 
 # For each embedding, compute the embedding and save to pickle file
 embeddings = {}
-if embeddings_precomputed:
+if not args.compute_embeddings:
     for file in pathlib.Path(embed_dir).glob('*.pkl'):
         with open(file, "rb") as f:
             data = pickle.load(f)
@@ -179,7 +183,7 @@ if index_config['name'] not in indexes:
     wait_on_index(index_config['name'])
 else:
     print(f"Pinecone index {index_config['name']} already exists")
-    if should_clear_index:
+    if args.clear_index:
         index = pinecone.Index(index_config['name'])
         print(f"Clearing the existing pinecone index for namespace {index_config['namespace']}")
         index.delete(deleteAll=True, namespace=index_config['namespace'])
