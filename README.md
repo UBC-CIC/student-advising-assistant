@@ -72,4 +72,16 @@ Run this command when you're in the root folder `student-advising-assistant`
 
 ```bash
 zip -r demo-app-v2.zip aws_helpers/ flask_app/ Dockerfile -x "*/.*" -x ".*"
-``````
+```
+
+### Executing SQL queries from local machine against an RDS database inside private subnet
+
+This procedure is meant to be done for LOCAL DEV/TEST ONLY
+
+1. Connect to UBC myVPN Cisco AnyConnect (otherwise it will fail)
+2. Put the `bastion-host.pem` file under the root directory `student-advising-assistant/`
+3. Make sure the following environment variables are present in the .env file (root directory `student-advising-assistant/`):
+    - EC2_PUBLIC_IP
+    - EC2_USERNAME
+    - SSH_PRIV_KEY
+4. Under root directory `student-advising-assistant/` run the simple demo script `test-connection.py` with `python3 test-connection.py`
