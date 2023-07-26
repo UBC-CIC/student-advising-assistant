@@ -1,16 +1,17 @@
+from dotenv import load_dotenv
+load_dotenv() # Loads env variable when running locally
+
 from langchain.docstore.document import Document
 from langchain import LLMChain
 from langchain.retrievers.document_compressors import LLMChainExtractor
 import regex as re
 from typing import List, Dict, Tuple
-from dotenv import load_dotenv
 import os
 import llm_utils
 import doc_graph_utils
 from comparator import Comparator
 from numpy import isnan
 import retrievers
-from retrievers import Retriever
 import copy 
 import json
 from langchain.chains.question_answering import load_qa_chain
@@ -20,17 +21,20 @@ sys.path.append('..')
 from aws_helpers.param_manager import get_param_manager
 from aws_helpers.s3_tools import download_s3_directory
 
-VERBOSE_LLMS = True
-
-load_dotenv()
+# If process is running locally, activate dev mode
+DEV_MODE = 'MODE' in os.environ and os.environ.get('MODE') == 'dev'
+VERBOSE_LLMS = DEV_MODE
 GRAPH_FILEPATH = os.path.join('data','documents','website_graph.txt')
+
+### CONSTANTS
+# Remove documents below a certain character length - helps with some LLM hallucinations
+min_doc_length = 100
 
 ### LOAD AWS CONFIG
 param_manager = get_param_manager()
 os.environ["HUGGINGFACEHUB_API_TOKEN"] = param_manager.get_secret('generator/HUGGINGFACE_API')['API_TOKEN']
 retriever_config = param_manager.get_parameter('retriever')
 generator_config = param_manager.get_parameter('generator')
-
 
 ### LOAD FILES
 def read_text(filename: str, as_json = False):
@@ -50,10 +54,13 @@ def download_all_dirs(retriever: str):
     """
     # Specify directories to download
     dirs = ['documents']
-    dirs.append(f'indexes/{retriever}')
+    if retriever == 'faiss':
+        dirs.append('indexes/faiss')
+    else:
+        dirs.append('indexes/pinecone')
+    
     for dir in dirs:
         download_s3_directory(dir, output_prefix='data')
-        
 download_all_dirs(retriever_config['RETRIEVER_NAME'])
 
 data_source_annotations = read_text(os.path.join('static','data_source_annotations.json'), as_json=True)
@@ -61,13 +68,13 @@ data_source_annotations = read_text(os.path.join('static','data_source_annotatio
 ### LOAD MODELS 
 
 # LLMs
-base_llm, prompt = llm_utils.load_model_and_prompt(generator_config['ENDPOINT_TYPE'], generator_config['ENDPOINT_NAME'], generator_config['MODEL_NAME'])
+base_llm, qa_prompt = llm_utils.load_model_and_prompt(generator_config['ENDPOINT_TYPE'], generator_config['ENDPOINT_NAME'], generator_config['MODEL_NAME'])
 concise_llm = llm_utils.load_fastchat_adapter(base_llm, generator_config['MODEL_NAME'], prompts.fastchat_system_concise)
 detailed_llm = llm_utils.load_fastchat_adapter(base_llm, generator_config['MODEL_NAME'], prompts.fastchat_system_detailed)
 
 # Chains
 spell_correct_chain = LLMChain(llm=concise_llm,prompt=prompts.spelling_correction_prompt)
-combine_documents_chain = load_qa_chain(llm=detailed_llm, chain_type="stuff")
+combine_documents_chain = load_qa_chain(llm=detailed_llm, chain_type="stuff", prompt=qa_prompt)
 
 # Document compressors
 filter, filter_question_fn = llm_utils.load_chain_filter(concise_llm, generator_config['MODEL_NAME'])
@@ -261,8 +268,7 @@ def backoff_retrieval(retriever: Retriever, program_info: Dict, topic: str, quer
         
         # Prefilter documents that are too short
         # Some LLMs will hallucinate if the document content is empty
-        min_length = 50
-        docs = [doc for doc in docs if len(doc.page_content) > min_length]
+        docs = [doc for doc in docs if len(doc.page_content) >= min_doc_length]
         
         # Filter docs
         docs_for_llms(docs)
@@ -295,7 +301,7 @@ def backoff_retrieval(retriever: Retriever, program_info: Dict, topic: str, quer
 async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=None,
                     combine_with_sibs:bool=False, spell_correct:bool=True, do_filter:bool=True, compress:bool=False, 
                     generate_by_document:bool=False,
-                    generate_combined:bool=True, k:int=5):
+                    generate_combined:bool=True, k:int=3):
 
     """
     Run the question answering chain with the given context and query

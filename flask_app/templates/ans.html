@@ -44,8 +44,13 @@
             <div id="feedback-toggle" class="btn-group">
               <input type="radio" class="btn-check" name="feedback-toggle" id="feedback-yes" autocomplete="off" value="yes">
               <label for="feedback-yes" class="btn btn-outline-success" type="button" data-bs-toggle="collapse" data-bs-target="#blank" aria-expanded="true" aria-controls="blank">Yes</label>
+              {% if main_response %}
               <input type="radio" class="btn-check" name="feedback-toggle" id="feedback-no" autocomplete="off" value="no">
               <label for="feedback-no" class="btn btn-outline-danger" type="button" data-bs-toggle="collapse" data-bs-target="#backup-response" aria-expanded="true" aria-controls="backup-response">No</label>
+              {% else %}
+              <input type="radio" class="btn-check" name="feedback-toggle" id="feedback-no" autocomplete="off" value="no">
+              <label for="feedback-no" class="btn btn-outline-danger" type="button" aria-expanded="true" aria-controls="backup-response">No</label>
+              {% endif %}
             </div>
           </div>
         </div>
