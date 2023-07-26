@@ -105,7 +105,7 @@ def get_related_links_from_compressed(docs, compressed_docs):
         doc.metadata['related_links'] = links
 
 
-def combine_sib_docs(retriever: Retriever, docs: List[Document]) -> List[Document]:
+def combine_sib_docs(retriever: retrievers.Retriever, docs: List[Document]) -> List[Document]:
     """
     For each document, combine its context with all of its immediate siblings
     """
@@ -213,7 +213,7 @@ def llm_filter_docs(docs: List[Document], program_info: Dict, topic: str, query:
     else:
         return filtered
     
-def backoff_retrieval(retriever: Retriever, program_info: Dict, topic: str, query:str, k:int = 5, threshold = 0, 
+def backoff_retrieval(retriever: retrievers.Retriever, program_info: Dict, topic: str, query:str, k:int = 5, threshold = 0, 
                       do_filter: bool = False) -> List[Document]:
     """
     Perform a multistep retrieval where, if no documents are returned for the full
