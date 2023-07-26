@@ -6,6 +6,7 @@ Simple flask application to demo model inference
 from flask import Flask, request, render_template
 import json
 from langchain_inference import run_chain
+from feedback import store_feedback
 import os 
 import csv
 
@@ -59,9 +60,18 @@ async def feedback():
               'feedback-hidden-reference-ids','feedback-hidden-response','feedback-reference-select','feedback-comments']
     data = [request.form[field] for field in fields]
 
-    with open(FEEDBACK_CSV_PATH, "w") as csv_file:
-        writer = csv.writer(csv_file, delimiter=',')
-        writer.writerow(data)
+    payload = json.dumps(dict(zip(fields, data)))
+
+    try:
+        response = store_feedback(json_payload=payload)
+        print(response)
+    except Exception as e:
+        # Handle any exceptions that occur during the Lambda invocation
+        print(f"ERROR occurs when submitting the feedback to the database: {e}")
+    
+    # with open(FEEDBACK_CSV_PATH, "w") as csv_file:
+    #     writer = csv.writer(csv_file, delimiter=',')
+    #     writer.writerow(data)
             
     # Render the results
     return render_template('feedback.html')

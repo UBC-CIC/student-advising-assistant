@@ -92,57 +92,5 @@ export class DatabaseStack extends Stack {
     // rdsProxy.grantConnect(dbProxyRole, "admin"); // Grant the role connection access to the DB Proxy for database user 'admin'.
 
     // this.rdsProxyEndpoint = rdsProxy.endpoint;
-
-    // The layer containing the psycopg2 library
-    // const psycopg2 = new lambda.LayerVersion(this, "psycopg2", {
-    //   code: lambda.Code.fromAsset("layers/psycopg2.zip"),
-    //   compatibleRuntimes: [lambda.Runtime.PYTHON_3_9, lambda.Runtime.PYTHON_3_10],
-    //   description: "psycopg2 library for connecting to the PostgreSQL database",
-    // });
-
-    // const triggerLambda = new triggers.TriggerFunction(
-    //   this,
-    //   "student-advising-triggerLambda",
-    //   {
-    //     functionName: "student-advising-setup-database",
-    //     runtime: lambda.Runtime.PYTHON_3_9,
-    //     handler: "setup_database.lambda_handler",
-    //     timeout: cdk.Duration.seconds(300),
-    //     memorySize: 512,
-    //     environment: {
-    //       DB_SECRET_NAME: this.secretPath,
-    //     },
-    //     vpc: vpcStack.vpc,
-    //     code: lambda.Code.fromAsset("./lambda/trigger_lambda"),
-    //     layers: [psycopg2],
-    //   }
-    // );
-    // triggerLambda.executeAfter(this.dbInstance)
-    // triggerLambda.executeAfter(rdsProxy)
-
-    // triggerLambda.addToRolePolicy(
-    //   new iam.PolicyStatement({
-    //     effect: iam.Effect.ALLOW,
-    //     actions: [
-    //       //Secrets Manager
-    //       "secretsmanager:GetSecretValue",
-    //     ],
-    //     resources: [
-    //       `arn:aws:secretsmanager:${this.region}:${this.account}:secret:student-advising/credentials/*`,
-    //     ],
-    //   })
-    // );
-    // triggerLambda.addToRolePolicy(
-    //   new iam.PolicyStatement({
-    //     effect: iam.Effect.ALLOW,
-    //     actions: [
-    //       // CloudWatch Logs
-    //       "logs:CreateLogGroup",
-    //       "logs:CreateLogStream",
-    //       "logs:PutLogEvents",
-    //     ],
-    //     resources: ["arn:aws:logs:*:*:*"],
-    //   })
-    // );
   }
 }

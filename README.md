@@ -32,7 +32,7 @@ To run the demo locally:
 - Create a conda env with the command `conda env create -f environment.yml` from the flask_app directory
 - Activate the environment with `conda activate flaskenv` (or whichever name you chose for the environment)
 - Ensure your AWS profile is logged in via `aws sso login --profile <profile name>`
-- Run `flask --app application --debug run` to run the app in debug mode
+- Run `flask --app application --debug run` to run the app in debug mode (specify the port with `-p <port num>`)
 
 **Note:** To run locally (not in AWS), the app will require a .env file under ./flask_app:
 ```
@@ -44,7 +44,7 @@ AWS_PROFILE_NAME=<insert AWS SSO profile name>
 The default platform intended for the container is `--platform=linux/amd64`. Might be able to run on MacOS. For Windows,
 you probably have to get rid of the flag inside the Dockerfile before building.
 
-Make sure you're in the flask_app directory and have Docker running on your computer
+Make sure you're in the root directory (`student-advising-assistant/`)and have Docker running on your computer
 
 To build the container, replace `image-name` with the image name of your choice:
 
@@ -63,3 +63,11 @@ docker run -v ${HOME}/.aws/credentials:/root/.aws/credentials:ro --env-file .env
 The docker run command mount the directory which contains the aws cli credentials into the container, which is the only way make it run locally. On the cloud, every boto3 called will be called with the service's IAM role.
 
 replace `localhost-port` with any port, usually 5000, but can use 5001 or other if 5000 is already used by other processes.
+
+### Zipping modules for Beanstalk
+
+Run this command when you're in the root folder `student-advising-assistant`
+
+```bash
+zip -r demo-app-v2.zip aws_helpers/ flask_app/ Dockerfile -x "*/.*" -x ".*"
+```

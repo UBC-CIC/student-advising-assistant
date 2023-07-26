@@ -3,6 +3,8 @@ import 'source-map-support/register';
 import * as cdk from 'aws-cdk-lib';
 import { VpcStack } from '../lib/vpc-stack';
 import { DatabaseStack } from '../lib/database-stack';
+import { InferenceStack } from '../lib/inference-stack';
+import { HostingStack } from '../lib/hosting-stack';
 
 const app = new cdk.App();
   /* If you don't specify 'env', this stack will be environment-agnostic.
@@ -35,3 +37,17 @@ const databaseStack = new DatabaseStack(app, "student-advising-DatabaseStack", v
   },
 }); 
 databaseStack.addDependency(vpcStack)
+
+const inferenceStack = new InferenceStack(app, "InferenceStack", vpcStack, databaseStack, {
+  env: {
+    account: process.env.CDK_DEFAULT_ACCOUNT,
+    region: process.env.CDK_DEFAULT_REGION
+  }
+});
+
+const hostingStack = new HostingStack(app, "HostingStack", vpcStack, {
+  env: {
+    account: process.env.CDK_DEFAULT_ACCOUNT,
+    region: process.env.CDK_DEFAULT_REGION
+  }
+});

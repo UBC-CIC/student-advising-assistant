@@ -11,6 +11,7 @@ DB_SECRET_NAME = os.environ["DB_SECRET_NAME"]
 
 
 def getDbSecret():
+    
     # secretsmanager client to get db credentials
     sm_client = boto3.client("secretsmanager")
     response = sm_client.get_secret_value(
@@ -18,19 +19,28 @@ def getDbSecret():
     secret = json.loads(response)
     return secret
 
+def createConnection():
+    
+    connection = psycopg2.connect(
+        user=dbSecret["username"],
+        password=dbSecret["password"],
+        host=dbSecret["host"],
+        dbname=dbSecret["dbname"],
+        # sslmode="require"
+    )
+    return connection
+
 dbSecret = getDbSecret()
-
-connection = psycopg2.connect(
-    user=dbSecret["username"],
-    password=dbSecret["password"],
-    host=dbSecret["host"],
-    dbname=dbSecret["dbname"],
-    # sslmode="require"
-)
-
-cursor = connection.cursor()
+connection = createConnection()
 
 def lambda_handler(event, context):
+
+    global connection
+    print(connection)
+    if connection.closed:
+        connection = createConnection()
+    
+    cursor = connection.cursor()
 
     sql = """
         CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -70,6 +80,5 @@ def lambda_handler(event, context):
     print(cursor.fetchall())
     
     cursor.close()
-    connection.close()
     
     print("Trigger Function scripts finished execution successfully!")
