@@ -2,30 +2,39 @@
 Functions relating to the document embeddings, indexes, and retrievers
 """
 from langchain.vectorstores import FAISS
-from langchain.embeddings.base import Embeddings
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.vectorstores.base import VectorStoreRetriever
 from langchain.schema import Document, BaseRetriever
 from langchain.retrievers import PineconeHybridSearchRetriever
+from langchain.vectorstores.pgvector import PGVector
 from pinecone_text.sparse import BM25Encoder
 import pinecone 
-from typing import List, Dict, Callable, Optional, Tuple
+from typing import List, Dict, Optional, Tuple
 import json
 import copy
 import os
 import ast
 from abc import ABC, abstractmethod
 from combined_embeddings import CombinedEmbeddings
+import sys
+sys.path.append('..')
+from aws_helpers.param_manager import get_param_manager
 
-FACULTIES_PATH = os.path.join('data','documents','faculties.txt')
+### Constants
 INDEX_PATH = os.path.join('data','indexes')
+# Names of AWS secret manager secrets for each supported retriever type
+RETRIEVER_SECRETS = { 
+    'pinecone': 'retriever/PINECONE',
+    'pgvector': 'credentials/RDSCredentials'
+}
 
+### Globals
+base_embeddings: Dict = {}
+
+### Classes
 def load_json_file(file: str):
     with open(file,'r') as f: 
         return json.load(f)
-
-base_embeddings: Dict = {}
-retrievers: Dict = {}
 
 class MyPineconeRetriever(PineconeHybridSearchRetriever):
     """
@@ -99,7 +108,11 @@ class Retriever(ABC):
     Wrapper class for a LangChain retriever that performs additional
     query and response conversion
     """
+    # The retriever being wrapped
     retriever: BaseRetriever
+    # Number of concatenated embeddings
+    # Used to prepare query embeddings for retrieval
+    num_embed_concats: int
     
     @abstractmethod
     def semantic_search(self, program_info: Dict, topic: str, query: str, k = 5, threshold = 0) -> List[Document]:
@@ -153,12 +166,13 @@ class Retriever(ABC):
         
         return embedding_model
     
-    @classmethod
-    def _retriever_combined_query(cls, args: List[str]):
+    def _retriever_combined_query(self, query: str):
         """
-        Combine all args into a single query separated by the separation character
+        Concatenate the query with itself as many times as necessary
+        For the correct embedding dimensions with the concatenated embeddings
         """
-        joined = CombinedEmbeddings.query_separator.join(args)
+        queries = [query for _ in range(self.num_embed_concats)]
+        joined = CombinedEmbeddings.query_separator.join(queries)
         return joined
 
     @abstractmethod
@@ -213,6 +227,7 @@ class PineconeRetriever(Retriever):
         
         # Load the dense embedding model
         embeddings_model = self._embeddings_model_from_config(index_config)
+        self.num_embed_concats = len(index_config['embeddings'])
         
         # Connect to the pinecone index
         pinecone.init(      
@@ -279,7 +294,7 @@ class PineconeRetriever(Retriever):
                 program_info_copy.pop(param)
 
         query_str = ' : '.join(list(program_info_copy.values()) + [topic,query])
-        return self._retriever_combined_query([query_str, query_str, query_str]), {'filter': filter}
+        return self._retriever_combined_query(query_str), {'filter': filter}
     
     def _response_converter(self, response: List[Document]) -> List[Document]:
         """
@@ -304,6 +319,101 @@ class PineconeRetriever(Retriever):
                      relevance is in the range [0,1] where 0 is dissimilar, and 1 is most similar
         """
         return [doc for doc in docs if doc.metadata['score'] >= threshold]
+
+class PGVectorRetriever(Retriever):
+    index_type: str = 'pgvector'
+    index_config_path: str = os.path.join(INDEX_PATH, index_type, 'index_config.json')
+    
+    # Parameters from the program_info to use in the metadata filter for queries
+    filter_params: List[str]
+    # Maximum number of documents to return
+    k: int
+    
+    def __init__(self, connection_string: str, filter_params = []):
+        """
+        Initialize the RDS PGvector retriever
+        - connection_string: connection string for the pgvector DB
+                             can be created using PGVector.connection_string_from_db_params
+        - filter_params:
+                 keys of entries in the program_info dict passed
+                 to semantic_search that should be used as a metadata
+                 filter when querying pinecone
+        """
+        self.filter_params = filter_params
+        
+        # Load the config file
+        index_config = load_json_file(self.index_config_path)
+        
+        # Load the dense embedding model
+        embeddings_model = self._embeddings_model_from_config(index_config)
+        self.num_embed_concats = len(index_config['embeddings'])
+        
+        # Connect to the pgvector db
+        db = PGVector.from_existing_index(embeddings_model, index_config['name'], connection_string=connection_string)
+        self.retriever = VectorStoreRetriever(vectorstore=db)
+    
+    def semantic_search(self, program_info: Dict, topic: str, query: str, k = 5, threshold = 0) -> List[Document]:
+        """
+        Return the documents from similarity search with the given context and query
+        - program_info: Dict of program information
+        - topic: keyword topic of the query
+        - query: the full query question
+        - k: number of documents to return
+        - threshold: relevance threshold, all returned documents must surpass the threshold
+                     relevance is cosine-similarity based, so ranges between 0 and 1
+                     larger scores indicate greater relevance
+        """
+        self.set_top_k(k)
+        query_str, kwargs = self._query_converter(program_info,topic,query)
+        
+        if threshold > 0:
+            self.retriever.search_type = "similarity_score_threshold"
+            kwargs['score_threshold'] = threshold 
+        else:
+            self.retriever.search_type = 'similarity'
+            
+        docs = self.retriever.get_relevant_documents(query_str,**kwargs)
+        return docs
+    
+    def docs_from_ids(self, doc_ids: List[int]) -> List[Document]:
+        """
+        Return a list of documents from a list of document indexes
+        """
+        docs = self.retriever.fetch_by_id(doc_ids, self.namespace)
+        return self._response_converter(docs)
+    
+    def set_top_k(self, k: int):
+        """
+        Set the retriever's 'top k' parameter, determines how many
+        documents to return from semantic search
+        """
+        self.retriever.top_k = k
+        
+    def _query_converter(self, program_info: Dict, topic: str, query: str) -> Tuple[str,Dict]:
+        """
+        Generates a text query and keyword args for the retriever from the input
+        - program_info: Dict of program information
+        - topic: keyword topic of the query
+        - query: the full query question
+        Returns:
+        - Tuple of the query string, and Dict of kwargs to pass to the retriever
+        """
+        # Create a filter from the program info
+        program_info_copy = copy.copy(program_info)
+        filter = {}
+        for param in self.filter_params:
+            if param in program_info:
+                filter[param] = program_info[param]
+                program_info_copy.pop(param)
+
+        query_str = ' : '.join(list(program_info_copy.values()) + [topic,query])
+        return self._retriever_combined_query(query_str), {'filter': filter, 'k': self.k}
+    
+    def _response_converter(self, response: List[Document]) -> List[Document]:
+        """
+        No conversion needed
+        """
+        return response
     
 class FaissRetriever(Retriever):
     def __init__(self, path: str):
@@ -345,11 +455,7 @@ class FaissRetriever(Retriever):
         """
         Return a list of documents from a list of document indexes
         """
-        docs = []
-        for doc_id in doc_ids:
-            id = self.retriever.vectorstore.index_to_docstore_id[doc_id]
-            docs.append(self.retriever.vectorstore.docstore.search(id))
-        return [copy.deepcopy(doc) for doc in docs]
+        raise NotImplemented()
     
     def set_top_k(self, k: int):
         """
@@ -383,20 +489,25 @@ class FaissRetriever(Retriever):
         that they can be modified without modifying the docstore
         """
         return [copy.deepcopy(doc) for doc in response]
-
-def load_faculties():
+        
+def load_retriever(retriever_name: str, **kwargs):
     """
-    Load the available faculties from json
+    Loads a supported retriever type
+    Requires that the associated params and secrets are set in AWS
+    - retriever_name: 'pinecone' or 'pgvector'
     """
-    with open(FACULTIES_PATH,'r') as f:
-        return json.load(f)
-
-def load_faiss_retrievers():
-    """
-    Load faiss retrievers from file
-    """
-    faiss_path = os.path.join(INDEX_PATH, 'faiss')
+    param_manager = get_param_manager()
+    secret = param_manager.get_secret(RETRIEVER_SECRETS[retriever_name])
     
-    for dirname in os.listdir(faiss_path):
-        retriever = FaissRetriever(dirname)
-        retrievers[dirname] = retriever
+    if retriever_name == 'pinecone':
+        return PineconeRetriever(secret['PINECONE_KEY'], secret['PINECONE_REGION'], **kwargs)
+    elif retriever_name == 'pgvector':
+        connection_string = PGVector.connection_string_from_db_params(
+            driver="psycopg2",
+            host=secret["host"],
+            port=secret["port"],
+            database=secret["dbname"],
+            user=secret["username"],
+            password=secret["password"],
+        )
+        return PGVectorRetriever(connection_string, **kwargs)

@@ -43,7 +43,7 @@ class ParamManager():
         secret = ast.literal_eval(get_secret_value_response['SecretString'])
         return secret
 
-    def get_parameter(self, name: str | List[str]):
+    def get_parameter(self, name):
         """
         Get a parameter from the SSM Parameter Store
         - name: Name of a parameter, or list of directories and name of the parameter
