@@ -6,17 +6,15 @@ Simple flask application to demo model inference
 from flask import Flask, request, render_template
 import json
 import os 
-import csv
 from langchain_inference import run_chain
+from feedback import store_feedback
 
 ### Constants
 FACULTIES_PATH = os.path.join('data','documents','faculties.txt')
-FEEDBACK_CSV_PATH = os.path.join('data','feedback.csv')
 
 ### Globals (set upon load)
 application = Flask(__name__)
 faculties = {}
-instructions = ''
 
 def read_text(filename: str, as_json = False):
     result = ''
@@ -59,9 +57,14 @@ async def feedback():
               'feedback-hidden-reference-ids','feedback-hidden-response','feedback-reference-select','feedback-comments']
     data = [request.form[field] for field in fields]
 
-    with open(FEEDBACK_CSV_PATH, "w") as csv_file:
-        writer = csv.writer(csv_file, delimiter=',')
-        writer.writerow(data)
+    payload = json.dumps(dict(zip(fields, data)))
+
+    try:
+        response = store_feedback(json_payload=payload)
+        print(response)
+    except Exception as e:
+        # Handle any exceptions that occur during the Lambda invocation
+        print(f"ERROR occurs when submitting the feedback to the database: {e}")
             
     # Render the results
     return render_template('feedback.html')
@@ -72,3 +75,8 @@ def setup():
     faculties = read_text(FACULTIES_PATH,as_json=True)
 
 setup()
+
+# Run the application
+# must be like this to run from container
+if __name__ == "__main__":
+    application.run(host="0.0.0.0")

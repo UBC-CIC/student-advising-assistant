@@ -1,0 +1,12 @@
+pandas
+flask
+langchai>=0.0.239
+faiss-cpu
+sentence-transformers
+networkx
+python-dotenv
+flask[async]
+pinecone-client 
+pinecone-text
+boto3
+fschat
