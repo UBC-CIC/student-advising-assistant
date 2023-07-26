@@ -38,7 +38,7 @@ class ContentHandler(LLMContentHandler):
 ### MODEL LOADING FUNCTIONS
 
 fastchat_models = {
-    'vicuna': 'vicuna_v1.1'
+    'vicuna': 'vicuna_v1.1',
 }
 
 def load_fastchat_adapter(base_llm: BaseLLM, model_name: str, system_instruction: str) -> BaseLLM:
@@ -47,7 +47,8 @@ def load_fastchat_adapter(base_llm: BaseLLM, model_name: str, system_instruction
     """
     
     if model_name not in fastchat_models:
-        raise Exception(f'{model_name} is not supported for FastChat')
+        print(f'Warning: {model_name} is not supported for FastChat')
+        return base_llm
 
     return FastChatLLM.from_base_llm(base_llm, fastchat_models[model_name], system_instruction=system_instruction)
     
@@ -124,4 +125,4 @@ def load_chain_filter(base_llm: BaseLLM, model_name: str) -> Tuple[LLMChainFilte
     if model_name == 'vicuna':
         return VerboseFilter.from_llm(base_llm,prompt=prompts.vicuna_filter_prompt), prompts.vicuna_filter_question_str
     else:
-        return LLMChainFilter.from_llm(base_llm,prompt=prompts.filter_prompt), prompts.basic_filter_question_str
+        return VerboseFilter.from_llm(base_llm,prompt=prompts.filter_prompt), prompts.basic_filter_question_str

@@ -39,6 +39,8 @@ To run the demo locally:
 AWS_PROFILE_NAME=<insert AWS SSO profile name>
 ```
 
+- Optionally, add 'MODE=dev' for verbose LLMs and to use the /dev versions of secrets and parameters
+
 ### Building docker container and run locally for the flask app
 
 The default platform intended for the container is `--platform=linux/amd64`. Might be able to run on MacOS. For Windows,
@@ -70,4 +72,4 @@ Run this command when you're in the root folder `student-advising-assistant`
 
 ```bash
 zip -r demo-app-v2.zip aws_helpers/ flask_app/ Dockerfile -x "*/.*" -x ".*"
-```
+``````
