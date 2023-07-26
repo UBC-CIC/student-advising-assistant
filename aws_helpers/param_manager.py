@@ -60,11 +60,9 @@ class ParamManager():
         
 manager: ParamManager = None
 
-def get_param_manager(dev: bool = False) -> ParamManager:
+def get_param_manager() -> ParamManager:
     """
     Return a singleton ParamManager
-    - dev: If true, uses the dev version of the secrets and parameters
-            (appends -dev to the prefix)
     """
     global manager
     if not manager:
