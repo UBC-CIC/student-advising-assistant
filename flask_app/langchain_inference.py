@@ -7,7 +7,6 @@ from dotenv import load_dotenv
 import os
 import llm_utils
 import doc_graph_utils
-from comparator import Comparator
 from numpy import isnan
 import retrievers
 from retrievers import Retriever
@@ -98,34 +97,6 @@ def get_related_links_from_compressed(docs, compressed_docs):
         links = [(title,link,doc_id) for title,(link,doc_id) in doc.metadata['links'].items() if title in compressed.page_content]
         doc.metadata['related_links'] = links
 
-def get_related_links_from_sim(retriever: Retriever, context, query, docs, score_threshold = 0.5):
-    """
-    Searches through links in the given documents:
-    - Computes similarity between the query and the link text
-    - If the similarities are over the threshold, adds the links to the document metadata
-    """
-    titles = []
-    spans = []
-    context_str = retriever.retriever_context_str(context)
-
-    # Finding linked docs
-    for doc in docs:
-        spans.append([len(titles)])
-        for title,(link,_) in doc.metadata['links'].items():
-            if type(link) == int: # only consider links to internal documents
-                titles.append(title)
-        spans[-1].append(len(titles))
-
-    if len(titles) == 0:
-        return [],[]
-    
-    # Score the query against the link titles
-    scores = comparator.compare_query_to_texts(query,titles,context_str)[0]
-    
-    for doc,span in zip(docs,spans):
-        scores_span = scores[span[0]:span[1]]
-        links = [(title,link,doc_id) for (title,(link,doc_id)),score in zip(doc.metadata['links'].items(),scores_span) if score >= score_threshold]
-        doc.metadata['related_links'] = links
 
 def combine_sib_docs(retriever: Retriever, docs: List[Document]) -> List[Document]:
     """

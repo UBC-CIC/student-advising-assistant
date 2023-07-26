@@ -9,6 +9,7 @@
 **/.DS_Store
 .DS_Store
 demo-app*.zip
+freeze_mac_m1.txt
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
