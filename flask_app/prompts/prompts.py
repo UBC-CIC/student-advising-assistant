@@ -100,14 +100,7 @@ class VerboseFlexibleBooleanOutputParser(FlexibleBooleanOutputParser):
         
         return super(self.__class__,self).parse(text), text
 
-title_filter_template = """
-Given the following question and document title, return YES if the document is relevant to the question and NO if it isn't.
-> Question: {question}
-> Title: {title}
-"""
-title_filter_prompt = PromptTemplate(template=title_filter_template, input_variables=["question","title"], output_parser=FlexibleBooleanOutputParser())
-
-def title_filter_context_str(program_info: Dict, topic: str) -> str:
+def filter_context_str(program_info: Dict, topic: str) -> str:
     """
     Generate a context string for input to the title_filter_context_template
     """
@@ -122,11 +115,6 @@ def title_filter_context_str(program_info: Dict, topic: str) -> str:
         context_str += program_info['year']
     return context_str if context_str != '' else None
 
-title_filter_context_template = """
-Is the following document title about {context}? Return YES or NO.
-> Title: {title}
-"""
-
 def basic_filter_question_str(program_info: Dict, topic: str, query: str) -> str:
     """
     Generate a filter question string
@@ -139,14 +127,14 @@ If the question and the document refer to different programs or year levels, ans
 > Question: {question}
 > Document: {context}
 """
-filter_prompt = PromptTemplate(template=filter_template, input_variables=["question","context"], output_parser=FlexibleBooleanOutputParser())
+filter_prompt = PromptTemplate(template=filter_template, input_variables=["question","context"], output_parser=VerboseFlexibleBooleanOutputParser())
 
 def vicuna_filter_question_str(program_info: Dict, topic: str, query: str) -> str:
     """
     Generate a filter question string for Vicuna filter template
     """
     question_str = ''
-    context_str = title_filter_context_str(program_info, topic)
+    context_str = filter_context_str(program_info, topic)
     
     if context_str:
         question_str += f'If the document is not about {context_str}, say no.'
