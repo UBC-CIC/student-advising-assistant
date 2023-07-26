@@ -1,18 +1,18 @@
 from bs4 import BeautifulSoup
-from website_dump_doc_extractor import DocExtractor, DumpConfig, DEFAULT_SPLIT_CLASS, make_tag
 import json
 import logging
 from tools import write_file
-from os.path import join
 import copy 
 import regex as re
 from typing import List
-from os import makedirs
+import os
+import website_dump_doc_extractor
+from website_dump_doc_extractor import make_tag, DumpConfig, DocExtractor
 
 """
-Processing functions specific to the data sources:
+Contains website dump processing functions specific to the data sources:
 - UBC Academic Calendar
-- UBC Science Distillation Blog
+- UBC Science Undergrad site
 
 Uses the DocExtractor class from website_dump_doc_extractor
 """
@@ -21,20 +21,7 @@ log = logging.getLogger(__name__)
 unhandled_tables = {}
 error_tables = {}
 
-
-### PAGE PREPROCESSING FUNCTIONS
-
-def parent_context_extractor(url: str, titles: List[str], parent_titles: List[str], text: str) -> str:
-    """
-    Given the contents of a 'parent' document extract, returns any context that 
-    should be considered for child pages.
-    Eg. if the parent extract describes the purpose of a table, that purpose should be
-        considered for child pages containing the actual table
-    """
-    keywords = ['below','as follows']
-    if len(text) < 400 and any(keyword in text for keyword in keywords): 
-        return text
-    return None
+### REPLACEMENT FUNCTIONS
 
 def convert_table(table: BeautifulSoup, url: str) -> BeautifulSoup:
     """
@@ -91,7 +78,7 @@ def table_conversion_function(table: BeautifulSoup, handle_row) -> BeautifulSoup
     while row and table in row.parents:
         if title := row.find(['h1','h2','h3','h4']): 
             # row is a title row
-            output.append(make_tag('p',title.text.strip(),{'class': DEFAULT_SPLIT_CLASS}))
+            output.append(make_tag('p',title.text.strip(),{'class': website_dump_doc_extractor.DEFAULT_SPLIT_CLASS}))
             current_list = make_tag('ul')
             output.append(current_list)
         else:
@@ -102,7 +89,7 @@ def table_conversion_function(table: BeautifulSoup, handle_row) -> BeautifulSoup
                 # row with single heading becomes start of new list
                 th = cells[0]
                 footnote = combine_cell_footnotes(th, footnotes,remove_sup=True)
-                p = make_tag('p',make_tag('div',th.text.strip(),{'class': DEFAULT_SPLIT_CLASS})) # title
+                p = make_tag('p',make_tag('div',th.text.strip(),{'class': website_dump_doc_extractor.DEFAULT_SPLIT_CLASS})) # title
                 if footnote: p.extend(['(', *footnote.contents, ')']) # footnote
                 
                 ul = make_tag('ul')
@@ -347,7 +334,7 @@ def combine_cell_footnotes(cell,footnotes,remove_sup=False):
         note_tag.extend([*note, ' '])
     return note_tag
 
-### UTILITY FNS
+### UTILITIES FOR REPLACEMENT FUNCTIONS
 
 def add_elem_to_dict(dict, url, title):
     """
@@ -369,16 +356,7 @@ def get_row_cells(row: BeautifulSoup) -> list[BeautifulSoup]:
         else: break
     return cells
 
-### DUMP CONFIGS
-
-BASE_DUMP_PATH = 'site_dumps'
-
-generic_remove_tags = [
-    {'name': 'form'},                   # ignore forms
-    {'class': 'sr-only'},               # screenreader only tags
-    {'class': 'hidden'},                # hidden tags
-    {'name': 'a', 'href': '#top'}       # 'go to top' links
-]
+### METADATA EXTRACTION FUNCTIONS
 
 faculty_prefixes = ['The Faculty of', 'The School of']
 faculty_suffixes = ['College(s)?', 'School of \w+']
@@ -422,52 +400,57 @@ def blog_extract_metadata(url: str, titles: List[str], parent_titles: List[str],
             metadata['specialization'].append(subtitle)
     return metadata
 
-calendar_is_new_format = True
-calendar_config = DumpConfig()
-calendar_config.base_url = 'https://vancouver.calendar.ubc.ca/'
-calendar_config.dump_path = join(BASE_DUMP_PATH, 'vancouver.calendar.ubc.ca') # os.path.join() will automatically create the correct path for any OS
-calendar_config.remove_tag_attrs = generic_remove_tags + [{'id': 'block-shareblock'}] if calendar_is_new_format else [{'id': 'shadedBox'},{'id': 'breadcrumbsWrapper'}]
-calendar_config.replacements = [({'name': 'table'}, convert_table)]
-calendar_config.main_content_attrs = {'id': 'primary-content' if calendar_is_new_format else 'unit-content'}
-calendar_config.title_attrs = {'name': 'h1'}
-calendar_config.metadata_extractor = calendar_extract_metadata
-calendar_config.parent_context_extractor = parent_context_extractor
+### SPLIT TAG PREDICATES 
 
-sc_students_config = DumpConfig()
-sc_students_config.base_url = 'https://science.ubc.ca/students/'
-sc_students_config.dump_path = join(BASE_DUMP_PATH, "science.ubc.ca", "students")
-sc_students_config.remove_tag_attrs = generic_remove_tags + [{'class': 'customBread'}, # breadcrumb
-                                                             {'id': 'block-views-student-notices-block-2'},
-                                                             {'class':'field-name-field-student-blog-topic'},
-                                                             {'class':'menu'},
-                                                             {'class':'pager'}, # page control
-                                                             {'class': 'nav'},   # nav menus
-                                                             ]
-sc_students_config.replacements = [({'name': 'table'}, convert_table)]
-sc_students_config.main_content_attrs = {'id': 'content'}
-sc_students_config.title_attrs = {'name': 'h1'}
-sc_students_config.metadata_extractor = blog_extract_metadata
-sc_students_config.parent_context_extractor = None
-sc_students_config.split_attrs = [{'name': 'h1'},{'name': 'h2'},{'function': lambda x: (x.name == 'h3' or DEFAULT_SPLIT_CLASS in x.get_attribute_list('class'))},{'name': 'h4'}]
-# ^ For the third split attributes, treats h3 and split class as the same level due to the structure of https://science.ubc.ca/students/degree/apply/req
-sc_students_config.mandatory_splits = 2
+def is_h3_or_split_class(tag: BeautifulSoup):
+    """
+    Returns true if a tag is a h3 tag 
+    OR it has the split class applied
+    """
+    return tag.name == 'h3' or website_dump_doc_extractor.DEFAULT_SPLIT_CLASS in tag.get_attribute_list('class')
 
+def strong_tag_title(tag: BeautifulSoup) -> bool:
+    """
+    Identifier of titles indicated by <strong> tags
+    """
+    # Check that the tag is a strong tag and contains text
+    if tag.name != 'strong': return False
+    if not tag.string: return False
+    
+    # Check that the tag has a length within a given range
+    tag_text_len = len(tag.string)
+    if tag_text_len < 1 or tag_text_len > 80: return False
+    
+    # Ensure that the tag is not within a table
+    next_sib = tag.next_sibling
+    parents = tag.parents
+    for parent in parents:
+        if parent.name in (website_dump_doc_extractor.DEFAULT_TITLE_TAGS + ['table','ul']): return False
+    return next_sib == None
+
+### CONTEXT EXTRACTION FUNCTIONS
+
+def parent_context_extractor(url: str, titles: List[str], parent_titles: List[str], text: str) -> str:
+    """
+    Given the contents of a 'parent' document extract, returns any context that 
+    should be considered for child pages.
+    Eg. if the parent extract describes the purpose of a table, that purpose should be
+        considered for child pages containing the actual table
+    """
+    keywords = ['below','as follows']
+    if len(text) < 400 and any(keyword in text for keyword in keywords): 
+        return text
+    return None
 
 ### MAIN FUNCTION
 
-def process_site_dumps(dump_configs: list[DumpConfig] = [calendar_config,sc_students_config], 
-                       redirect_map_path: str = join(BASE_DUMP_PATH, 'redirects.txt'), 
-                       out_path: str = 'processed/'):
+def process_site_dumps(doc_extractor: DocExtractor, dump_configs: list[DumpConfig], 
+                       redirect_map_path: str, out_path: str):
     """
-    Parse website dumps
-    - dump_configs
+    Process predownloaded website dumps to extracts
+    - dump_configs: List of dump config classes for the downloaded websites
     - redirect_map_path: filepath to the redirect map
     """
-
-    doc_extractor = DocExtractor()
-    doc_extractor.max_len = 1000
-    doc_extractor.overlap_window = 100
-
     # Read the redirect map
     if redirect_map_path:
         with open(redirect_map_path,'r') as f:
@@ -477,9 +460,9 @@ def process_site_dumps(dump_configs: list[DumpConfig] = [calendar_config,sc_stud
     doc_extractor.parse_folder(dump_configs,out_path)
 
     def writer():
-        makedirs("processed", exist_ok=True)
-        unhandled_tables_file = join(out_path,'unhandled_tables.txt')
-        error_tables_file = join(out_path,'error_tables.txt')
+        os.makedirs("processed", exist_ok=True)
+        unhandled_tables_file = os.path.join(out_path,'unhandled_tables.txt')
+        error_tables_file = os.path.join(out_path,'error_tables.txt')
         with open(unhandled_tables_file,'w') as f:
             json.dump(unhandled_tables,f, indent=4)
         with open(error_tables_file,'w') as f:

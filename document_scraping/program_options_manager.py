@@ -34,5 +34,3 @@ def find_program_options(website_extracts_path: str):
             json.dump(faculties,f,indent=4)
     
     write_file(writer)
-    
-find_program_options('./processed/website_extracts.csv')
