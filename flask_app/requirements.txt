@@ -1,6 +1,6 @@
 pandas
 flask
-langchain<=0.0.231
+langchai>=0.0.239
 faiss-cpu
 sentence-transformers
 networkx
