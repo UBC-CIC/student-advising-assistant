@@ -1,9 +1,11 @@
+from dotenv import load_dotenv
+load_dotenv() # Loads env variable when running locally
+
 from langchain.docstore.document import Document
 from langchain import LLMChain
 from langchain.retrievers.document_compressors import LLMChainExtractor
 import regex as re
 from typing import List, Dict, Tuple
-from dotenv import load_dotenv
 import os
 import llm_utils
 import doc_graph_utils
@@ -19,9 +21,9 @@ sys.path.append('..')
 from aws_helpers.param_manager import get_param_manager
 from aws_helpers.s3_tools import download_s3_directory
 
-VERBOSE_LLMS = True
-
-load_dotenv()
+# If process is running locally, activate dev mode
+DEV_MODE = 'MODE' in os.environ and os.environ.get('MODE') == 'dev'
+VERBOSE_LLMS = DEV_MODE
 GRAPH_FILEPATH = os.path.join('data','documents','website_graph.txt')
 
 ### CONSTANTS
@@ -38,7 +40,6 @@ generator_config = param_manager.get_parameter('generator')
 
 # LLMs
 base_llm, qa_prompt = llm_utils.load_model_and_prompt(generator_config['ENDPOINT_TYPE'], generator_config['ENDPOINT_NAME'], generator_config['MODEL_NAME'])
-#base_llm, qa_prompt = llm_utils.load_model_and_prompt(generator_config['ENDPOINT_TYPE'], 'vicuna7b2xlarge2', generator_config['MODEL_NAME'])
 concise_llm = llm_utils.load_fastchat_adapter(base_llm, generator_config['MODEL_NAME'], prompts.fastchat_system_concise)
 detailed_llm = llm_utils.load_fastchat_adapter(base_llm, generator_config['MODEL_NAME'], prompts.fastchat_system_detailed)
 

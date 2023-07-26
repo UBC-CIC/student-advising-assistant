@@ -35,3 +35,4 @@ To run the demo locally:
 ```
 AWS_PROFILE_NAME=<insert AWS SSO profile name>
 ```
+- Optionally, add 'MODE=dev' for verbose LLMs and to use the /dev versions of secrets and parameters

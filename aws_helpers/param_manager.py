@@ -1,6 +1,7 @@
 from typing import List 
 from botocore.exceptions import ClientError
 import ast
+import os
 from .ssm_parameter_store import SSMParameterStore
 from .get_session import get_session
     
@@ -15,6 +16,14 @@ class ParamManager():
     """
     
     def __init__(self):
+        """
+        Init the ParamManager
+        If the environment variable MODE = 'dev', 
+        uses the dev version of the secrets and parameters
+        """
+        dev_mode = 'MODE' in os.environ and os.environ.get('MODE') == 'dev'
+        if dev_mode:
+            self.prefix += '/dev'
         session = get_session()
         self.param_store = SSMParameterStore(prefix='/' + self.prefix, ssm_client=session.client('ssm', region_name=self.region))
         self.secret_client = session.client(service_name='secretsmanager', region_name=self.region)
@@ -51,9 +60,11 @@ class ParamManager():
         
 manager: ParamManager = None
 
-def get_param_manager() -> ParamManager:
+def get_param_manager(dev: bool = False) -> ParamManager:
     """
     Return a singleton ParamManager
+    - dev: If true, uses the dev version of the secrets and parameters
+            (appends -dev to the prefix)
     """
     global manager
     if not manager:
