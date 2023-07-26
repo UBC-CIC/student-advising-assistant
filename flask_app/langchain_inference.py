@@ -1,23 +1,26 @@
+# Loads env variable when running locally
 from dotenv import load_dotenv
-load_dotenv() # Loads env variable when running locally
+load_dotenv()
 
+## Add parent directory to path for aws_helpers
+import sys
+sys.path.append('..')
+
+# Imports
 from langchain.docstore.document import Document
 from langchain import LLMChain
 from langchain.retrievers.document_compressors import LLMChainExtractor
 import regex as re
 from typing import List, Dict, Tuple
-import os
-import llm_utils
-import doc_graph_utils
-from comparator import Comparator
 from numpy import isnan
-import retrievers
+from retrievers import Retriever, load_retriever
 import copy 
 import json
+import os
 from langchain.chains.question_answering import load_qa_chain
-from prompts import prompts 
-import sys
-sys.path.append('..')
+import llms
+from documents import load_graph, get_split_sib_ids
+import prompts
 from aws_helpers.param_manager import get_param_manager
 from aws_helpers.s3_tools import download_s3_directory
 
@@ -44,7 +47,7 @@ def read_text(filename: str, as_json = False):
         else: result = f.read()
     return result
     
-graph = doc_graph_utils.read_graph(GRAPH_FILEPATH)
+graph = load_graph(GRAPH_FILEPATH)
 
 def download_all_dirs(retriever: str):
     """
@@ -68,20 +71,20 @@ data_source_annotations = read_text(os.path.join('static','data_source_annotatio
 ### LOAD MODELS 
 
 # LLMs
-base_llm, qa_prompt = llm_utils.load_model_and_prompt(generator_config['ENDPOINT_TYPE'], generator_config['ENDPOINT_NAME'], generator_config['MODEL_NAME'])
-concise_llm = llm_utils.load_fastchat_adapter(base_llm, generator_config['MODEL_NAME'], prompts.fastchat_system_concise)
-detailed_llm = llm_utils.load_fastchat_adapter(base_llm, generator_config['MODEL_NAME'], prompts.fastchat_system_detailed)
+base_llm, qa_prompt = llms.load_model_and_prompt(generator_config['ENDPOINT_TYPE'], generator_config['ENDPOINT_NAME'], generator_config['MODEL_NAME'])
+concise_llm = llms.load_fastchat_adapter(base_llm, generator_config['MODEL_NAME'], prompts.fastchat_system_concise)
+detailed_llm = llms.load_fastchat_adapter(base_llm, generator_config['MODEL_NAME'], prompts.fastchat_system_detailed)
 
 # Chains
 spell_correct_chain = LLMChain(llm=concise_llm,prompt=prompts.spelling_correction_prompt)
 combine_documents_chain = load_qa_chain(llm=detailed_llm, chain_type="stuff", prompt=qa_prompt)
 
 # Document compressors
-filter, filter_question_fn = llm_utils.load_chain_filter(concise_llm, generator_config['MODEL_NAME'])
+filter, filter_question_fn = llms.load_chain_filter(concise_llm, generator_config['MODEL_NAME'])
 compressor = LLMChainExtractor.from_llm(concise_llm)
 
 # Retriever
-retriever: retrievers.Retriever = retrievers.load_retriever(retriever_config['RETRIEVER_NAME'], filter_params=['faculty','program'])
+retriever: Retriever = load_retriever(retriever_config['RETRIEVER_NAME'], filter_params=['faculty','program'])
 
 ### UTILITY FUNCTIONS
 
@@ -105,41 +108,12 @@ def get_related_links_from_compressed(docs, compressed_docs):
         links = [(title,link,doc_id) for title,(link,doc_id) in doc.metadata['links'].items() if title in compressed.page_content]
         doc.metadata['related_links'] = links
 
-def get_related_links_from_sim(retriever: Retriever, context, query, docs, score_threshold = 0.5):
-    """
-    Searches through links in the given documents:
-    - Computes similarity between the query and the link text
-    - If the similarities are over the threshold, adds the links to the document metadata
-    """
-    titles = []
-    spans = []
-    context_str = retriever.retriever_context_str(context)
-
-    # Finding linked docs
-    for doc in docs:
-        spans.append([len(titles)])
-        for title,(link,_) in doc.metadata['links'].items():
-            if type(link) == int: # only consider links to internal documents
-                titles.append(title)
-        spans[-1].append(len(titles))
-
-    if len(titles) == 0:
-        return [],[]
-    
-    # Score the query against the link titles
-    scores = comparator.compare_query_to_texts(query,titles,context_str)[0]
-    
-    for doc,span in zip(docs,spans):
-        scores_span = scores[span[0]:span[1]]
-        links = [(title,link,doc_id) for (title,(link,doc_id)),score in zip(doc.metadata['links'].items(),scores_span) if score >= score_threshold]
-        doc.metadata['related_links'] = links
-
 def combine_sib_docs(retriever: Retriever, docs: List[Document]) -> List[Document]:
     """
     For each document, combine its context with all of its immediate siblings
     """
     for doc in docs:
-        sib_ids = doc_graph_utils.get_split_sib_ids(graph, doc.metadata['doc_id'])
+        sib_ids = get_split_sib_ids(graph, doc.metadata['doc_id'])
         sib_docs = retriever.docs_from_ids(sib_ids)
         combined_content = ' '.join([sib_doc.page_content for sib_doc in sib_docs])
         doc.page_content = combined_content

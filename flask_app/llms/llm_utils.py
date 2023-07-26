@@ -7,13 +7,13 @@ from langchain import HuggingFaceHub, SagemakerEndpoint, Prompt
 from langchain.llms import BaseLLM
 from langchain.llms.sagemaker_endpoint import LLMContentHandler
 from langchain.retrievers.document_compressors import LLMChainFilter
-from huggingface_qa import HuggingFaceQAEndpoint
 import json
 from typing import Tuple, Dict, Callable
-import prompts.prompts as prompts
 import os 
-from fastchat_adapter import FastChatLLM
+import prompts
 from filters import VerboseFilter
+from .fastchat_adapter import FastChatLLM
+from .huggingface_qa import HuggingFaceQAEndpoint
 
 ### HELPER CLASSES
 class ContentHandler(LLMContentHandler):

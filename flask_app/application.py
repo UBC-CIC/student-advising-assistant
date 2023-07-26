@@ -5,9 +5,9 @@ Simple flask application to demo model inference
 
 from flask import Flask, request, render_template
 import json
-from langchain_inference import run_chain
 import os 
 import csv
+from langchain_inference import run_chain
 
 ### Constants
 FACULTIES_PATH = os.path.join('data','documents','faculties.txt')

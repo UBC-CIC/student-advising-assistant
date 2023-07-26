@@ -12,7 +12,7 @@ class DocRelation(IntEnum):
     SIBLING_EXTRACT = 4
     SIBLING_SPLIT_EXTRACT = 5
 
-def read_graph(filepath) -> nx.DiGraph:
+def load_graph(filepath) -> nx.DiGraph:
     """
     Read the website relationship graph from file
     """
