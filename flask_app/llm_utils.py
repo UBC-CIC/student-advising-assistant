@@ -14,6 +14,8 @@ import prompts.prompts as prompts
 import os 
 from fastchat_adapter import FastChatLLM
 from filters import VerboseFilter
+from dotenv import load_dotenv, find_dotenv
+import boto3
 
 ### HELPER CLASSES
 class ContentHandler(LLMContentHandler):
@@ -86,13 +88,15 @@ def load_sagemaker_endpoint(endpoint_name: str) -> BaseLLM:
     Loads the LLM for a sagemaker inference endpoint
     """
     content_handler = ContentHandler()
+    credentials_profile = os.environ["AWS_PROFILE_NAME"] if "AWS_PROFILE_NAME" in os.environ else None
     llm = SagemakerEndpoint(
-            endpoint_name=endpoint_name,
-            credentials_profile_name=os.environ.get('AWS_PROFILE_NAME'),
-            region_name="us-west-2",
-            model_kwargs={"do_sample": False, "temperature": 0.1, "max_new_tokens":200},
-            content_handler=content_handler,
-        )
+        endpoint_name=endpoint_name,
+        credentials_profile_name=credentials_profile,
+        region_name="us-west-2", 
+        model_kwargs={"do_sample": False, "temperature": 0.1, "max_new_tokens":200},
+        content_handler=content_handler
+    )
+
     return llm
 
 def load_huggingface_endpoint(name: str) -> BaseLLM:

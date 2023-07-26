@@ -1,0 +1,27 @@
+# Ignore common development files and directories
+.git
+.vscode
+.env
+*.pyc
+*__pycache__
+
+# Ignore deployment-specific files and directories
+.dockerignore
+Dockerfile
+docker-compose.yml
+
+# Ignore editor-specific files and directories
+.idea
+*.sublime-workspace
+*.sublime-project
+.vs
+
+# Ignore OS-specific files and directories
+.DS_Store
+Thumbs.db
+
+# Ignore package management files
+venv/
+*.venv/
+pipenv/
+pipfile*
