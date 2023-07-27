@@ -8,6 +8,7 @@ import json
 import os 
 from langchain_inference import run_chain
 from feedback import store_feedback
+from typing import List
 
 ### Constants
 FACULTIES_PATH = os.path.join('data','documents','faculties.txt')
@@ -23,6 +24,20 @@ def read_text(filename: str, as_json = False):
         else: result = f.read()
     return result
 
+def log_question(question: str, context: str, answer: str, reference_ids: List[int]):
+    # Save submitted question and answer
+    fields = ['question','context','answer','reference_ids']
+    data = [question, context, answer, reference_ids]
+
+    payload = json.dumps(dict(zip(fields, data)))
+    
+    try:
+        response = store_feedback(json_payload=payload, logging_only=True)
+        print(response)
+    except Exception as e:
+        # Handle any exceptions that occur during the Lambda invocation
+        print(f"ERROR occurs when submitting the feedback to the database: {e}")
+        
 @application.route('/', methods=['GET'])
 def home():
     # Render the form template
@@ -43,9 +58,12 @@ async def answer():
 
     # Run the model inference
     docs, main_response, alerts, removed_docs = await run_chain(program_info,topic,question,start_doc=start_doc)
-
-    # Render the results
+    
+    # Log the question
     context_str = ' : '.join(list(program_info.values()) + [topic])
+    log_question(question, context_str, main_response, [doc.metadata['doc_id'] for doc in docs])
+    
+    # Render the results
     return render_template('ans.html',question=question,context=context_str,docs=docs,
                            form=request.form.to_dict(), main_response=main_response, alerts=alerts,
                            removed_docs=removed_docs)
