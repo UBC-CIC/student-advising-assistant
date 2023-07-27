@@ -4,6 +4,7 @@ from langchain.vectorstores.pgvector import PGVector
 from typing import List, Dict, Tuple
 import os
 import copy
+import ast
 from .tools import load_json_file
 from .base import Retriever, INDEX_PATH
 
@@ -55,12 +56,12 @@ class PGVectorRetriever(Retriever):
         
         if threshold > 0:
             self.retriever.search_type = "similarity_score_threshold"
-            kwargs['score_threshold'] = threshold 
+            self.retriever.search_kwargs['score_threshold'] = threshold
         else:
             self.retriever.search_type = 'similarity'
             
         docs = self.retriever.get_relevant_documents(query_str,**kwargs)
-        return docs
+        return self._response_converter(docs)
     
     def docs_from_ids(self, doc_ids: List[int]) -> List[Document]:
         """
@@ -74,7 +75,7 @@ class PGVectorRetriever(Retriever):
         Set the retriever's 'top k' parameter, determines how many
         documents to return from semantic search
         """
-        self.retriever.top_k = k
+        self.retriever.search_kwargs['k'] = k
         
     def _query_converter(self, program_info: Dict, topic: str, query: str) -> Tuple[str,Dict]:
         """
@@ -93,11 +94,21 @@ class PGVectorRetriever(Retriever):
                 filter[param] = program_info[param]
                 program_info_copy.pop(param)
 
+        self.retriever.search_kwargs['filter'] = filter
+        
         query_str = ' : '.join(list(program_info_copy.values()) + [topic,query])
-        return self._retriever_combined_query(query_str), {'filter': filter, 'k': self.k}
+        return self._retriever_combined_query(query_str), {}
     
     def _response_converter(self, response: List[Document]) -> List[Document]:
         """
-        No conversion needed
+        Decode the document metadatas from rds
+        Since rds requires primitive datatypes for metadatas,
+        evaluates strings into dicts/arrays
         """
+        decode_columns = ['titles','parent_titles','links']
+        for doc in response:
+            for column in decode_columns:
+                doc.metadata[column] = ast.literal_eval(doc.metadata[column])
+            doc.page_content = doc.metadata['text']
+
         return response
