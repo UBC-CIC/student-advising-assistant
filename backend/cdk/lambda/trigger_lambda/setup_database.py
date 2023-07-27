@@ -57,9 +57,12 @@ def lambda_handler(event, context):
         	"comment" VARCHAR
         );
         
-        CREATE TABLE IF NOT EXISTS document_embedding (
+        CREATE TABLE IF NOT EXISTS logging (
             "id" BIGSERIAL PRIMARY KEY,
-            "embedding" vector(768)
+        	"question" VARCHAR NOT NULL,
+        	"context" VARCHAR,
+        	"retrieved_doc_ids" VARCHAR,
+        	"response" VARCHAR
         );
     """
 

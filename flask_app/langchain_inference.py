@@ -84,7 +84,8 @@ filter, filter_question_fn = llms.load_chain_filter(concise_llm, generator_confi
 compressor = LLMChainExtractor.from_llm(concise_llm)
 
 # Retriever
-retriever: Retriever = load_retriever(retriever_config['RETRIEVER_NAME'], filter_params=['faculty','program'])
+#retriever: Retriever = load_retriever(retriever_config['RETRIEVER_NAME'], dev_mode=DEV_MODE, filter_params=['faculty','program'])
+retriever: Retriever = load_retriever('pgvector', dev_mode=DEV_MODE, filter_params=['faculty','program'])
 
 ### UTILITY FUNCTIONS
 
@@ -172,7 +173,7 @@ def docs_for_llms(docs: List[Document]):
     """
     for doc in docs:
         content = doc_display_title(doc)
-        if 'context' in doc.metadata and not isnan(doc.metadata['context']) and doc.metadata['context'] != '': 
+        if 'context' in doc.metadata and type(doc.metadata['context']) == str and doc.metadata['context'] != '': 
             content += '\n\n' + doc.metadata['context']
         content += '\n\n' + doc.page_content
         doc.metadata['original_page_content'] = doc.page_content

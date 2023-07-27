@@ -4,7 +4,12 @@ import boto3
 import psycopg2
 
 DB_SECRET_NAME = os.environ["DB_SECRET_NAME"]
-
+LOGGING_KEY = 'logging' 
+# ^ name of the key in the event that specifies whether to
+# store the feedback to a logging table (otherwise feedback table)
+PAYLOAD_KEY = 'payload'
+# ^ name of the key in the event that includes the json
+# payload for inserting into the table
 
 def getDbSecret():
     
@@ -39,36 +44,41 @@ def lambda_handler(event, context):
     
     cursor = connection.cursor()
     
-    sql = """
-        INSERT INTO feedback (helpful_response, question, context, retrieved_doc_ids, response, most_relevant_doc, comment) 
-        VALUES (%s, %s, %s, %s, %s, %s,%s);
-    """
+    sql = None
+    if event[LOGGING_KEY]:
+        sql = """
+            INSERT INTO logging (question, context, retrieved_doc_ids, response) 
+            VALUES (%s, %s, %s, %s);
+        """
+    else:
+        sql = """
+            INSERT INTO feedback (helpful_response, question, context, retrieved_doc_ids, response, most_relevant_doc, comment) 
+            VALUES (%s, %s, %s, %s, %s, %s,%s);
+        """
     
     data = []
-    for key in event.keys():
-
+    for key, val in json.loads(event[PAYLOAD_KEY]).items():
         if key == "feedback-hidden-helpful":
-            data.append(True if event[key] == "yes" else False)
+            data.append(True if val == "yes" else False)
         elif key == "feedback-reference-select":
-            data.append(int(event[key]))
+            data.append(int(val))
         else:
-            data.append(event[key])
-            
+            data.append(val)
+    
     print(data)
-    
-    cursor.execute(sql, tuple(data))
-    
-    sql = """
-        SELECT * FROM feedback;
-    """
-    res = cursor.fetchall()
-    print(res)
-    
-    cursor.close()
-    
-    return {
-        "statusCode": 200,
-        "msg": "Successfuly connected to db",
-        "body": json.dumps(res),
-        # "orig_event": event
-    }
+
+    try:
+        cursor.execute(sql, tuple(data))
+        connection.commit()
+        return {
+            "statusCode": 200,
+            "msg": "Successfuly stored feedback"
+        }
+    except Exception as e:
+        return {
+            "statusCode": 400,
+            "msg": "Failed to store feedback",
+            "body": str(e)
+        }
+    finally:
+        cursor.close()
