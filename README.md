@@ -26,20 +26,36 @@ The repo includes a demo flask app under flask_app, which runs the model for inf
 Prerequisites:
 
 - Requires an S3 bucket containing the processed documents in a 'documents' folder and the document indexes in a 'indexes' folder
-- More details on the index creation process will be uploaded soon
 
-To run the demo locally:
+### Running the Demo App Locally
+Some setup will be required if you want to run the app locally for development.
+- Create a `.env` file under `/flask_app`
+    - File contents:
+    ```
+    AWS_PROFILE_NAME=<insert AWS SSO profile name>
+    MODE=dev
+    ```
+    - 'MODE=dev' activates verbose LLMs and uses the /dev versions of secrets and SSM parameters
 - Create a conda env with the command `conda env create -f environment.yml` from the flask_app directory
 - Activate the environment with `conda activate flaskenv` (or whichever name you chose for the environment)
 - Ensure your AWS profile is logged in via `aws sso login --profile <profile name>`
 - Run `flask --app application --debug run` to run the app in debug mode (specify the port with `-p <port num>`)
 
-**Note:** To run locally (not in AWS), the app will require a .env file under ./flask_app:
-```
-AWS_PROFILE_NAME=<insert AWS SSO profile name>
-```
-
-- Optionally, add 'MODE=dev' for verbose LLMs and to use the /dev versions of secrets and parameters
+### Using PGVector locally
+If using the RDS PGVector to store documents, some setup will be required to access the it while developing locally since the DB is within a VPC.
+- Modify the `.env` file in the root of `/flask_app`
+    - Add these variables:
+        ```
+        EC2_PUBLIC_IP=<insert ip>
+        EC2_USERNAME=<insert username>
+        SSH_PRIV_KEY=bastion-host.pem
+        ```
+    - Also ensure that `MODE=dev` is in the `.env`
+- Add the `bastion-host.pem` file in the root of `/flask_app`
+    - *details about how to get the file*
+- Connect to a VPN within the set of allowed IP addresses for your bastion host
+    - *details about this*
+- Restart the flask app, it should now be able to use the `pgvector` retriever with connection to RDS
 
 ### Building docker container and run locally for the flask app
 
