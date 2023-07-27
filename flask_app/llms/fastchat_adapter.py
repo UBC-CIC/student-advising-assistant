@@ -2,7 +2,7 @@ from langchain.llms.base import BaseLLM, LLM
 from langchain.callbacks.manager import CallbackManagerForLLMRun
 from fastchat.model import get_conversation_template
 from typing import Optional, List, Any
-from prompts.prompts import fastchat_system_detailed
+from prompts import fastchat_system_detailed
 
 default_system_instruction = fastchat_system_detailed
 
