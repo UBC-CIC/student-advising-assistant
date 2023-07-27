@@ -1,10 +1,8 @@
 
 from langchain import PromptTemplate
-from langchain.prompts.few_shot import FewShotPromptTemplate
-from prompts.degree_requirements import few_shot_examples
-import huggingface_qa
 from typing import Dict
 from langchain.output_parsers import BooleanOutputParser
+from llms import query_context_split
 
 ### GENERAL QUERY TRANSORMATIONS
 
@@ -164,19 +162,8 @@ vicuna_qa_template = """
 vicuna_qa_prompt = PromptTemplate(template=vicuna_qa_template, input_variables=["context","question"])
 
 # Template for huggingface endpoints of the 'question answering' type (eg BERT, not text generation)
-huggingface_qa_template = "{question}" + huggingface_qa.query_context_split + "{context}"
+huggingface_qa_template = "{question}" + query_context_split + "{context}"
 huggingface_qa_prompt = PromptTemplate(template=huggingface_qa_template, input_variables=["context","question"])
-
-### FEW-SHOT PROMPTS
-
-few_shot_example_prompt = PromptTemplate(input_variables=["doc", "query", "answer"], template="Evidence:{doc}\nQuestion:{query}\nAnswer:{answer}")
-
-few_shot_prompt = FewShotPromptTemplate(
-    examples=few_shot_examples, 
-    example_prompt=few_shot_example_prompt, 
-    suffix="Evidence:{doc}\nQuestion:{query}\nAnswer:", 
-    input_variables=["doc","query"]
-)
 
 ### OTHER PROMPTS
 
