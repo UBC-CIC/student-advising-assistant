@@ -75,14 +75,13 @@ if not args.compute_embeddings:
 title_sep = ' : ' # separator to use to join titles into strings
 parent_titles = [title_sep.join(doc.metadata['parent_titles']) for doc in docs]
 titles = [title_sep.join(doc.metadata['titles']) for doc in docs]
-combined_titles = [f"{parent_title}{title_sep}{title}" for (title,parent_title) in zip(titles,parent_titles)]
 texts = [doc.page_content for doc in docs]
 
 ### CREATE EMBEDDINGS (DENSE VECTORS)
 
 # Lists of embeddings
-embedding_names = ['parent_title_embeddings', 'title_embeddings', 'combined_title_embeddings', 'document_embeddings']
-embedding_texts = [parent_titles,titles,combined_titles,texts]
+embedding_names = ['parent_title_embeddings', 'title_embeddings', 'document_embeddings']
+embedding_texts = [parent_titles,titles,texts]
 
 # For each embedding, compute the embedding and save to pickle file
 embeddings = {}
