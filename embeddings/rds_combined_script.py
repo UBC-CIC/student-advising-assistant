@@ -51,6 +51,8 @@ parser.add_argument('--no-gpu_available', dest='gpu_available', action='store_fa
 parser.set_defaults(gpu_available=True)
 args = parser.parse_args()
 
+print(args)
+
 ### DOCUMENT LOADING 
 
 # Load the csv of documents from s3

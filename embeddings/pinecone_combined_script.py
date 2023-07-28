@@ -14,6 +14,7 @@ import doc_loader
 import batcher
 from combined_embeddings import concat_embeddings
 import sys
+import argparse
 sys.path.append('..')
 from aws_helpers.param_manager import get_param_manager
 from aws_helpers.s3_tools import download_s3_directory, upload_directory_to_s3
@@ -52,6 +53,8 @@ parser.add_argument('--no-gpu_available', dest='gpu_available', action='store_fa
 parser.set_defaults(gpu_available=True)
 args = parser.parse_args()
 
+print(args)
+
 ### DOCUMENT LOADING 
 
 # Load the csv of documents from s3
@@ -79,7 +82,7 @@ index_dir = 'indexes'
 pinecone_dir = os.path.join(index_dir,'pinecone')
 os.makedirs(pinecone_dir,exist_ok=True)
 
-# Lists of embeddings 
+# Lists of embeddings
 embedding_names = ['parent_title_embeddings', 'title_embeddings', 'combined_title_embeddings', 'document_embeddings']
 embedding_texts = [parent_titles,titles,combined_titles,texts]
 
@@ -92,12 +95,12 @@ if not args.compute_embeddings:
             embeddings[file.stem] = data['embeddings']
             print(f'Loaded embeddings {file.stem}')
 else:
-    os.makedirs(embed_dir,exist_ok=True)
-    
     # Load the base embedding model from huggingface
     device = 'cuda' if args.gpu_available else 'cpu'
     base_embeddings = HuggingFaceEmbeddings(model_name=index_config['base_embedding_model'], model_kwargs={'device': device})
-
+    
+    os.makedirs(embed_dir,exist_ok=True)
+    
     ### Create dense vectors
     for name,content in zip(embedding_names,embedding_texts):
         print(f'Computing {name}')
@@ -217,6 +220,10 @@ def pinecone_upsert_batch(ids, sparse_vectors, dense_vectors, metadatas, texts):
             'metadata': {"context": content, **metadata}, # Include plain text as metadata
             'sparse_values': sparse
         })
+    
+    if len(vectors) == 0:
+        # Ignore an empty batch
+        return 
     
     # Upload the documents to the pinecone index
     pinecone_index.upsert(vectors=vectors, namespace=index_config['namespace'])

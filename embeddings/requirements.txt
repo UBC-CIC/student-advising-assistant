@@ -1,0 +1,15 @@
+# General requirements
+huggingface_hub 
+transformers
+langchain==0.0.240
+pandas
+sentence-transformers
+python-dotenv
+
+# PGVector requirements
+pgvector
+psycopg2-binary
+
+# Pinecone requirements
+pinecone-client
+pinecone-text
