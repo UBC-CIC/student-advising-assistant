@@ -405,7 +405,7 @@ class DocExtractor:
             while tag:
                 replacement = replacement_config['function'](tag, url)
                 tag.replace_with(replacement)
-                tag = replacement.find_next(**tag_attrs)
+                tag = replacement.find_next(**replacement_config['attrs'])
 
         return mainContent
 

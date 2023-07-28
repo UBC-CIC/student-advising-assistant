@@ -44,8 +44,10 @@ def load_retriever(retriever_name: str, dev_mode: bool = False, **kwargs) -> Ret
     secret = param_manager.get_secret(RETRIEVER_SECRETS[retriever_name])
     
     if retriever_name == 'pinecone':
+        print('Using pinecone retriever')
         return PineconeRetriever(secret['PINECONE_KEY'], secret['PINECONE_REGION'], **kwargs)
     elif retriever_name == 'pgvector':
+        print('Using pgvector retriever')
         forwarder_port = None
         if dev_mode:
             # Use an SSH forwarder so that we can connect to the pgvector RDS in a private subnet
