@@ -14,6 +14,7 @@ import doc_loader
 import batcher
 from combined_embeddings import concat_embeddings
 import sys
+import argparse
 sys.path.append('..')
 from aws_helpers.param_manager import get_param_manager
 from aws_helpers.s3_tools import download_s3_directory, upload_directory_to_s3
@@ -217,6 +218,10 @@ def pinecone_upsert_batch(ids, sparse_vectors, dense_vectors, metadatas, texts):
             'metadata': {"context": content, **metadata}, # Include plain text as metadata
             'sparse_values': sparse
         })
+    
+    if len(vectors) == 0:
+        # Ignore an empty batch
+        return 
     
     # Upload the documents to the pinecone index
     pinecone_index.upsert(vectors=vectors, namespace=index_config['namespace'])
