@@ -74,11 +74,7 @@ texts = [doc.page_content for doc in docs]
 
 ### CREATE EMBEDDINGS (DENSE VECTORS)
 
-# Load the base embedding model from huggingface
-device = 'cuda' if args.gpu_available else 'cpu'
-base_embeddings = HuggingFaceEmbeddings(model_name=index_config['base_embedding_model'], model_kwargs={'device': device})
-
-# Lists of embeddings to compute
+# Lists of embeddings
 embedding_names = ['parent_title_embeddings', 'title_embeddings', 'combined_title_embeddings', 'document_embeddings']
 embedding_texts = [parent_titles,titles,combined_titles,texts]
 
@@ -91,6 +87,10 @@ if not args.compute_embeddings:
             embeddings[file.stem] = data['embeddings']
             print(f'Loaded embeddings {file.stem}')
 else:
+    # Load the base embedding model from huggingface
+    device = 'cuda' if args.gpu_available else 'cpu'
+    base_embeddings = HuggingFaceEmbeddings(model_name=index_config['base_embedding_model'], model_kwargs={'device': device})
+
     os.makedirs(embed_dir,exist_ok=True)
     
     ### Create dense vectors
