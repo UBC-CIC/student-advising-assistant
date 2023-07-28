@@ -10,6 +10,7 @@
 .DS_Store
 demo-app*.zip
 freeze_mac_m1.txt
+**.pem
 bastion-host.pem
 
 # Byte-compiled / optimized / DLL files
@@ -28,7 +29,6 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
 lib64/
 parts/
 sdist/
