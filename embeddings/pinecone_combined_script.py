@@ -15,6 +15,7 @@ import batcher
 from combined_embeddings import concat_embeddings
 import sys
 import argparse
+import torch
 sys.path.append('..')
 from aws_helpers.param_manager import get_param_manager
 from aws_helpers.s3_tools import download_s3_directory, upload_directory_to_s3
@@ -50,9 +51,13 @@ parser.add_argument('--no-clear_index', dest='clear_index', action='store_false'
 parser.set_defaults(clear_index=True)
 parser.add_argument('--gpu_available', dest='gpu_available', action='store_true')
 parser.add_argument('--no-gpu_available', dest='gpu_available', action='store_false')
-parser.set_defaults(gpu_available=True)
+parser.set_defaults(gpu_available=False)
+
 args = parser.parse_args()
 
+if not args.gpu_available:
+    torch.set_num_threads(os.cpu_count())
+                    
 ### DOCUMENT LOADING 
 
 # Load the csv of documents from s3
@@ -80,11 +85,7 @@ index_dir = 'indexes'
 pinecone_dir = os.path.join(index_dir,'pinecone')
 os.makedirs(pinecone_dir,exist_ok=True)
 
-# Load the base embedding model from huggingface
-device = 'cuda' if args.gpu_available else 'cpu'
-base_embeddings = HuggingFaceEmbeddings(model_name=index_config['base_embedding_model'], model_kwargs={'device': device})
-
-# Lists of embeddings to compute
+# Lists of embeddings
 embedding_names = ['parent_title_embeddings', 'title_embeddings', 'combined_title_embeddings', 'document_embeddings']
 embedding_texts = [parent_titles,titles,combined_titles,texts]
 
@@ -97,6 +98,14 @@ if not args.compute_embeddings:
             embeddings[file.stem] = data['embeddings']
             print(f'Loaded embeddings {file.stem}')
 else:
+    # Load the base embedding model from huggingface
+    device = 'cuda' if args.gpu_available else 'cpu'
+    base_embeddings = HuggingFaceEmbeddings(model_name=index_config['base_embedding_model'], 
+                                            model_kwargs={'device': device},
+                                           encode_kwargs={
+                                                'show_progress_bar': True,
+                                                'batch_size': 64})
+    
     os.makedirs(embed_dir,exist_ok=True)
     
     ### Create dense vectors
