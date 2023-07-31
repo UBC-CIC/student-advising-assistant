@@ -13,10 +13,14 @@ import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as triggers from "aws-cdk-lib/triggers";
 import { DatabaseStack } from "./database-stack";
 import * as ecsPatterns from "aws-cdk-lib/aws-ecs-patterns";
-import * as events from 'aws-cdk-lib/aws-events';
+import * as events from "aws-cdk-lib/aws-events";
 import * as s3 from "aws-cdk-lib/aws-s3";
 
 export class InferenceStack extends Stack {
+  public readonly psycopg2_layer: lambda.LayerVersion;
+  public readonly lambda_rds_role: iam.Role;
+  public readonly SM_ENDPOINT_NAME: string;
+
   constructor(
     scope: Construct,
     id: string,
@@ -29,18 +33,14 @@ export class InferenceStack extends Stack {
     const vpc = vpcStack.vpc;
 
     // Bucket for files related to inference
-    const inferenceBucket = new s3.Bucket(
-      this,
-      "student-advising-s3bucket",
-      {
-        removalPolicy: RemovalPolicy.DESTROY,
-        autoDeleteObjects: true,
-        versioned: false,
-        publicReadAccess: false,
-        blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-        encryption: s3.BucketEncryption.S3_MANAGED,
-      }
-    );
+    const inferenceBucket = new s3.Bucket(this, "student-advising-s3bucket", {
+      removalPolicy: RemovalPolicy.DESTROY,
+      autoDeleteObjects: true,
+      versioned: false,
+      publicReadAccess: false,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      encryption: s3.BucketEncryption.S3_MANAGED,
+    });
 
     const clusterSg = new ec2.SecurityGroup(this, "cluster-sg", {
       vpc: vpc,
@@ -64,7 +64,7 @@ export class InferenceStack extends Stack {
       iam.ManagedPolicy.fromAwsManagedPolicyName("SecretsManagerReadWrite")
     );
     ecsTaskRole.addManagedPolicy(
-      iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonSSMFullAccess")
+      iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonSSMReadOnlyAccess")
     );
 
     const fargateCluster = new ecs.Cluster(this, "datapipeline-cluster", {
@@ -105,22 +105,25 @@ export class InferenceStack extends Stack {
     });
 
     // Create a scheduled fargate task that runs at 8:00 UTC on the first of every month
-    const scheduledFargateTask = new ecsPatterns.ScheduledFargateTask(this, 'ScheduledFargateTask', {
-      cluster: fargateCluster,
-      scheduledFargateTaskDefinitionOptions: {
-        taskDefinition: ecsTaskDef
-      },
-      securityGroups: [clusterSg],
-      schedule: events.Schedule.cron({
-        minute: '0',
-        hour: '0',
-        month: '*',
-        weekDay: 'SAT'
-      }),
-      subnetSelection: {subnetType: ec2.SubnetType.PRIVATE_ISOLATED},
-    });
+    const scheduledFargateTask = new ecsPatterns.ScheduledFargateTask(
+      this,
+      "ScheduledFargateTask",
+      {
+        cluster: fargateCluster,
+        scheduledFargateTaskDefinitionOptions: {
+          taskDefinition: ecsTaskDef,
+        },
+        securityGroups: [clusterSg],
+        schedule: events.Schedule.cron({
+          minute: "0",
+          hour: "0",
+          month: "*",
+          weekDay: "SAT",
+        }),
+        subnetSelection: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
+      }
+    );
 
-    // this role will be used for both task role and task execution role
     const lambdaRole = new iam.Role(this, "lambda-vpc-role", {
       assumedBy: new iam.ServicePrincipal("lambda.amazonaws.com"),
       description: "Role for all Lambda function inside vpc",
@@ -163,6 +166,7 @@ export class InferenceStack extends Stack {
     lambdaRole.addManagedPolicy(
       iam.ManagedPolicy.fromAwsManagedPolicyName("SSMReadOnlyAccess")
     );
+    this.lambda_rds_role = lambdaRole;
 
     // The layer containing the psycopg2 library
     const psycopg2 = new lambda.LayerVersion(this, "psycopg2", {
@@ -170,6 +174,7 @@ export class InferenceStack extends Stack {
       compatibleRuntimes: [lambda.Runtime.PYTHON_3_9],
       description: "psycopg2 library for connecting to the PostgreSQL database",
     });
+    this.psycopg2_layer = psycopg2;
 
     // Trigger function to set up database
     const triggerLambda = new triggers.TriggerFunction(
@@ -190,22 +195,51 @@ export class InferenceStack extends Stack {
       }
     );
 
-    const storeFeedbackLambda = new lambda.Function(
+    // Role for Sagemaker
+    // this role will be used for both task role and task execution role
+    const smRole = new iam.Role(this, "sagemaker-role", {
+      assumedBy: new iam.ServicePrincipal("sagemaker.amazonaws.com"),
+      description: "Role for Sagemaker to create inference endpoint",
+    });
+    smRole.addManagedPolicy(
+      iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonSagemakerFullAccess")
+    );
+
+    this.SM_ENDPOINT_NAME = "vicuna-7b-inference";
+    const HUGGINGFACE_MODEL_ID = 'lmsys/vicuna-7b-v1.3'
+    const createSMEndpointLambda = new lambda.Function(
       this,
-      "student-advising-store-feedback",
+      "student-advising-create-sm-endpoint",
       {
-        functionName: "student-advising-store-feedback-to-db",
+        functionName: "student-advising-create-sagemaker-endpoint",
         runtime: lambda.Runtime.PYTHON_3_9,
-        handler: "store_feedback_to_db.lambda_handler",
+        handler: "create_sagemaker_endpoint.lambda_handler",
         timeout: Duration.seconds(300),
         memorySize: 512,
         environment: {
-          DB_SECRET_NAME: databaseStack.secretPath,
+          SM_ENDPOINT_NAME: this.SM_ENDPOINT_NAME,
+          SM_REGION: this.region || "us-west-2",
+          SM_ROLE_ARN: smRole.roleArn,
+          HF_MODEL_ID: HUGGINGFACE_MODEL_ID
         },
         vpc: vpcStack.vpc,
-        code: lambda.Code.fromAsset("./lambda/store_feedback"),
-        layers: [psycopg2],
+        vpcSubnets: {
+          subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
+        },
+        code: lambda.Code.fromAsset("./lambda/create_sagemaker_endpoint"),
       }
     );
+    createSMEndpointLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          // CloudWatch Logs
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+        ],
+        resources: ["arn:aws:logs:*:*:*"],
+      })
+    )
   }
 }

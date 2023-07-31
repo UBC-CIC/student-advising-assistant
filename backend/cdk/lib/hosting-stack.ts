@@ -6,6 +6,7 @@ import * as path from "path";
 import { VpcStack } from "./vpc-stack";
 import { DatabaseStack } from "./database-stack";
 import * as lambda from "aws-cdk-lib/aws-lambda";
+import { InferenceStack } from "./inference-stack";
 
 export class HostingStack extends cdk.Stack {
   private readonly zipFilePath: string;
@@ -15,6 +16,7 @@ export class HostingStack extends cdk.Stack {
     id: string,
     vpcStack: VpcStack,
     databaseStack: DatabaseStack,
+    inferenceStack: InferenceStack,
     props?: cdk.StackProps
   ) {
     super(scope, id, props);
@@ -37,7 +39,8 @@ export class HostingStack extends cdk.Stack {
         },
         vpc: vpcStack.vpc,
         code: lambda.Code.fromAsset("./lambda/store_feedback"),
-        layers: [psycopg2],
+        layers: [inferenceStack.psycopg2_layer],
+        role: inferenceStack.lambda_rds_role
       }
     );
 

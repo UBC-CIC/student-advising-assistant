@@ -45,7 +45,7 @@ const inferenceStack = new InferenceStack(app, "InferenceStack", vpcStack, datab
   }
 });
 
-const hostingStack = new HostingStack(app, "HostingStack", vpcStack, {
+const hostingStack = new HostingStack(app, "HostingStack", vpcStack, databaseStack, inferenceStack, {
   env: {
     account: process.env.CDK_DEFAULT_ACCOUNT,
     region: process.env.CDK_DEFAULT_REGION
