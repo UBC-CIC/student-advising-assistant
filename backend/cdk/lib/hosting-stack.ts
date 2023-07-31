@@ -162,7 +162,7 @@ export class HostingStack extends cdk.Stack {
         {
           namespace: "aws:elasticbeanstalk:application:environment",
           optionName: "FEEDBACK_LAMBDA",
-          value: this.region,
+          value: storeFeedbackLambda.functionName,
         },
         {
           namespace: "aws:elasticbeanstalk:cloudwatch:logs",
