@@ -84,8 +84,7 @@ filter, filter_question_fn = llms.load_chain_filter(concise_llm, generator_confi
 compressor = LLMChainExtractor.from_llm(concise_llm)
 
 # Retriever
-#retriever: Retriever = load_retriever(retriever_config['RETRIEVER_NAME'], dev_mode=DEV_MODE, filter_params=['faculty','program'])
-retriever: Retriever = load_retriever('pgvector', dev_mode=DEV_MODE, filter_params=['faculty','program'])
+retriever: Retriever = load_retriever(retriever_config['RETRIEVER_NAME'], dev_mode=DEV_MODE, filter_params=['faculty','program'])
 
 ### UTILITY FUNCTIONS
 
