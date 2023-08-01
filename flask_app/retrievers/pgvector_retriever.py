@@ -17,7 +17,7 @@ class PGVectorRetriever(Retriever):
     # Maximum number of documents to return
     k: int
     
-    def __init__(self, connection_string: str, filter_params = []):
+    def __init__(self, connection_string: str, filter_params: List[str] = [], verbose: bool = False):
         """
         Initialize the RDS PGvector retriever
         - connection_string: connection string for the pgvector DB
@@ -26,7 +26,10 @@ class PGVectorRetriever(Retriever):
                  keys of entries in the program_info dict passed
                  to semantic_search that should be used as a metadata
                  filter when querying pinecone
+        - verbose: set retriever to verbose mode
         """
+        super().__init__(verbose)
+        
         self.filter_params = filter_params
         
         # Load the config file
@@ -60,6 +63,7 @@ class PGVectorRetriever(Retriever):
         else:
             self.retriever.search_type = 'similarity'
             
+        self._output_query_verbose(query_str, kwargs)
         docs = self.retriever.get_relevant_documents(query_str,**kwargs)
         return self._response_converter(docs)
     

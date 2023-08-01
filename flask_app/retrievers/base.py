@@ -23,7 +23,12 @@ class Retriever(ABC):
     # Number of concatenated embeddings
     # Used to prepare query embeddings for retrieval
     num_embed_concats: int
+    # Set the retriever to verbose mode
+    verbose: bool
     
+    def __init__(self, verbose: bool = False):
+        self.verbose = verbose
+        
     @abstractmethod
     def semantic_search(self, program_info: Dict, topic: str, query: str, k = 5, threshold = 0) -> List[Document]:
         """
@@ -52,6 +57,13 @@ class Retriever(ABC):
         """
         pass
 
+    def _output_query_verbose(self, query: str, kwargs: dict):
+        """
+        If in verbose mode, log the query and kwargs to console
+        """
+        if self.verbose:
+            print(f"Querying {self.index_type} retriever: '{query}', {kwargs}")
+            
     @classmethod
     def _load_base_embedding(cls, name: str):
         if name in base_embeddings:

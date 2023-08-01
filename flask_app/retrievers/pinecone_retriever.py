@@ -86,7 +86,8 @@ class PineconeRetriever(Retriever):
     # Namespace to use for all queries to the pinecone index
     namespace: Optional[str] 
     
-    def __init__(self, pinecone_key: str, pinecone_region: str, alpha = 0.4, filter_params = []):
+    def __init__(self, pinecone_key: str, pinecone_region: str, alpha = 0.4, 
+                 filter_params: List[str] = [], verbose: bool = False):
         """
         Initialize the pinecone retriever
         - pinecone_key: API key for pinecone
@@ -99,6 +100,7 @@ class PineconeRetriever(Retriever):
                  to semantic_search that should be used as a metadata
                  filter when querying pinecone
         """
+        super().__init__(verbose)
         self.filter_params = filter_params
         
         # Load the config file
@@ -140,8 +142,11 @@ class PineconeRetriever(Retriever):
         self.set_top_k(k)
         query_str, kwargs = self._query_converter(program_info,topic,query)
         if self.namespace: kwargs['namespace'] = self.namespace
+        
+        self._output_query_verbose(query_str, kwargs)
         docs = self.retriever.get_relevant_documents(query_str,**kwargs)
-        #docs = self._apply_score_threshold(docs, threshold)
+        
+        docs = self._apply_score_threshold(docs, threshold)
         return self._response_converter(docs)
     
     def docs_from_ids(self, doc_ids: List[int]) -> List[Document]:
