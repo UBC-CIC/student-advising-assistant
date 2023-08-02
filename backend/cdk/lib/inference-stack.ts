@@ -292,8 +292,11 @@ export class InferenceStack extends Stack {
       iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonSagemakerFullAccess")
     );
 
-    this.SM_ENDPOINT_NAME = "vicuna-7b-inference";
     const HUGGINGFACE_MODEL_ID = "lmsys/vicuna-7b-v1.3";
+    const MODEL_NAME = "vicuna-7b";
+    const INSTANCE_TYPE = "ml.g5.2xlarge";
+    const NUM_GPUS = 1;
+    this.SM_ENDPOINT_NAME = MODEL_NAME + "-inference";
     const createSMEndpointLambda = new triggers.TriggerFunction(
       this,
       "student-advising-create-sm-endpoint",
@@ -308,6 +311,9 @@ export class InferenceStack extends Stack {
           SM_REGION: this.region || "us-west-2",
           SM_ROLE_ARN: smRole.roleArn,
           HF_MODEL_ID: HUGGINGFACE_MODEL_ID,
+          MODEL_NAME: MODEL_NAME,
+          INSTANCE_TYPE: INSTANCE_TYPE,
+          NUM_GPUS: NUM_GPUS
         },
         vpc: vpcStack.vpc,
         vpcSubnets: {
@@ -328,5 +334,23 @@ export class InferenceStack extends Stack {
         resources: ["arn:aws:logs:*:*:*"],
       })
     );
+
+    // Create the SSM parameter with the string value of the sagemaker inference endpoint name
+    new ssm.StringParameter(this, "SmEndpointNameParameter", {
+      parameterName: "/student-advising/generator/ENDPOINT_NAME",
+      stringValue: this.SM_ENDPOINT_NAME,
+    });
+
+    // Create the SSM parameter with the name of the generator model
+    new ssm.StringParameter(this, "GeneratorModelNameParameter", {
+      parameterName: "/student-advising/generator/MODEL_NAME",
+      stringValue: MODEL_NAME,
+    });
+
+    // Create the SSM parameter with the type of the generator model
+    new ssm.StringParameter(this, "GeneratorModelTypeParameter", {
+      parameterName: "/student-advising/generator/ENDPOINT_TYPE",
+      stringValue: "sagemaker",
+    });
   }
 }

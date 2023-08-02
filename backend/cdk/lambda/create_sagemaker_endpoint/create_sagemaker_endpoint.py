@@ -16,11 +16,15 @@ sm_client = boto3.client("sagemaker", region_name=SM_REGION)
 image_uri = f"763104351884.dkr.ecr.{SM_REGION}.amazonaws.com/huggingface-pytorch-tgi-inference:2.0.0-tgi0.8.2-gpu-py39-cu118-ubuntu20.04"
 
 HF_MODEL_ID = os.environ["HF_MODEL_ID"]
+MODEL_NAME = os.environ["MODEL_NAME"] 
+INSTANCE_TYPE = os.environ["INSTANCE_TYPE"]
+NUM_GPUS = os.environ["NUM_GPUS"]
+SM_ENDPOINT_NAME = os.environ["SM_ENDPOINT_NAME"] # the name of the endpoint that we will create and make request to
 
 # container's env variables (copy from the Jumpstart notebook)
 hub = {
     'HF_MODEL_ID': HF_MODEL_ID,
-	'SM_NUM_GPUS': json.dumps(1),
+	'SM_NUM_GPUS': json.dumps(NUM_GPUS),
     'HF_TASK':'text-generation',
     'MAX_INPUT_LENGTH': json.dumps(1024),  # Max length of input text
     'MAX_TOTAL_TOKENS': json.dumps(2048),  # Max length of the generation (including input text)
@@ -28,13 +32,11 @@ hub = {
     'SAGEMAKER_CONTAINER_LOG_LEVEL': json.dumps(20)
 }
 
-model_name = 'vicuna7b-huggingface' # just an identifier, not the actual full huggingface model card name
+if "HF_API_TOKEN" in os.environ:
+    hub["HF_API_TOKEN"] = os.environ["HF_API_TOKEN"]
 
-endpoint_config_name = 'vicuna7b-endpoint-config' # also just an identifier
-
-instance_type = 'ml.g5.2xlarge'
-
-SM_ENDPOINT_NAME = os.environ["SM_ENDPOINT_NAME"] # the name of the endpoint that we will create and make request to
+model_name = f'{MODEL_NAME}-huggingface' # just an identifier, not the actual full huggingface model card name
+endpoint_config_name = f'{MODEL_NAME}-endpoint-config' # also just an identifier
 
 def lambda_handler(event, context):
     
@@ -61,7 +63,7 @@ def lambda_handler(event, context):
                 {
                     "VariantName": "variant1", # The name of the production variant.
                     "ModelName": model_name, 
-                    "InstanceType": instance_type, # Specify the compute instance type.
+                    "InstanceType": INSTANCE_TYPE, # Specify the compute instance type.
                     "InitialInstanceCount": 1 # Number of instances to launch initially.
                 }
             ]
