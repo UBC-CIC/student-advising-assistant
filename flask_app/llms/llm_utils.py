@@ -55,6 +55,10 @@ def load_model_and_prompt(endpoint_type: str, endpoint_name: str, model_name: st
     """
     Utility function loads a LLM of the given endpoint type and model name, and the QA Prompt
     - endpoint_type: 'sagemaker', 'huggingface', or 'huggingface_qa'
+        - sagemaker: an AWS sagemaker endpoint
+        - huggingface: a huggingface api endpoint for the 'text generation' task
+        - huggingface_qa: a huggingface api endpoint for the 'question answering' task
+                          (eg. a BERT-type model)
     - endpoint_name: huggingface model id, or sagemaker endpoint name
     - model_name: display name of the model
     """
@@ -62,9 +66,12 @@ def load_model_and_prompt(endpoint_type: str, endpoint_name: str, model_name: st
     if endpoint_type == 'sagemaker':
         llm = load_sagemaker_endpoint(endpoint_name)
     elif endpoint_type == 'huggingface':
+        param_manager = get_param_manager()
         os.environ["HUGGINGFACEHUB_API_TOKEN"] = param_manager.get_secret('generator/HUGGINGFACE_API')['API_TOKEN']
         llm = load_huggingface_endpoint(endpoint_name)
     elif endpoint_type == 'huggingface_qa':
+        param_manager = get_param_manager()
+        os.environ["HUGGINGFACEHUB_API_TOKEN"] = param_manager.get_secret('generator/HUGGINGFACE_API')['API_TOKEN']
         llm = load_huggingface_qa_endpoint(endpoint_name)
         
     return llm, load_prompt(endpoint_type, model_name)
