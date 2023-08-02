@@ -13,6 +13,7 @@ import pathlib
 import ast
 import doc_loader
 import batcher
+import torch
 from combined_embeddings import concat_embeddings
 import sys
 import argparse
