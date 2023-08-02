@@ -1,10 +1,7 @@
 import { Stack, StackProps, Duration, RemovalPolicy } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
-import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as iam from "aws-cdk-lib/aws-iam";
-import { ManagedPolicy } from "aws-cdk-lib/aws-iam";
-import { NatProvider } from "aws-cdk-lib/aws-ec2";
 import { VpcStack } from "./vpc-stack";
 import * as ecs from "aws-cdk-lib/aws-ecs";
 import { RetentionDays } from "aws-cdk-lib/aws-logs";
@@ -15,6 +12,9 @@ import { DatabaseStack } from "./database-stack";
 import * as ecsPatterns from "aws-cdk-lib/aws-ecs-patterns";
 import * as events from "aws-cdk-lib/aws-events";
 import * as s3 from "aws-cdk-lib/aws-s3";
+import * as s3n from "aws-cdk-lib/aws-s3-notifications";
+import * as ssm from "aws-cdk-lib/aws-ssm";
+import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
 
 export class InferenceStack extends Stack {
   public readonly psycopg2_layer: lambda.LayerVersion;
@@ -40,6 +40,12 @@ export class InferenceStack extends Stack {
       publicReadAccess: false,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       encryption: s3.BucketEncryption.S3_MANAGED,
+    });
+
+    // Create the SSM parameter with the string value representing the S3 bucket name
+    new ssm.StringParameter(this, "S3BucketNameParameter", {
+      parameterName: "/student-advising/documents/S3_BUCKET_NAME",
+      stringValue: inferenceBucket.bucketName, // Replace 'your-s3-bucket-name' with the actual S3 bucket name
     });
 
     const clusterSg = new ec2.SecurityGroup(this, "cluster-sg", {
@@ -80,11 +86,17 @@ export class InferenceStack extends Stack {
         memoryLimitMiB: 4096,
         taskRole: ecsTaskRole,
         executionRole: ecsTaskRole,
+        runtimePlatform: {
+          operatingSystemFamily: ecs.OperatingSystemFamily.LINUX
+        }
       }
     );
-    ecsTaskDef.addContainer("datapipeline-containers", {
+    const scraping_container = ecsTaskDef.addContainer("datapipeline-scraping", {
       image: ecs.ContainerImage.fromAsset(
-        path.join(__dirname, "..", "..", "..", "document_scraping")
+        path.join(__dirname, "..", "..", ".."),
+        {
+          file: path.join("scraping.Dockerfile"),
+        }
       ),
       logging: ecs.LogDrivers.awsLogs({
         streamPrefix: "student-advising",
@@ -93,16 +105,95 @@ export class InferenceStack extends Stack {
       environment: {
         BUCKET_NAME: inferenceBucket.bucketName,
       },
+      gpuCount: 1,
+    });
+    const embedding_container = ecsTaskDef.addContainer("datapipeline-document-embeddings", {
+      image: ecs.ContainerImage.fromAsset(
+        path.join(__dirname, "..", "..", ".."),
+        {
+          file: path.join("embedding.Dockerfile"),
+        }
+      ),
+      logging: ecs.LogDrivers.awsLogs({
+        streamPrefix: "student-advising",
+        logRetention: RetentionDays.ONE_YEAR,
+      }),
+      // environment: {
+      //   "ECS_ENABLE_GPU_SUPPORT": "true"
+      // }
+    });
+    // only start the embedding container when the scraping container successfully exit without error
+    embedding_container.addContainerDependencies({
+      container: scraping_container,
+      condition: ecs.ContainerDependencyCondition.SUCCESS
     });
 
-    const fargateService = new ecs.FargateService(this, "fargate-service", {
-      cluster: fargateCluster,
-      taskDefinition: ecsTaskDef,
-      securityGroups: [clusterSg],
-      vpcSubnets: {
-        subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
-      },
-    });
+    const startECSTaskLambda = new lambda.Function(
+      this,
+      "student-advising-start-ecs-task",
+      {
+        functionName: "student-advising-start-ecs-task",
+        runtime: lambda.Runtime.PYTHON_3_9,
+        handler: "start-ecs-task.lambda_handler",
+        timeout: Duration.seconds(300),
+        memorySize: 512,
+        environment: {
+          ECS_CLUSTER_NAME: fargateCluster.clusterName,
+          ECS_TASK_ARN: ecsTaskDef.taskDefinitionArn,
+          PRIV_SUBNET: vpcStack.vpc.isolatedSubnets[0].subnetId,
+          SGR: clusterSg.securityGroupId,
+        },
+        vpc: vpcStack.vpc,
+        code: lambda.Code.fromAsset("./lambda/start_ecs_task"),
+      }
+    );
+    startECSTaskLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ["iam:PassRole", "ecs:RunTask"],
+        resources: [
+          ecsTaskRole.roleArn,
+          `arn:aws:ecs:*:${this.account}:task-definition/*:*`,
+        ],
+      })
+    );
+    // S3ReadOnlyAccess
+    startECSTaskLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          "s3:Get*",
+          "s3:List*",
+          "s3-object-lambda:Get*",
+          "s3-object-lambda:List*",
+        ],
+        resources: ["*"],
+      })
+    );
+
+    inferenceBucket.addObjectCreatedNotification(
+      new s3n.LambdaDestination(startECSTaskLambda),
+      {
+        prefix: "document_scraping/dump_config.json5",
+      }
+    );
+
+    // Upload only the dump_config.json5 file instead of entire document_scraping directory
+    const s3Deploy1 = new s3deploy.BucketDeployment(
+      this,
+      "upload-dump-config",
+      {
+        sources: [
+          s3deploy.Source.asset(
+            path.join(__dirname, "..", "..", "..", "document_scraping"),
+            { exclude: ["**", "!dump_config.json5"] }
+          ),
+        ],
+        destinationBucket: inferenceBucket,
+        destinationKeyPrefix: "document_scraping",
+      }
+    );
+    s3Deploy1.node.addDependency(startECSTaskLambda);
 
     // Create a scheduled fargate task that runs at 8:00 UTC on the first of every month
     const scheduledFargateTask = new ecsPatterns.ScheduledFargateTask(
@@ -114,12 +205,8 @@ export class InferenceStack extends Stack {
           taskDefinition: ecsTaskDef,
         },
         securityGroups: [clusterSg],
-        schedule: events.Schedule.cron({
-          minute: "0",
-          hour: "0",
-          month: "*",
-          weekDay: "SAT",
-        }),
+        // CRON: At 01:00 AM, on the first Sunday of the month, only in September, January, and May
+        schedule: events.Schedule.expression("0 0 1 ? SEP,JAN,MAY SUN#1 *"),
         subnetSelection: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
       }
     );
@@ -206,8 +293,8 @@ export class InferenceStack extends Stack {
     );
 
     this.SM_ENDPOINT_NAME = "vicuna-7b-inference";
-    const HUGGINGFACE_MODEL_ID = 'lmsys/vicuna-7b-v1.3'
-    const createSMEndpointLambda = new lambda.Function(
+    const HUGGINGFACE_MODEL_ID = "lmsys/vicuna-7b-v1.3";
+    const createSMEndpointLambda = new triggers.TriggerFunction(
       this,
       "student-advising-create-sm-endpoint",
       {
@@ -220,7 +307,7 @@ export class InferenceStack extends Stack {
           SM_ENDPOINT_NAME: this.SM_ENDPOINT_NAME,
           SM_REGION: this.region || "us-west-2",
           SM_ROLE_ARN: smRole.roleArn,
-          HF_MODEL_ID: HUGGINGFACE_MODEL_ID
+          HF_MODEL_ID: HUGGINGFACE_MODEL_ID,
         },
         vpc: vpcStack.vpc,
         vpcSubnets: {
@@ -240,6 +327,6 @@ export class InferenceStack extends Stack {
         ],
         resources: ["arn:aws:logs:*:*:*"],
       })
-    )
+    );
   }
 }

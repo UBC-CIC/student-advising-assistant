@@ -14,7 +14,7 @@ from program_options_manager import find_program_options
 from dotenv import load_dotenv
 load_dotenv()
 sys.path.append('..')
-from aws_helpers.s3_tools import upload_file_to_s3
+from aws_helpers.s3_tools import upload_file_to_s3, download_single_file
 
 """
 Script to download the data sources using wget, and then split all pages into document extracts for 
@@ -23,7 +23,9 @@ downstream tasks.
 
 ### CONSTANTS
 # Input files
-CONFIG_FILEPATH = 'dump_config.json5' # Filepath to the dump config file
+CONFIG_FILEPATH = 'dump_config.json5' # Filepath to the dump config file in current working dir
+download_single_file(f"document_scraping/{CONFIG_FILEPATH}", CONFIG_FILEPATH)
+
 WGET_EXE_PATH = "wget.exe" # Wget executable used on non-unix systems
 WGET_CONFIG_PATH = 'wget_config.txt' # Config file for wget calls
 

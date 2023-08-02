@@ -1,3 +1,4 @@
+# THIS DOCKERFILE IS USED TO BUILD THE DOCUMENT SCRAPING CONTAINER
 FROM --platform=linux/amd64 public.ecr.aws/docker/library/python:3
 
 WORKDIR /usr/src/app

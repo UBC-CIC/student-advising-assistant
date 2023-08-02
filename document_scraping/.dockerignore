@@ -1,6 +1,3 @@
-# custom
-backend/*
-
 # Ignore common development files and directories
 .git
 .vscode
@@ -10,7 +7,7 @@ backend/*
 
 # Ignore deployment-specific files and directories
 .dockerignore
-*Dockerfile
+Dockerfile
 docker-compose.yml
 
 # Ignore editor-specific files and directories

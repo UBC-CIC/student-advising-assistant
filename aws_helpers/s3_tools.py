@@ -7,7 +7,23 @@ from .param_manager import get_param_manager
 log = logging.getLogger(__name__)
 default_bucket_name = get_param_manager().get_parameter(['documents','S3_BUCKET_NAME'])
 default_client = get_session().client('s3')
-    
+
+def download_single_file(s3_key:str, local_path:str, bucket_name=default_bucket_name,  s3_client=default_client):
+    """
+    Downloads a file from an S3 bucket and saves it to the specified local path.
+
+    Arguments:
+        bucket_name: Name of the S3 bucket.
+        s3_key: S3 object key (path) of the file.
+        local_path: Local path where the file will be saved.
+        s3_client: the boto3 S3 client
+    """
+    try:
+        s3_client.download_file(bucket_name, s3_key, local_path)
+        print(f"File s3://{bucket_name}/{s3_key} downloaded successfully to {local_path}")
+    except Exception as e:
+        print(f"Error downloading file: {e}")
+
 def download_s3_directory(directory: str, s3_client = default_client, output_prefix: str = './', bucket_name: str = default_bucket_name):
     """
     Download a folder from s3
