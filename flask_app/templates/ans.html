@@ -169,44 +169,45 @@
           </div>
         </div>
         {% endfor %}
-
-        <h3 class='mt-5'>Additional References</h3>
-        <p>These references were filtered out and ignored for answer generation, but may still contain relevant information.</p>
-        <div id="removed-docs-accordion" class="accordion">
-          {% for doc in removed_docs %}
-          <div class="accordion-item">
-            <h2 class="accordion-header" id="filtered-heading{{loop.index}}">
-              <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#filtered-collapse{{loop.index}}" aria-expanded="true" aria-controls="filtered-collapse{{loop.index}}">
-                Reference {{docs|length + loop.index}}
-              </button>
-            </h2>
-            <div id="filtered-collapse{{loop.index}}" class="accordion-collapse collapse" aria-labelledby="filtered-heading{{loop.index}}" data-bs-parent="#removed-docs-accordion">
-              <div class="accordion-body">
-                <zero-md>
-                  <template>
-                    <style>
-                      em {
-                        font-style: normal;
-                        background: lightgoldenrodyellow;
-                      }
-                    </style>
-                  </template>
-                  <script type="text/markdown">{{doc.page_content}}</script>
-                </zero-md>
-                {% if 'keep_reason' in doc.metadata %}
-                <strong>Is this document relevant?</strong>
-                <p> {{doc.metadata['keep_reason']}} </p>
-                {% endif %}
-                <strong>Source</strong>
-                {% if 'source' in doc.metadata %}
-                <p> {{doc.metadata['source']}} </p>
-                {% endif %}
-                <p>Url: <a href="{{doc.metadata['url']}}">{{doc.metadata['url']}}</a></p>
+        {% if removed_docs|length > 0 %}
+          <h3 class='mt-5'>Additional References</h3>
+          <p>These references were filtered out and ignored for answer generation, but may still contain relevant information.</p>
+          <div id="removed-docs-accordion" class="accordion">
+            {% for doc in removed_docs %}
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="filtered-heading{{loop.index}}">
+                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#filtered-collapse{{loop.index}}" aria-expanded="true" aria-controls="filtered-collapse{{loop.index}}">
+                  Reference {{docs|length + loop.index}}
+                </button>
+              </h2>
+              <div id="filtered-collapse{{loop.index}}" class="accordion-collapse collapse" aria-labelledby="filtered-heading{{loop.index}}" data-bs-parent="#removed-docs-accordion">
+                <div class="accordion-body">
+                  <zero-md>
+                    <template>
+                      <style>
+                        em {
+                          font-style: normal;
+                          background: lightgoldenrodyellow;
+                        }
+                      </style>
+                    </template>
+                    <script type="text/markdown">{{doc.page_content}}</script>
+                  </zero-md>
+                  {% if 'keep_reason' in doc.metadata %}
+                  <strong>Is this document relevant?</strong>
+                  <p> {{doc.metadata['keep_reason']}} </p>
+                  {% endif %}
+                  <strong>Source</strong>
+                  {% if 'source' in doc.metadata %}
+                  <p> {{doc.metadata['source']}} </p>
+                  {% endif %}
+                  <p>Url: <a href="{{doc.metadata['url']}}">{{doc.metadata['url']}}</a></p>
+                </div>
               </div>
             </div>
+            {% endfor %}
           </div>
-          {% endfor %}
-        </div>
+        {% endif %}
       </section>
     </div>
 </body>
