@@ -1,9 +1,9 @@
-import subprocess
 import platform
 import os
 import sys
 import regex as re
-import pyjson5 as json
+import pyjson5 as json5
+import json
 from subprocess import check_call, STDOUT, CalledProcessError
 import logging
 from typing import Dict, List, Tuple, Any
@@ -115,7 +115,7 @@ def load_config(config_filepath: str) -> Tuple[DocExtractor, List[DumpConfig]]:
     """
     config_json = None
     with open(config_filepath,'r') as f:
-        config_json = json.load(f)
+        config_json = json5.load(f)
         
     doc_extractor = load_general_config(config_json['general_config'])
     dump_configs = []
