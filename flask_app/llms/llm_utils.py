@@ -14,6 +14,7 @@ import prompts
 from filters import VerboseFilter
 from .fastchat_adapter import FastChatLLM
 from .huggingface_qa import HuggingFaceQAEndpoint
+from aws_helpers.param_manager import get_param_manager
 
 ### HELPER CLASSES
 class ContentHandler(LLMContentHandler):
@@ -61,6 +62,7 @@ def load_model_and_prompt(endpoint_type: str, endpoint_name: str, model_name: st
     if endpoint_type == 'sagemaker':
         llm = load_sagemaker_endpoint(endpoint_name)
     elif endpoint_type == 'huggingface':
+        os.environ["HUGGINGFACEHUB_API_TOKEN"] = param_manager.get_secret('generator/HUGGINGFACE_API')['API_TOKEN']
         llm = load_huggingface_endpoint(endpoint_name)
     elif endpoint_type == 'huggingface_qa':
         llm = load_huggingface_qa_endpoint(endpoint_name)

@@ -12,7 +12,6 @@ from langchain import LLMChain
 from langchain.retrievers.document_compressors import LLMChainExtractor
 import regex as re
 from typing import List, Dict, Tuple
-from numpy import isnan
 from retrievers import Retriever, load_retriever
 import copy 
 import json
@@ -35,7 +34,6 @@ min_doc_length = 100
 
 ### LOAD AWS CONFIG
 param_manager = get_param_manager()
-os.environ["HUGGINGFACEHUB_API_TOKEN"] = param_manager.get_secret('generator/HUGGINGFACE_API')['API_TOKEN']
 retriever_config = param_manager.get_parameter('retriever')
 generator_config = param_manager.get_parameter('generator')
 
@@ -86,8 +84,7 @@ filter, filter_question_fn = llms.load_chain_filter(concise_llm, generator_confi
 compressor = LLMChainExtractor.from_llm(concise_llm)
 
 # Retriever
-#retriever: Retriever = load_retriever(retriever_config['RETRIEVER_NAME'], dev_mode=DEV_MODE, filter_params=['faculty','program'])
-retriever: Retriever = load_retriever('pgvector', dev_mode=DEV_MODE, filter_params=['faculty','program'])
+retriever: Retriever = load_retriever(retriever_config['RETRIEVER_NAME'], dev_mode=DEV_MODE, filter_params=['faculty','program'])
 
 ### UTILITY FUNCTIONS
 

@@ -86,8 +86,8 @@ pinecone_dir = os.path.join(index_dir,'pinecone')
 os.makedirs(pinecone_dir,exist_ok=True)
 
 # Lists of embeddings
-embedding_names = ['parent_title_embeddings', 'title_embeddings', 'combined_title_embeddings', 'document_embeddings']
-embedding_texts = [parent_titles,titles,combined_titles,texts]
+embedding_names = ['parent_title_embeddings', 'title_embeddings', 'document_embeddings']
+embedding_texts = [parent_titles,titles,texts]
 
 # For each embedding, compute the embedding and save to pickle file
 embeddings = {}
