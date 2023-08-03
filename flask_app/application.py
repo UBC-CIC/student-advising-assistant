@@ -11,7 +11,7 @@ from feedback import store_feedback
 from typing import List
 
 ### Constants
-FACULTIES_PATH = os.path.join('data','documents','faculties.txt')
+FACULTIES_PATH = os.path.join('data','documents','faculties.json')
 
 ### Globals (set upon load)
 application = Flask(__name__)
