@@ -8,3 +8,4 @@ lxml
 boto3
 pyjson5
 python-dotenv
+dictdiffer
