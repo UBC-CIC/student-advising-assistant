@@ -1,4 +1,4 @@
-import { Stack, StackProps, Duration, RemovalPolicy } from "aws-cdk-lib";
+import { Stack, StackProps, Duration, RemovalPolicy, CfnParameter } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as iam from "aws-cdk-lib/aws-iam";
@@ -15,7 +15,6 @@ import * as s3 from "aws-cdk-lib/aws-s3";
 import * as s3n from "aws-cdk-lib/aws-s3-notifications";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
-
 export class InferenceStack extends Stack {
   public readonly psycopg2_layer: lambda.LayerVersion;
   public readonly lambda_rds_role: iam.Role;
@@ -31,6 +30,13 @@ export class InferenceStack extends Stack {
     super(scope, id, props);
 
     const vpc = vpcStack.vpc;
+
+    // CDK params
+    const retrieverType = new CfnParameter(this, 'port', {
+      description: 'Parameter for the type of retriever to use',
+      default: 'pgvector',
+      allowedValues: ['pgvector', 'pinecone'], // allowed values of the parameter
+    }).valueAsString // get the value of the parameter as string
 
     // Bucket for files related to inference
     const inferenceBucket = new s3.Bucket(this, "student-advising-s3bucket", {
@@ -292,8 +298,8 @@ export class InferenceStack extends Stack {
       iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonSagemakerFullAccess")
     );
 
-    const HUGGINGFACE_MODEL_ID = "lmsys/vicuna-7b-v1.3";
-    const MODEL_NAME = "vicuna-7b";
+    const HUGGINGFACE_MODEL_ID = "lmsys/vicuna-7b-v1.5";
+    const MODEL_NAME = "vicuna";
     const INSTANCE_TYPE = "ml.g5.2xlarge";
     const NUM_GPUS = 1;
     this.SM_ENDPOINT_NAME = MODEL_NAME + "-inference";
@@ -351,6 +357,12 @@ export class InferenceStack extends Stack {
     new ssm.StringParameter(this, "GeneratorModelTypeParameter", {
       parameterName: "/student-advising/generator/ENDPOINT_TYPE",
       stringValue: "sagemaker",
+    });
+
+    // Create the SSM parameter with the type of the retriever
+    new ssm.StringParameter(this, "RetrieverTypeParameter", {
+      parameterName: "/student-advising/retriever/RETRIEVER_TYPE",
+      stringValue: retrieverType,
     });
   }
 }
