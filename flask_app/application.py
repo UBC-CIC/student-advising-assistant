@@ -6,9 +6,8 @@ Simple flask application to demo model inference
 from flask import Flask, request, render_template
 import json
 import os 
-from langchain_inference import run_chain
-from feedback import store_feedback
 from typing import List
+from importlib import reload 
 
 ### Constants
 FACULTIES_PATH = os.path.join('data','documents','faculties.json')
@@ -16,6 +15,8 @@ FACULTIES_PATH = os.path.join('data','documents','faculties.json')
 ### Globals (set upon load)
 application = Flask(__name__)
 faculties = {}
+run_chain = None
+store_feedback = None
 
 def read_text(filename: str, as_json = False):
     result = ''
@@ -40,11 +41,19 @@ def log_question(question: str, context: str, answer: str, reference_ids: List[i
         
 @application.route('/', methods=['GET'])
 def home():
+    if not run_chain:
+        # App is not yet initialized
+        return render_template('not_initialized.html')
+    
     # Render the form template
     return render_template('index.html', faculties=faculties)
 
 @application.route('/answer', methods=['POST'])
 async def answer():
+    if not run_chain:
+        # App is not yet initialized
+        return render_template('not_initialized.html')
+    
     # Submission from the form template
     topic = request.form['topic']
     question = request.form['question']
@@ -86,13 +95,30 @@ async def feedback():
             
     # Render the results
     return render_template('feedback.html')
-    
+
+@application.route('/initialize', methods=['GET'])
 def setup():
+    """
+    Imports files and runs all initial setup of the app
+    Exists as an endpoint so that configuration can be reloaded on demand
+    """
+    global run_chain, store_feedback
+    
+    if not run_chain:
+        import langchain_inference
+        import feedback
+    else:
+        reload(langchain_inference)
+        reload(feedback)
+    
+    run_chain = langchain_inference.run_chain
+    store_feedback = feedback.store_feedback
+    
     # Upon loading, load the available settings for the form
     global faculties, instructions
     faculties = read_text(FACULTIES_PATH,as_json=True)
-
-setup()
+    
+    return "Successfully initialized the system"
 
 # Run the application
 # must be like this to run from container
