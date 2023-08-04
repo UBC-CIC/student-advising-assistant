@@ -78,6 +78,13 @@ export class InferenceStack extends Stack {
     ecsTaskRole.addManagedPolicy(
       iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonSSMReadOnlyAccess")
     );
+    ecsTaskRole.addToPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ["logs:CreateLogGroup"],
+        resources: ["*"],
+      })
+    );
 
     const fargateCluster = new ecs.Cluster(this, "datapipeline-cluster", {
       vpc: vpc,
@@ -88,50 +95,57 @@ export class InferenceStack extends Stack {
       this,
       "datapipeline-taskdef",
       {
-        cpu: 1024,
-        memoryLimitMiB: 4096,
+        cpu: 16384,
+        memoryLimitMiB: 32768,
         taskRole: ecsTaskRole,
         executionRole: ecsTaskRole,
         runtimePlatform: {
-          operatingSystemFamily: ecs.OperatingSystemFamily.LINUX
-        }
+          operatingSystemFamily: ecs.OperatingSystemFamily.LINUX,
+        },
+        family: "scraping-and-embedding-16cpu-32gb"
       }
     );
-    const scraping_container = ecsTaskDef.addContainer("datapipeline-scraping", {
-      image: ecs.ContainerImage.fromAsset(
-        path.join(__dirname, "..", "..", ".."),
-        {
-          file: path.join("scraping.Dockerfile"),
-        }
-      ),
-      logging: ecs.LogDrivers.awsLogs({
-        streamPrefix: "student-advising",
-        logRetention: RetentionDays.ONE_YEAR,
-      }),
-      environment: {
-        BUCKET_NAME: inferenceBucket.bucketName,
-      },
-      gpuCount: 1,
-    });
-    const embedding_container = ecsTaskDef.addContainer("datapipeline-document-embeddings", {
-      image: ecs.ContainerImage.fromAsset(
-        path.join(__dirname, "..", "..", ".."),
-        {
-          file: path.join("embedding.Dockerfile"),
-        }
-      ),
-      logging: ecs.LogDrivers.awsLogs({
-        streamPrefix: "student-advising",
-        logRetention: RetentionDays.ONE_YEAR,
-      }),
-      // environment: {
-      //   "ECS_ENABLE_GPU_SUPPORT": "true"
-      // }
-    });
+    const scraping_container = ecsTaskDef.addContainer(
+      "datapipeline-scraping",
+      {
+        containerName: "scraping-container",
+        image: ecs.ContainerImage.fromAsset(
+          path.join(__dirname, "..", "..", ".."),
+          {
+            file: path.join("scraping.Dockerfile"),
+          }
+        ),
+        logging: ecs.LogDrivers.awsLogs({
+          streamPrefix: "student-advising",
+          logRetention: RetentionDays.ONE_YEAR,
+        }),
+        gpuCount: 1,
+      }
+    );
+    const embedding_container = ecsTaskDef.addContainer(
+      "datapipeline-document-embeddings",
+      {
+        containerName: "embedding-container",
+        image: ecs.ContainerImage.fromAsset(
+          path.join(__dirname, "..", "..", ".."),
+          {
+            file: path.join("embedding.Dockerfile"),
+          }
+        ),
+        logging: ecs.LogDrivers.awsLogs({
+          streamPrefix: "student-advising",
+          logRetention: RetentionDays.ONE_YEAR,
+        }),
+        cpu: 14
+        // environment: {
+        //   "ECS_ENABLE_GPU_SUPPORT": "true"
+        // }
+      }
+    );
     // only start the embedding container when the scraping container successfully exit without error
     embedding_container.addContainerDependencies({
       container: scraping_container,
-      condition: ecs.ContainerDependencyCondition.SUCCESS
+      condition: ecs.ContainerDependencyCondition.SUCCESS,
     });
 
     const startECSTaskLambda = new lambda.Function(

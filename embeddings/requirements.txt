@@ -1,4 +1,5 @@
 # General requirements
+boto3
 huggingface_hub 
 transformers
 langchain==0.0.240
