@@ -15,9 +15,8 @@ sys.path.append('..')
 from flask import Flask, request, render_template
 import json
 import os 
-from langchain_inference import run_chain
-from feedback import store_feedback
 from typing import List
+from importlib import reload 
 from aws_helpers.rds_tools import execute_and_fetch
 
 ### Constants
@@ -28,6 +27,8 @@ DEV_MODE = 'MODE' in os.environ and os.environ.get('MODE') == 'dev'
 application = Flask(__name__)
 faculties = {}
 last_updated_time = None
+run_chain = None
+store_feedback = None
 
 # Helper functions
 def read_text(filename: str, as_json = False):
@@ -66,11 +67,19 @@ def get_last_updated_time():
         
 @application.route('/', methods=['GET'])
 def home():
+    if not run_chain:
+        # App is not yet initialized
+        return render_template('not_initialized.html')
+    
     # Render the form template
     return render_template('index.html', faculties=faculties, last_updated=last_updated_time)
 
 @application.route('/answer', methods=['POST'])
 async def answer():
+    if not run_chain:
+        # App is not yet initialized
+        return render_template('not_initialized.html')
+    
     # Submission from the form template
     topic = request.form['topic']
     question = request.form['question']
@@ -112,14 +121,31 @@ async def feedback():
             
     # Render the results
     return render_template('feedback.html')
-    
+
+@application.route('/initialize', methods=['GET'])
 def setup():
+    """
+    Imports files and runs all initial setup of the app
+    Exists as an endpoint so that configuration can be reloaded on demand
+    """
+    global run_chain, store_feedback
+    
+    if not run_chain:
+        import langchain_inference
+        import feedback
+    else:
+        reload(langchain_inference)
+        reload(feedback)
+    
+    run_chain = langchain_inference.run_chain
+    store_feedback = feedback.store_feedback
+    
     # Upon loading, load the available settings for the form
     global faculties, last_updated_time
     faculties = read_text(FACULTIES_PATH,as_json=True)
     last_updated_time = get_last_updated_time()
-
-setup()
+    
+    return "Successfully initialized the system"
 
 # Run the application
 # must be like this to run from container
