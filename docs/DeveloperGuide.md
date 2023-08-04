@@ -1,27 +1,24 @@
-## Demo App
+# Developer Guide
 
-The repo includes a demo flask app under flask_app, which runs the model for inference.
+### Local Flask app deployment
+Some additional steps are required to deploy the web app locally for development
 
-Prerequisites:
-
-- Requires an S3 bucket containing the processed documents in a 'documents' folder and the document indexes in a 'indexes' folder
-
-### Running the Demo App Locally
-Some setup will be required if you want to run the app locally for development.
-- Create a `.env` file under `/flask_app`
+1. Clone the git repo
+2. Create a `.env` file under `/flask_app`
     - File contents:
     ```
     AWS_PROFILE_NAME=<insert AWS SSO profile name>
     MODE=dev
     ```
-    - 'MODE=dev' activates verbose LLMs and uses the /dev versions of secrets and SSM parameters
-- Create a conda env with the command `conda env create -f environment.yml` from the flask_app directory
-- Activate the environment with `conda activate flaskenv` (or whichever name you chose for the environment)
-- Ensure your AWS profile is logged in via `aws sso login --profile <profile name>`
-- Run `flask --app application --debug run` to run the app in debug mode (specify the port with `-p <port num>`)
+    - `MODE=dev` activates verbose LLMs and uses the `/dev` versions of secrets and SSM parameters
+    - Using dev mode requires creating the dev versions of secrets and SSM parameters, eg `student-advising/generator/ENDPOINT-TYPE` -> `student-advising/dev/generator/ENDPOINT-TYPE`
+2. In `/flask_app`, create a conda environment with the command `conda env create -f environment.yml`
+3. Activate the environment with `conda activate flaskenv` (or whichever name you chose for the environment)
+4. Ensure your AWS profile is logged in via `aws sso login --profile <profile name>` using the same profile name as specified in the `.env` file
+5. Run `flask --app application --debug run` to run the app in debug mode (Optionally, specify the port with `-p <port num>`)
 
 ### Using PGVector locally
-If using the RDS PGVector to store documents, some setup will be required to access the it while developing locally since the DB is within a VPC.
+If using the RDS PGVector to store documents, some setup will be required to access the it while developing locally since the RDS db is hidden within a VPC.
 - Modify the `.env` file in the root of `/flask_app`
     - Add these variables:
         ```
