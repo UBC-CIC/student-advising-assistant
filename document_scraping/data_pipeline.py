@@ -12,9 +12,10 @@ import process_site_dumps
 from website_dump_doc_extractor import DumpConfig, DocExtractor
 from program_options_manager import find_program_options
 from dotenv import load_dotenv
+from dictdiffer import diff, patch
 load_dotenv()
 sys.path.append('..')
-from aws_helpers.s3_tools import upload_file_to_s3, download_single_file
+from aws_helpers.s3_tools import upload_file_to_s3, download_single_file, download_s3_directory
 
 """
 Script to download the data sources using wget, and then split all pages into document extracts for 
@@ -33,6 +34,8 @@ WGET_CONFIG_PATH = 'wget_config.txt' # Config file for wget calls
 BASE_DUMP_PATH = 'site_dumps' # Directory where site dump files are saved
 OUTPUT_PROCESSED_PATH = 'processed' # Directory where processed extracts are saved
 REDIRECT_FILEPATH = os.path.join(BASE_DUMP_PATH,'redirects.txt') # Filepath for dict of redirects
+FACULTIES_UNPRUNED_FILEPATH = os.path.join(OUTPUT_PROCESSED_PATH, "faculties_unpruned.json")
+FACULTIES_FILEPATH = os.path.join(OUTPUT_PROCESSED_PATH, "faculties.json")
 
 # Other constants
 redirect_log_re = re.compile('http[^\n]*(\n[^\n]*){2}301 Moved Permanently\nLocation:\s[^\n\s]*')
@@ -242,6 +245,20 @@ def get_redirects_from_log(log_file, redirects):
 
 ### Main
 
+def load_json_file(filepath: str) -> Dict:
+    # Helper function to read file contents to json
+    with open(filepath) as f:
+        # Use json5, more lenient with trailing commas
+        return json5.load(f)
+    
+def write_json_file(filepath: str, item: Dict):
+    # Helper function to write json to file
+    def writer():
+        with open(filepath,'w') as f: 
+            json.dump(item,f,indent=4)
+    
+    write_file(writer)
+            
 def main(recreate_faculties: bool = False):
     """
     - recreate_faculties: if True, recreates the faculties.txt file
@@ -257,17 +274,40 @@ def main(recreate_faculties: bool = False):
     logging.info(f"System OS: {system_os}")
 
     doc_extractor, dump_configs = load_config(CONFIG_FILEPATH)
-    pull_sites(dump_configs, system_os=system_os, output_folder = BASE_DUMP_PATH, wget_exe_path=WGET_EXE_PATH, wget_config_path=WGET_CONFIG_PATH)
-    process_site_dumps.process_site_dumps(doc_extractor, dump_configs, redirect_map_path=REDIRECT_FILEPATH, out_path=OUTPUT_PROCESSED_PATH)
+    #pull_sites(dump_configs, system_os=system_os, output_folder = BASE_DUMP_PATH, wget_exe_path=WGET_EXE_PATH, wget_config_path=WGET_CONFIG_PATH)
+    #process_site_dumps.process_site_dumps(doc_extractor, dump_configs, redirect_map_path=REDIRECT_FILEPATH, out_path=OUTPUT_PROCESSED_PATH)
 
     # Upload the website_extracts.csv and website_graph.txt
     upload_file_to_s3(os.path.join(OUTPUT_PROCESSED_PATH, "website_extracts.csv"), "documents/website_extracts.csv")
     upload_file_to_s3(os.path.join(OUTPUT_PROCESSED_PATH, "website_graph.txt"), "documents/website_graph.txt")
     
-    if recreate_faculties:
-        find_program_options(os.path.join(OUTPUT_PROCESSED_PATH, "website_extracts.csv"))
-        upload_file_to_s3(os.path.join(OUTPUT_PROCESSED_PATH, "faculties.txt"), "documents/website_graph.txt")
+    # Find the diff between the previous iteration of faculties.json, if the files exist
+    download_s3_directory('documents')
+    old_faculties_diff = None
+    try:
+        old_unpruned_faculties = load_json_file(FACULTIES_UNPRUNED_FILEPATH)
+        old_faculties = load_json_file(FACULTIES_FILEPATH)
+        old_faculties_diff = diff(old_unpruned_faculties,old_faculties)
+    except Exception as e:
+        logging.error('Error while reading faculties files')
+        logging.error(e)
+        
+        # The faculties files don't already exist, the diff is none
+        old_faculties_diff = diff({}, {})
+        
+    # Filter for removal diffs only
+    old_faculties_diff = [(type,key,val) for (type,key,val) in old_faculties_diff if type == 'remove']
+            
+    # Create new faculties json and apply dif
+    new_unpruned_faculties = find_program_options(os.path.join(OUTPUT_PROCESSED_PATH, "website_extracts.csv"))
+    new_pruned_faculties = patch(old_faculties_diff, new_unpruned_faculties)
+    
+    # Upload faculties files
+    write_json_file(FACULTIES_UNPRUNED_FILEPATH,new_unpruned_faculties)
+    write_json_file(FACULTIES_FILEPATH,new_pruned_faculties)
+    upload_file_to_s3(FACULTIES_UNPRUNED_FILEPATH, "documents/faculties_unpruned.json")
+    upload_file_to_s3(FACULTIES_FILEPATH, "documents/faculties.json")
 
 if __name__ == '__main__':
-    main()
+    main(recreate_faculties=True)
  

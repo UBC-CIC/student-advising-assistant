@@ -315,7 +315,7 @@ export class InferenceStack extends Stack {
     const HUGGINGFACE_MODEL_ID = "lmsys/vicuna-7b-v1.5";
     const MODEL_NAME = "vicuna";
     const INSTANCE_TYPE = "ml.g5.2xlarge";
-    const NUM_GPUS = 1;
+    const NUM_GPUS = "1";
     this.SM_ENDPOINT_NAME = MODEL_NAME + "-inference";
     const createSMEndpointLambda = new triggers.TriggerFunction(
       this,
