@@ -3,6 +3,7 @@ import * as elasticbeanstalk from "aws-cdk-lib/aws-elasticbeanstalk";
 import * as s3assets from "aws-cdk-lib/aws-s3-assets";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as path from "path";
+import * as ssm from "aws-cdk-lib/aws-ssm";
 import { VpcStack } from "./vpc-stack";
 import { DatabaseStack } from "./database-stack";
 import * as lambda from "aws-cdk-lib/aws-lambda";
@@ -113,9 +114,10 @@ export class HostingStack extends cdk.Stack {
     );
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const cnamePrefix = "student-advising-demo" // Prefix for the web app's url
     const elbEnv = new elasticbeanstalk.CfnEnvironment(this, "Environment", {
       environmentName: "student-advising-demo-app-env",
-      cnamePrefix: "student-advising-demo",
+      cnamePrefix: cnamePrefix,
       description: "Docker environment for Python Flask application",
       applicationName: app.applicationName || appName,
       solutionStackName: "64bit Amazon Linux 2 v3.5.9 running Docker",
@@ -185,5 +187,16 @@ export class HostingStack extends cdk.Stack {
     });
     // Also very important - make sure that `app` exists before creating an app version
     appVersionProps.addDependency(app);
+
+    // Create the SSM parameter with the url of the elastic beanstalk web app
+    const regionLongName: string = ssm.StringParameter.valueFromLookup(
+      this,
+      `/aws/service/global-infrastructure/regions/${this.region}/longName`
+    );
+
+    new ssm.StringParameter(this, "S3BucketNameParameter", {
+      parameterName: "/student-advising/BEANSTALK_URL",
+      stringValue: cnamePrefix + "." + regionLongName + ".elasticbeanstalk.com",
+    });
   }
 }
