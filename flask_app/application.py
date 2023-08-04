@@ -3,21 +3,34 @@
 Simple flask application to demo model inference
 """
 
+# Loads env variable when running locally
+from dotenv import load_dotenv
+load_dotenv()
+
+## Add parent directory to path for aws_helpers
+import sys
+sys.path.append('..')
+
+# Imports
 from flask import Flask, request, render_template
 import json
 import os 
 from typing import List
 from importlib import reload 
+from aws_helpers.rds_tools import execute_and_fetch
 
 ### Constants
 FACULTIES_PATH = os.path.join('data','documents','faculties.json')
+DEV_MODE = 'MODE' in os.environ and os.environ.get('MODE') == 'dev'
 
 ### Globals (set upon load)
 application = Flask(__name__)
 faculties = {}
+last_updated_time = None
 run_chain = None
 store_feedback = None
 
+# Helper functions
 def read_text(filename: str, as_json = False):
     result = ''
     with open(filename) as f:
@@ -38,6 +51,19 @@ def log_question(question: str, context: str, answer: str, reference_ids: List[i
     except Exception as e:
         # Handle any exceptions that occur during the Lambda invocation
         print(f"ERROR occurs when submitting the feedback to the database: {e}")
+
+def get_last_updated_time():
+    """
+    Get the last time documents were updated from the RDS table
+    Return as a formatted datetime
+    """
+    sql = """
+        SELECT datetime
+        FROM update_logs 
+        ORDER BY id DESC 
+        LIMIT 1"""
+    result = execute_and_fetch(sql, dev_mode=DEV_MODE)
+    return result[0][0].strftime("%m/%d/%Y, %H:%M:%S (UTC)")
         
 @application.route('/', methods=['GET'])
 def home():
@@ -46,7 +72,7 @@ def home():
         return render_template('not_initialized.html')
     
     # Render the form template
-    return render_template('index.html', faculties=faculties)
+    return render_template('index.html', faculties=faculties, last_updated=last_updated_time)
 
 @application.route('/answer', methods=['POST'])
 async def answer():
@@ -75,7 +101,7 @@ async def answer():
     # Render the results
     return render_template('ans.html',question=question,context=context_str,docs=docs,
                            form=request.form.to_dict(), main_response=main_response, alerts=alerts,
-                           removed_docs=removed_docs)
+                           removed_docs=removed_docs, last_updated=last_updated_time)
 
 @application.route('/feedback', methods=['POST'])
 async def feedback():
@@ -115,8 +141,9 @@ def setup():
     store_feedback = feedback.store_feedback
     
     # Upon loading, load the available settings for the form
-    global faculties, instructions
+    global faculties, last_updated_time
     faculties = read_text(FACULTIES_PATH,as_json=True)
+    last_updated_time = get_last_updated_time()
     
     return "Successfully initialized the system"
 
