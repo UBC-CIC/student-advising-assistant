@@ -86,6 +86,10 @@
               <span class="input-group-text">Specialization</span>
               <input type="search" id="specialization" class="form-control" name="specialization"
                 list="specialization_list" placeholder="All Specializations" autocomplete="off">
+              <small id="specialization-help-block" class="form-text text-muted">
+                Including the 'specialization' field will make the system search for information matching the specialization.
+                For more general questions, you may find better results by leaving this blank.
+              </small>
               <datalist id="specialization_list">
                 {% for faculty in faculties.keys() %}
                 {% for program in faculties[faculty]['programs'].keys() %}
@@ -102,6 +106,10 @@
               <span class="input-group-text">Year Level</span>
               <input type="search" id="year" class="form-control" name="year" list="year_list" placeholder="All Years"
                 autocomplete="off">
+                <small id="year-help-block" class="form-text text-muted">
+                  Including the 'year level' field will make the system search for information matching the year level.
+                  For more general questions, you may find better results by leaving this blank.
+                </small>
               <datalist id="year_list">
                 {% for year in ["First Year","Second Year","Third Year","Fourth Year","Fifth Year"] %}
                 <option value="{{year}}">{{year}}</option>

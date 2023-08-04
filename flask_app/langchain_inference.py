@@ -375,5 +375,3 @@ async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=Non
         alerts.append(f"Did not find answer specific to {', '.join([program_info[key] for key in ignored_keys])}")
     
     return docs, main_response, alerts, removed_docs
-
-backoff_retrieval(retriever,{'faculty': 'The Faculty of Science', 'program': 'Bachelor of Science','specialization':'Major Computer Science'},'','Can I take math 120 instead of math 100?',do_filter=True)
