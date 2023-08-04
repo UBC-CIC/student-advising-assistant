@@ -32,7 +32,7 @@ export class InferenceStack extends Stack {
     const vpc = vpcStack.vpc;
 
     // CDK params
-    const retrieverType = new CfnParameter(this, 'port', {
+    const retrieverType = new CfnParameter(this, 'retriever', {
       description: 'Parameter for the type of retriever to use',
       default: 'pgvector',
       allowedValues: ['pgvector', 'pinecone'], // allowed values of the parameter
