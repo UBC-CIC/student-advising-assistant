@@ -10,3 +10,4 @@ pinecone-client
 pinecone-text
 boto3
 fschat
+sshtunnel

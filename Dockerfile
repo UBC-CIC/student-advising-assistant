@@ -1,5 +1,8 @@
 # THIS DOCKERFILE IS USED TO BUILD THE FLASK APP
-FROM --platform=linux/amd64 public.ecr.aws/docker/library/python:3
+# FROM --platform=linux/amd64 public.ecr.aws/docker/library/python:3
+FROM --platform=linux/amd64 python:slim
+
+RUN pip install --upgrade pip
 
 # Sets the working directory inside the container to /usr/src/app
 WORKDIR /usr/src/app

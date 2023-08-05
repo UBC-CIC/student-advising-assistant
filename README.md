@@ -68,7 +68,7 @@ Make sure you're in the root directory (`student-advising-assistant/`)and have D
 
 To build the container, replace `image-name` with the image name of your choice:
 
-```docker
+```bash
 docker build . -t <image-name>:latest
 ```
 
@@ -76,7 +76,7 @@ Run the container:
 
 Here we're mounting the aws credentials directory so that the container have access to the aws cli profiles
 
-```docker
+```bash
 docker run -v ${HOME}/.aws/credentials:/root/.aws/credentials:ro --env-file .env -d -p <localhost-port>:5000 <image-name>:latest
 ```
 
