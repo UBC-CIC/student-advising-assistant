@@ -1,5 +1,4 @@
 from langchain.docstore.document import Document
-from langchain import LLMChain
 from langchain.retrievers.document_compressors import LLMChainExtractor
 import regex as re
 from typing import List, Dict, Tuple
@@ -20,8 +19,8 @@ VERBOSE_LLMS = DEV_MODE
 GRAPH_FILEPATH = os.path.join('data','documents','website_graph.txt')
 
 ### CONSTANTS
-# Remove documents below a certain character length - helps with some LLM hallucinations
-min_doc_length = 100
+MIN_DOC_LENGTH = 100 # Remove documents below a certain character length - helps with some LLM hallucinations
+MAX_TOKENS = 900 # Max input tokens
 
 ### LOAD AWS CONFIG
 param_manager = get_param_manager()
@@ -67,7 +66,7 @@ concise_llm = llms.load_fastchat_adapter(base_llm, generator_config['MODEL_NAME'
 detailed_llm = llms.load_fastchat_adapter(base_llm, generator_config['MODEL_NAME'], prompts.fastchat_system_detailed)
 
 # Chains
-spell_correct_chain = LLMChain(llm=concise_llm,prompt=prompts.spelling_correction_prompt)
+spell_correct_chain = llms.load_spell_chain(base_llm, generator_config['MODEL_NAME'])
 combine_documents_chain = load_qa_chain(llm=detailed_llm, chain_type="stuff", prompt=qa_prompt)
 
 # Document compressors
@@ -75,7 +74,8 @@ filter, filter_question_fn = llms.load_chain_filter(concise_llm, generator_confi
 compressor = LLMChainExtractor.from_llm(concise_llm)
 
 # Retriever
-retriever: Retriever = load_retriever(retriever_config['RETRIEVER_NAME'], dev_mode=DEV_MODE, filter_params=['faculty','program'])
+retriever: Retriever = load_retriever(retriever_config['RETRIEVER_NAME'], dev_mode=DEV_MODE, 
+                                      verbose=VERBOSE_LLMS)
 
 ### UTILITY FUNCTIONS
 
@@ -220,7 +220,13 @@ def backoff_retrieval(retriever: Retriever, program_info: Dict, topic: str, quer
                  the threshold range depends on the scoring function of the chosen retriever
     - do_filter: If true, performs an LLM filter step on returned documents
     """ 
-    backoff_order = [['specialization','year'],['program'],['faculty']] # order of filter elements to remove
+    backoff_order = [['specialization','year'],['program'],['faculty']] 
+    # ^ order of context elements to remove
+    metadata_filter_keys = ['program','faculty']
+    # ^ these keys will be included in the metadata filter when the value is not empty
+    metadata_filter_when_empty = ['specialization','program','faculty'] 
+    # ^ these keys will be included in the metadata filter when the value is empty
+    
     program_info_copy = copy.copy(program_info) # copy the dict since elements will be popped
     docs = []
     removed_docs = []
@@ -228,17 +234,26 @@ def backoff_retrieval(retriever: Retriever, program_info: Dict, topic: str, quer
     backoff_index = 0
     removed_keys = []
     while len(docs) == 0 and backoff_index < len(backoff_order):
+        # Prepare the metadata filter
+        filter = {}
+        nonfiltered_program_info = copy.copy(program_info_copy)
+        for key, val in program_info_copy.items():
+            if (key in metadata_filter_keys and val is not None and val != '') or \
+               (key in metadata_filter_when_empty and val == ''):
+                filter[key] = val
+                nonfiltered_program_info.pop(key)
+        
         # Perform search
-        docs = retriever.semantic_search(program_info_copy, topic, query, k=k)
+        docs = retriever.semantic_search(filter, nonfiltered_program_info, topic, query, k=k)
         
         # Prefilter documents that are too short
         # Some LLMs will hallucinate if the document content is empty
-        docs = [doc for doc in docs if len(doc.page_content) >= min_doc_length]
+        docs = [doc for doc in docs if len(doc.page_content) >= MIN_DOC_LENGTH]
         
         # Filter docs
         docs_for_llms(docs)
         if do_filter: 
-            docs, removed = llm_filter_docs(docs, program_info_copy, topic, query, return_removed=True)
+            docs, removed = llm_filter_docs(docs, nonfiltered_program_info, topic, query, return_removed=True)
             removed_docs += removed
     
         if len(docs) > 0: 
@@ -249,7 +264,7 @@ def backoff_retrieval(retriever: Retriever, program_info: Dict, topic: str, quer
         # Find the next key(s) that can be removed from the program info
         while not has_key and backoff_index < len(backoff_order):
             for key in backoff_order[backoff_index]:
-                if key in program_info_copy:
+                if key in program_info_copy and program_info_copy[key] != '':
                     # Remove the key from the filter and redo search
                     program_info_copy[key] = ''
                     has_key = True
@@ -260,11 +275,22 @@ def backoff_retrieval(retriever: Retriever, program_info: Dict, topic: str, quer
         if not has_key:
             # No key left to remove, break loop
             break
-            
-    return docs[:min(len(docs),k)], removed_keys, removed_docs
+    
+    if len(docs) > k:
+        # If there are extra relevant docs beyond k, move them
+        # to removed docs
+        removed_docs = docs[k:] + removed_docs
+        docs = docs[:k+1]
+        
+    # If any docs in removed_docs were included in the docs in a later iteration,
+    # don't include them in removed_docs
+    doc_ids = [doc.metadata['doc_id'] for doc in docs]
+    removed_docs = [doc for doc in removed_docs if doc.metadata['doc_id'] not in doc_ids]
+    return docs, removed_keys, removed_docs
 
 async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=None,
-                    combine_with_sibs:bool=False, spell_correct:bool=True, do_filter:bool=True, compress:bool=False, 
+                    combine_with_sibs:bool=False, spell_correct:bool=True, 
+                    do_filter:bool=True, compress:bool=False, 
                     generate_by_document:bool=False,
                     generate_combined:bool=True, k:int=3):
 
@@ -316,11 +342,17 @@ async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=Non
     if generate_combined:
         input_docs = compressed_docs if compressed_docs else docs
         if len(input_docs) > 0:
+            print(combine_documents_chain.prompt_length(input_docs, question=llm_query))
+            while combine_documents_chain.prompt_length(input_docs, question=llm_query) > MAX_TOKENS:
+                print(combine_documents_chain.prompt_length(input_docs, question=llm_query))
+                last_doc = input_docs[-1]
+                removed_docs.insert(0,last_doc)
+                input_docs.remove(last_doc)
             combined_answer = combine_documents_chain.run(input_documents=input_docs, question=llm_query)
             main_response = combined_answer
     
     for doc in docs:    
-        # Generate a response from this document only, if the option is turned on
+        # Generate a response from this document onlys, if the option is turned on
         if generate_by_document:
             generated = detailed_llm.run(doc=doc,query=query)
             doc.metadata['generated_response'] = generated

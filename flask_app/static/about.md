@@ -1,3 +1,3 @@
-- Ask Cali is a tool that leverages Large Language Models to search through the Academic Calendar and the Science Students site for sections relevant to a query.
+- Ask Cali is a tool that leverages Large Language Models to search through the UBC Academic Calendar and the Science Students site for sections relevant to a query.
 - As an experimental feature, it also uses Generative AI to generate a response to your query, given the retrieved website sections as context.
 - There is the potential for bias and/or inaccuracy with the generative feature, so please use it with caution. Information from the generative response does not supercede senate approved policy or other official UBC documentation.

@@ -172,8 +172,9 @@
               {% endif %}
             </div>
           </div>
-          {% endfor %}
-
+        </div>
+        {% endfor %}
+        {% if removed_docs|length > 0 %}
           <h3 class='mt-5'>Additional References</h3>
           <p>These references were filtered out and ignored for answer generation, but may still contain relevant information.</p>
           <div id="removed-docs-accordion" class="accordion">
@@ -211,9 +212,9 @@
             </div>
             {% endfor %}
           </div>
-        </section>
-      </div>
-    </main>
+        {% endif %}
+      </section>
+    </div>
 </body>
 
 <script type="text/javascript">

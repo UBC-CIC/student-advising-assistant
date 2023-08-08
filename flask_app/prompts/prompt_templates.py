@@ -1,6 +1,6 @@
 
 from langchain import PromptTemplate
-from typing import Dict
+from typing import Dict, Optional
 from langchain.output_parsers import BooleanOutputParser
 from llms import query_context_split
 
@@ -38,13 +38,12 @@ def llm_query(program_info: Dict, topic: str, query: str):
 
 fastchat_system_concise = """
 A chat between a user and an artificial intelligence assistant.
-The assistant is for the University of British Columiba (UBC). 
+The assistant is for the University of British Columbia (UBC). 
 The assistant follows instructions precisely and gives concise answers."""
 
 fastchat_system_detailed = """
 A chat between a University of British Columbia (UBC) student and an artificial intelligence assistant. 
-The assistant gives helpful, detailed, and polite answers to the user's questions.
-The assistant only uses the context provided in each message to answer questions, and no other information."""
+The assistant gives helpful, detailed, and polite answers to the user's questions."""
 
 ### FILTER PROMPTS
 
@@ -53,7 +52,10 @@ class FlexibleBooleanOutputParser(BooleanOutputParser):
     Boolean output parser that only requires the output to contain
     the boolean value, not to exactly match.
     Preferences towards the first mentioned value.
+    If a default value is defined, then returns this if no boolean value found.
     """
+    default_val: Optional[bool] = None
+    
     def parse(self, text: str) -> bool:
         """Parse the output of an LLM call to a boolean.
 
@@ -74,6 +76,8 @@ class FlexibleBooleanOutputParser(BooleanOutputParser):
             return True
         elif false_val in cleaned_text.upper():
             return False
+        elif self.default_val is not None:
+            return self.default_val
         else:
             raise ValueError(
                 f"BooleanOutputParser expected output value to either be "
@@ -119,13 +123,14 @@ def basic_filter_question_str(program_info: Dict, topic: str, query: str) -> str
     """
     return llm_query(program_info, topic, query)
 
-filter_template = """
+default_filter_template = """
 Given the following question and document, return YES if the document contains the answer to the question, and NO otherwise.
 If the question and the document refer to different programs or year levels, answer NO.
 > Question: {question}
 > Document: {context}
 """
-filter_prompt = PromptTemplate(template=filter_template, input_variables=["question","context"], output_parser=VerboseFlexibleBooleanOutputParser())
+default_filter_prompt = PromptTemplate(template=default_filter_template, input_variables=["question","context"], 
+                               output_parser=VerboseFlexibleBooleanOutputParser(default_val=False))
 
 def vicuna_filter_question_str(program_info: Dict, topic: str, query: str) -> str:
     """
@@ -135,17 +140,19 @@ def vicuna_filter_question_str(program_info: Dict, topic: str, query: str) -> st
     context_str = filter_context_str(program_info, topic)
     
     if context_str:
-        question_str += f'If the document is not about {context_str}, say no.'
+        question_str += f'If the context is not about {context_str}, then say no and explain why the context is not relevant.'
         
     question_str += f'\n> Question: {query}\n'
     return question_str
 
 vicuna_filter_template = """
-Does the document below contain information that helps answer the following question?
+Does the context below contain information that answers the following question?
+Only use information directly present in the context.
 {question}
-> Document: {context}
+> Context: {context}
 """
-vicuna_filter_prompt = PromptTemplate(template=vicuna_filter_template, input_variables=["question","context"], output_parser=VerboseFlexibleBooleanOutputParser())
+vicuna_filter_prompt = PromptTemplate(template=vicuna_filter_template, input_variables=["question","context"], 
+                                      output_parser=VerboseFlexibleBooleanOutputParser(default_val=False))
 
 ### QA PROMPTS
 
@@ -155,8 +162,9 @@ default_qa_prompt = PromptTemplate(template=default_qa_template, input_variables
 
 # Template for Vicuna question answering
 vicuna_qa_template = """
-    Please answer the question based on the context below. Only use information present in the context. If you don't have
-    enough information to answer, say 'There is not enough information to answer'.\n
+    Please answer the question based on the context below.
+    Use only the context provided to answer the question, and no other information.
+    If the context doesn't have enough information to answer, explain what information is missing.\n
     Context:{context}\n
     Question:{question}""".strip()
 vicuna_qa_prompt = PromptTemplate(template=vicuna_qa_template, input_variables=["context","question"])
@@ -167,9 +175,17 @@ huggingface_qa_prompt = PromptTemplate(template=huggingface_qa_template, input_v
 
 ### OTHER PROMPTS
 
-spelling_correction_template = """
-Please correct the grammar and spelling errors in the following text. Do not respond to the question, only return the corrected version of the text.
-
+default_spelling_correction_template = """
+Please correct the grammar and spelling errors in the following text. 
+Return only the corrected version of the text, do not respond to the question and do not include any annotation.
+>>> Input:
 {text}
 """
-spelling_correction_prompt = PromptTemplate(template=spelling_correction_template, input_variables=["text"])
+default_spelling_correction_prompt = PromptTemplate(template=default_spelling_correction_template, input_variables=["text"])
+
+falcon_spelling_correction_template = """
+You are a spell correction tool. Correct any spelling and grammar mistakes in the following text:
+{text}
+Corrected version:
+"""
+falcon_spelling_correction_prompt = PromptTemplate(template=falcon_spelling_correction_template, input_variables=["text"])
