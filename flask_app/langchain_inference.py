@@ -8,7 +8,6 @@ sys.path.append('..')
 
 # Imports
 from langchain.docstore.document import Document
-from langchain import LLMChain
 from langchain.retrievers.document_compressors import LLMChainExtractor
 import regex as re
 from typing import List, Dict, Tuple
@@ -29,8 +28,8 @@ VERBOSE_LLMS = DEV_MODE
 GRAPH_FILEPATH = os.path.join('data','documents','website_graph.txt')
 
 ### CONSTANTS
-# Remove documents below a certain character length - helps with some LLM hallucinations
-min_doc_length = 100
+MIN_DOC_LENGTH = 100 # Remove documents below a certain character length - helps with some LLM hallucinations
+MAX_TOKENS = 900 # Max input tokens
 
 ### LOAD AWS CONFIG
 param_manager = get_param_manager()
@@ -76,7 +75,7 @@ concise_llm = llms.load_fastchat_adapter(base_llm, generator_config['MODEL_NAME'
 detailed_llm = llms.load_fastchat_adapter(base_llm, generator_config['MODEL_NAME'], prompts.fastchat_system_detailed)
 
 # Chains
-spell_correct_chain = LLMChain(llm=concise_llm,prompt=prompts.spelling_correction_prompt)
+spell_correct_chain = llms.load_spell_chain(base_llm, generator_config['MODEL_NAME'])
 combine_documents_chain = load_qa_chain(llm=detailed_llm, chain_type="stuff", prompt=qa_prompt)
 
 # Document compressors
@@ -258,7 +257,7 @@ def backoff_retrieval(retriever: Retriever, program_info: Dict, topic: str, quer
         
         # Prefilter documents that are too short
         # Some LLMs will hallucinate if the document content is empty
-        docs = [doc for doc in docs if len(doc.page_content) >= min_doc_length]
+        docs = [doc for doc in docs if len(doc.page_content) >= MIN_DOC_LENGTH]
         
         # Filter docs
         docs_for_llms(docs)
@@ -352,11 +351,17 @@ async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=Non
     if generate_combined:
         input_docs = compressed_docs if compressed_docs else docs
         if len(input_docs) > 0:
+            print(combine_documents_chain.prompt_length(input_docs, question=llm_query))
+            while combine_documents_chain.prompt_length(input_docs, question=llm_query) > MAX_TOKENS:
+                print(combine_documents_chain.prompt_length(input_docs, question=llm_query))
+                last_doc = input_docs[-1]
+                removed_docs.insert(0,last_doc)
+                input_docs.remove(last_doc)
             combined_answer = combine_documents_chain.run(input_documents=input_docs, question=llm_query)
             main_response = combined_answer
     
     for doc in docs:    
-        # Generate a response from this document only, if the option is turned on
+        # Generate a response from this document onlys, if the option is turned on
         if generate_by_document:
             generated = detailed_llm.run(doc=doc,query=query)
             doc.metadata['generated_response'] = generated

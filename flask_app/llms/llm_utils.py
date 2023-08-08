@@ -3,7 +3,7 @@
 Utility functions for loading LLMs and associated prompts
 """
 
-from langchain import HuggingFaceHub, SagemakerEndpoint, Prompt
+from langchain import HuggingFaceHub, Prompt, LLMChain
 from langchain.llms import BaseLLM
 from langchain.llms.sagemaker_endpoint import LLMContentHandler
 from langchain.retrievers.document_compressors import LLMChainFilter
@@ -14,6 +14,7 @@ import prompts
 from filters import VerboseFilter
 from .fastchat_adapter import FastChatLLM
 from .huggingface_qa import HuggingFaceQAEndpoint
+from .sagemaker_endpoint import MySagemakerEndpoint
 from aws_helpers.param_manager import get_param_manager
 
 ### HELPER CLASSES
@@ -38,6 +39,7 @@ class ContentHandler(LLMContentHandler):
 
 fastchat_models = {
     'vicuna': 'vicuna_v1.1',
+    'falcon': 'falcon'
 }
 
 def load_fastchat_adapter(base_llm: BaseLLM, model_name: str, system_instruction: str) -> BaseLLM:
@@ -96,7 +98,7 @@ def load_sagemaker_endpoint(endpoint_name: str) -> BaseLLM:
     """
     content_handler = ContentHandler()
     credentials_profile = os.environ["AWS_PROFILE_NAME"] if "AWS_PROFILE_NAME" in os.environ else None
-    llm = SagemakerEndpoint(
+    llm = MySagemakerEndpoint(
         endpoint_name=endpoint_name,
         credentials_profile_name=credentials_profile,
         region_name="us-west-2", 
@@ -131,5 +133,20 @@ def load_chain_filter(base_llm: BaseLLM, model_name: str) -> Tuple[LLMChainFilte
     """
     if model_name == 'vicuna':
         return VerboseFilter.from_llm(base_llm,prompt=prompts.vicuna_filter_prompt), prompts.vicuna_filter_question_str
+    elif model_name == 'falcon':
+        return VerboseFilter.from_llm(base_llm,prompt=prompts.vicuna_filter_prompt), prompts.vicuna_filter_question_str
     else:
-        return VerboseFilter.from_llm(base_llm,prompt=prompts.filter_prompt), prompts.basic_filter_question_str
+        return VerboseFilter.from_llm(base_llm,prompt=prompts.default_filter_prompt), prompts.basic_filter_question_str
+    
+def load_spell_chain(base_llm: BaseLLM, model_name: str) -> LLMChain:
+    """
+    Loads a spelling correction chain using the given base llm
+    Chooses a prompts based on the model name
+    Returns: A LLMChain for spelling correction
+    """
+    prompt = prompts.default_spelling_correction_prompt
+    
+    if model_name == 'falcon':
+        prompt = prompts.falcon_spelling_correction_prompt
+        
+    return LLMChain(llm=base_llm,prompt=prompt)
