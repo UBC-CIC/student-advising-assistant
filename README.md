@@ -31,6 +31,48 @@ For instructions on how to navigate the web app interface, refer to the [Web App
 
 For instructions on how to develop the application, refer to the [Developer Guide](docs/DeveloperGuide.md).
 
+## Directories
+
+```
+├───aws_helpers
+├───backend
+│   └───cdk
+│       ├───bin
+│       ├───lambda
+│       │   ├───start_ecs
+│       │   ├───store_feedback
+│       │   └───trigger_lambda
+│       ├───layers
+│       ├───lib
+│       └───test
+├───document_scraping
+├───embeddings
+└───flask_app
+    ├───documents
+    ├───embeddings
+    ├───filters
+    ├───llms
+    ├───prompts
+    ├───retrievers
+    ├───static
+    └───templates
+```
+1. `/aws_helpers`: Contains utilities classes / functions for connecting to AWS Services, used across the other portions of the app
+2. `/backend/cdk`: Contains the deployment code for the app's AWS infrastructure
+    - `/lambda`: Contains the scripts for all lambda functions
+    - `/lib`: Contains the deployment code for all 4 stacks of the infrastructre
+3. `/document_scraping`: Contains the scripts that run to scrape text from the information source websites
+4. `/embeddings`: Contains the scripts that convert the scraped texts to embeddings, then uploads them to the vectorstore
+5. `/flask_app`: Contains the inference and user interface code for the prototype question answering system
+    - `/documents`: Functions relating to document loading
+    - `/embeddings`: Classes relating to embeddings
+    - `/filters`: Classes relating to document filters
+    - `/llms`: Classes relating to LLMs, adapters to connect to LLMs, and helpers to load LLMs
+    - `/prompts`: Prompt template definitions
+    - `/retrievers`: Retriever classes for PGVector and Pinecone
+    - `/static`: Static web content as .md or .json
+    - `/templates`: HTML files with Jinja2 templates for the web app's pages
+
 ## Changelog
 N/A
 
