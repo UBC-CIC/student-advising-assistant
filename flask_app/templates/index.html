@@ -154,6 +154,9 @@
     </div>
   </main>
   <script type="text/javascript">
+    let default_faculty = "{{defaults['faculty']}}"
+    let default_program = "{{defaults['program']}}"
+
     // <![CDATA[
     function preloader() {
       $('#question-form').on('submit', function (e) {
@@ -195,10 +198,10 @@
         });
       });
 
-      $("#faculty").val('The Faculty of Science');
+      $("#faculty").val(default_faculty);
       $('#faculty').trigger('change');
 
-      $("#program").val('Bachelor of Science');
+      $("#program").val(default_program);
       $('#program').trigger('change');
 
       $('.has-clear input[type="text"]').on('input propertychange', function () {

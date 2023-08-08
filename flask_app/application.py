@@ -22,6 +22,7 @@ from aws_helpers.rds_tools import execute_and_fetch
 ### Constants
 FACULTIES_PATH = os.path.join('data','documents','faculties.json')
 TITLE_PATH = os.path.join('static','app_title.txt')
+DEFAULTS_PATH = os.path.join('static','defaults.json')
 DEV_MODE = 'MODE' in os.environ and os.environ.get('MODE') == 'dev'
 
 ### Globals (set upon load)
@@ -74,7 +75,7 @@ def home():
         return render_template('not_initialized.html')
     
     # Render the form template
-    return render_template('index.html',title=app_title,faculties=faculties,last_updated=last_updated_time)
+    return render_template('index.html',title=app_title,faculties=faculties,last_updated=last_updated_time,defaults=defaults)
 
 @application.route('/answer', methods=['POST'])
 async def answer():
@@ -153,8 +154,9 @@ def setup():
     """
     Setup to perform on load, before initialization
     """
-    global app_title
-    app_title = read_text(TITLE_PATH,as_json=False)
+    global app_title, defaults
+    app_title = read_text(TITLE_PATH, as_json=False)
+    defaults = read_text(DEFAULTS_PATH, as_json=True)
 
 setup()
 
