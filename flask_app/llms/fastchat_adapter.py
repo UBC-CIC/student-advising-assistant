@@ -3,7 +3,7 @@ from langchain.callbacks.manager import CallbackManagerForLLMRun
 from fastchat.model import get_conversation_template
 from typing import Optional, List, Any
 from prompts import fastchat_system_detailed
-
+import regex as re
 default_system_instruction = fastchat_system_detailed
 
 class FastChatLLM(LLM):
@@ -43,9 +43,9 @@ class FastChatLLM(LLM):
         result = self.base_llm.generate([fastchat_prompt], stop, run_manager, **kwargs)
         
         output = result.generations[0][0].text
-        if output.startswith(fastchat_prompt): 
-            # If the model returned the prompt as well as generated text, remove the prompt
-            output = output[len(fastchat_prompt):]
+        
+        # Remove suffixes that the model may add
+        output = re.sub(f'{re.escape(self.template.roles[0])}\:?(\s|\n)*', '', output)
             
         return output
     

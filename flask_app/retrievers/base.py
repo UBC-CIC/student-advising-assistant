@@ -30,9 +30,10 @@ class Retriever(ABC):
         self.verbose = verbose
         
     @abstractmethod
-    def semantic_search(self, program_info: Dict, topic: str, query: str, k = 5, threshold = 0) -> List[Document]:
+    def semantic_search(self, filter: Dict, program_info: Dict, topic: str, query: str, k = 5, threshold = 0) -> List[Document]:
         """
         Return the documents from similarity search with the given context and query
+        - filter: Dict of metadata filter keys and values
         - program_info: Dict of program information
         - topic: keyword topic of the query
         - query: the full query question
@@ -98,9 +99,10 @@ class Retriever(ABC):
         return joined
 
     @abstractmethod
-    def _query_converter(self, program_info: Dict, topic: str, query: str) -> Tuple[str,Dict]:
+    def _query_converter(self, filter: Dict, program_info: Dict, topic: str, query: str) -> Tuple[str,Dict]:
         """
         Generates a text query and keyword args for the retriever from the input
+        - filter: Dict of metadata filter keys and values
         - program_info: Dict of program information
         - topic: keyword topic of the query
         - query: the full query question

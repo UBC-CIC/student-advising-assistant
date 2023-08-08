@@ -86,8 +86,7 @@ class PineconeRetriever(Retriever):
     # Namespace to use for all queries to the pinecone index
     namespace: Optional[str] 
     
-    def __init__(self, pinecone_key: str, pinecone_region: str, alpha = 0.4, 
-                 filter_params: List[str] = [], verbose: bool = False):
+    def __init__(self, pinecone_key: str, pinecone_region: str, alpha = 0.4, verbose: bool = False):
         """
         Initialize the pinecone retriever
         - pinecone_key: API key for pinecone
@@ -95,13 +94,8 @@ class PineconeRetriever(Retriever):
         - alpha: weighting of the sparse vs dense vectors
                  0 = pure semantic search (dense vectors)
                  1 = pure keyword search (sparse vectors)
-        - filter_params:
-                 keys of entries in the program_info dict passed
-                 to semantic_search that should be used as a metadata
-                 filter when querying pinecone
         """
         super().__init__(verbose)
-        self.filter_params = filter_params
         
         # Load the config file
         index_config = load_json_file(self.index_config_path)
@@ -128,9 +122,10 @@ class PineconeRetriever(Retriever):
         hybrid_retriever.alpha = alpha
         self.retriever = hybrid_retriever
     
-    def semantic_search(self, program_info: Dict, topic: str, query: str, k = 5, threshold = 0) -> List[Document]:
+    def semantic_search(self, filter: Dict, program_info: Dict, topic: str, query: str, k = 5, threshold = 0) -> List[Document]:
         """
         Return the documents from similarity search with the given context and query
+        - filter: Dict of metadata filter keys and values
         - program_info: Dict of program information
         - topic: keyword topic of the query
         - query: the full query question
@@ -140,7 +135,7 @@ class PineconeRetriever(Retriever):
                      larger scores indicate greater relevance
         """
         self.set_top_k(k)
-        query_str, kwargs = self._query_converter(program_info,topic,query)
+        query_str, kwargs = self._query_converter(filter,program_info,topic,query)
         if self.namespace: kwargs['namespace'] = self.namespace
         
         self._output_query_verbose(query_str, kwargs)
@@ -163,25 +158,22 @@ class PineconeRetriever(Retriever):
         """
         self.retriever.top_k = k
         
-    def _query_converter(self, program_info: Dict, topic: str, query: str) -> Tuple[str,Dict]:
+    def _query_converter(self, filter: Dict, program_info: Dict, topic: str, query: str) -> Tuple[str,Dict]:
         """
         Generates a text query and keyword args for the retriever from the input
+        - filter: Dict of metadata filter keys and values
         - program_info: Dict of program information
         - topic: keyword topic of the query
         - query: the full query question
         Returns:
         - Tuple of the query string, and Dict of metadata to pass to the retriever
         """
-        # Create a filter from the program info
-        program_info_copy = copy.copy(program_info)
-        filter = {}
-        for param in self.filter_params:
-            if param in program_info:
-                filter[param] = {"$eq": program_info[param]}
-                program_info_copy.pop(param)
+        retriever_filter = {}
+        for key,val in filter.items():
+            retriever_filter[key] = {"$eq": val}
 
-        query_str = ' : '.join(list(program_info_copy.values()) + [topic,query])
-        return self._retriever_combined_query(query_str), {'filter': filter}
+        query_str = ' : '.join(list(program_info.values()) + [topic,query])
+        return self._retriever_combined_query(query_str), {'filter': retriever_filter}
     
     def _response_converter(self, response: List[Document]) -> List[Document]:
         """

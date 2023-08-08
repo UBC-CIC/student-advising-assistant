@@ -55,12 +55,13 @@
           </div>
         </div>
       </div>
+      </div>
       <div id="content" class="card" style="justify-content: center; display: flex;">
         <div class="card-header primary">
           Ask a Question
         </div>
         <div class="card-body">
-          <form action="/answer" method="post">
+          <form id="question-form" action="/answer" method="post">
             <div class="col-12">
               <div class="input-group mb-3">
                 <span class="input-group-text">Faculty</span>
@@ -71,46 +72,54 @@
                   <option value="{{faculty}}">{{faculty}}</option>
                   {% endfor %}
                 </datalist>
+            </div>
+
+            <div class="mb-3">
+              <label for="topic" class="form-label"
+                title="Eg. 'Second year specialization application', 'academic concessions', etc.">
+                What is the topic of your question?
+                <i class="fa fa-question-circle" style="font-size:18px"></i>
+              </label>
+              <textarea id="topic" class="form-control" name="topic" cols="40" rows="1"></textarea>
+            </div>
+              
+              <div class="mb-3">
+                <div class="input-group">
+                  <span class="input-group-text">Specialization</span>
+                  <input type="search" id="specialization" class="form-control" name="specialization"
+                    list="specialization_list" placeholder="All Specializations" autocomplete="off">
+                  <datalist id="specialization_list">
+                    {% for faculty in faculties.keys() %}
+                    {% for program in faculties[faculty]['programs'].keys() %}
+                    {% for specialization in faculties[faculty]['programs'][program]['specializations'].keys() %}
+                    <option value="{{specialization}}" data-program="{{program}}" disabled hidden>{{specialization}}
+                    </option>
+                    {% endfor %}
+                    {% endfor %}
+                    {% endfor %}
+                  </datalist>
+                </div>
+                <small id="specialization-help-block" class="form-text text-muted">
+                  Including the 'specialization' field will make the system search for information matching the specialization.
+                  For more general questions, you may find better results by leaving this blank.
+                </small>
               </div>
 
-              <div class="input-group mb-3">
-                <span class="input-group-text">Program</span>
-                <input type="search" id="program" class="form-control" name="program" list="program_list"
-                  placeholder="All Programs" autocomplete="off">
-                <datalist id="program_list">
-                  {% for faculty in faculties.keys() %}
-                  {% for program in faculties[faculty]['programs'].keys() %}
-                  <option value="{{program}}" data-faculty="{{faculty}}" disabled hidden>{{program}}</option>
-                  {% endfor %}
-                  {% endfor %}
-                </datalist>
-              </div>
-
-              <div class="input-group mb-3">
-                <span class="input-group-text">Specialization</span>
-                <input type="search" id="specialization" class="form-control" name="specialization"
-                  list="specialization_list" placeholder="All Specializations" autocomplete="off">
-                <datalist id="specialization_list">
-                  {% for faculty in faculties.keys() %}
-                  {% for program in faculties[faculty]['programs'].keys() %}
-                  {% for specialization in faculties[faculty]['programs'][program]['specializations'].keys() %}
-                  <option value="{{specialization}}" data-program="{{program}}" disabled hidden>{{specialization}}
-                  </option>
-                  {% endfor %}
-                  {% endfor %}
-                  {% endfor %}
-                </datalist>
-              </div>
-
-              <div class="input-group mb-3">
-                <span class="input-group-text">Year Level</span>
-                <input type="search" id="year" class="form-control" name="year" list="year_list" placeholder="All Years"
-                  autocomplete="off">
-                <datalist id="year_list">
-                  {% for year in ["First Year","Second Year","Third Year","Fourth Year","Fifth Year"] %}
-                  <option value="{{year}}">{{year}}</option>
-                  {% endfor %}
-                </datalist>
+              <div class="mb-3">
+                <div class="input-group">
+                  <span class="input-group-text">Year Level</span>
+                  <input type="search" id="year" class="form-control" name="year" list="year_list" placeholder="All Years"
+                    autocomplete="off">
+                  <datalist id="year_list">
+                    {% for year in ["First Year","Second Year","Third Year","Fourth Year","Fifth Year"] %}
+                    <option value="{{year}}">{{year}}</option>
+                    {% endfor %}
+                  </datalist>
+                </div>
+                <small id="year-help-block" class="form-text text-muted">
+                  Including the 'year level' field will make the system search for information matching the year level.
+                  For more general questions, you may find better results by leaving this blank.
+                </small>
               </div>
             </div>
 
@@ -129,20 +138,22 @@
             </div>
 
             <div class="col-12">
-              <button id="submit" type="submit" class="btn btn-primary">Submit</button>
+              <button id="submit" type="submit" class="btn btn-primary">
+                <span id="submit-loading" class="spinner-border spinner-border-sm" role="status" aria-hidden="true" hidden></span>
+                Submit
+              </button>
             </div>
           </form>
-        </div>
       </div>
     </div>
   </main>
   <script type="text/javascript">
     // <![CDATA[
     function preloader() {
-      submit = document.getElementById("submit")
-      submit.addEventListener('click', function () {
-        submit.classList.add("loading");
-      }, false);
+      $('#question-form').on('submit', function (e) {
+        $('#submit-loading').prop('hidden',false)
+        $('#submit').prop('disabled',true)
+      });
 
       $('#faculty').on('change', function () {
         $("#program").val('');
