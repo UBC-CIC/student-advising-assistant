@@ -172,9 +172,9 @@
               {% endif %}
             </div>
           </div>
-        </div>
-        {% endfor %}
-        {% if removed_docs|length > 0 %}
+          {% endfor %}
+
+          {% if removed_docs|length > 0 %}
           <h3 class='mt-5'>Additional References</h3>
           <p>These references were filtered out and ignored for answer generation, but may still contain relevant information.</p>
           <div id="removed-docs-accordion" class="accordion">
@@ -199,22 +199,23 @@
                     <script type="text/markdown">{{doc.page_content}}</script>
                   </zero-md>
                   {% if 'keep_reason' in doc.metadata %}
-                  <strong>Is this document relevant?</strong>
-                  <p> {{doc.metadata['keep_reason']}} </p>
-                  {% endif %}
-                  <strong>Source</strong>
-                  {% if 'source' in doc.metadata %}
-                  <p> {{doc.metadata['source']}} </p>
-                  {% endif %}
-                  <p>Url: <a href="{{doc.metadata['url']}}">{{doc.metadata['url']}}</a></p>
+                    <strong>Is this document relevant?</strong>
+                    <p> {{doc.metadata['keep_reason']}} </p>
+                    {% endif %}
+                    <strong>Source</strong>
+                    {% if 'source' in doc.metadata %}
+                    <p> {{doc.metadata['source']}} </p>
+                    {% endif %}
+                    <p>Url: <a href="{{doc.metadata['url']}}">{{doc.metadata['url']}}</a></p>
+                  </div>
                 </div>
               </div>
+              {% endfor %}
             </div>
-            {% endfor %}
-          </div>
-        {% endif %}
-      </section>
-    </div>
+            {% endif %}
+        </section>
+      </div>
+    </main>
 </body>
 
 <script type="text/javascript">
