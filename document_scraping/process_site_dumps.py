@@ -364,7 +364,7 @@ faculty_prefix_regex = f"({'|'.join(faculty_prefixes)}).+"
 faculty_suffix_regex = f".+({'|'.join(faculty_suffixes)})"
 faculty_regex = re.compile(f"^({faculty_prefix_regex}|{faculty_suffix_regex})$")
 
-program_prefixes = ['Bachelor of','Master of','Doctor of','Diploma in','Certificate in','Program in', 'B.[\w\.]+ in']
+program_prefixes = ['Bachelor of','Master of','Doctor of','Diploma in','Certificate in','(Dual Degree )?Program in', 'B.[\w\.]+ in']
 program_suffixes = ['Program','Programs']
 program_prefix_regex = f"(\w+\s)?({'|'.join(program_prefixes)}).+"
 program_suffix_regex = f".+({'|'.join(program_suffixes)})"
@@ -377,27 +377,32 @@ specialization_suffix_regex = f".+({'|'.join(specialization_suffixes)})"
 specialization_regex = re.compile(f"^({specialization_prefix_regex}|{specialization_suffix_regex})$")
 
 def calendar_extract_metadata(url: str, titles: List[str], parent_titles: List[str], text: str):
-    metadata = {'specialization': []}
+    metadata = {}
     for subtitle in parent_titles + titles:
         if 'faculty' not in metadata and re.match(faculty_regex, subtitle):
             metadata['faculty'] = subtitle
         if 'program' not in metadata and re.match(program_regex, subtitle):
             metadata['program'] = subtitle
         if re.match(specialization_regex, subtitle):
+            if 'specialization' not in metadata:
+                metadata['specialization'] = []
             metadata['specialization'].append(subtitle)
 
-    if re.search('\* \d+ credits of ', text):
+    if re.search('\- \d+ credits of ', text):
         if 'specialization' in metadata:
             metadata['context'] = f"This is a list of degree requirements for {metadata['specialization']}.\n"
         else: metadata['context'] = f'This is a list of degree requirements.\n'
-
+                
     return metadata
 
 def blog_extract_metadata(url: str, titles: List[str], parent_titles: List[str], text: str):
-    metadata = {'faculty': 'The Faculty of Science', 'program': 'Bachelor of Science', 'specialization': []}
+    metadata = {'faculty': 'The Faculty of Science', 'program': 'Bachelor of Science'}
     for subtitle in parent_titles + titles:
         if re.match(specialization_regex, subtitle):
+            if 'specialization' not in metadata:
+                metadata['specialization'] = []
             metadata['specialization'].append(subtitle)
+        
     return metadata
 
 ### SPLIT TAG PREDICATES 

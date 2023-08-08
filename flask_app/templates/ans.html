@@ -17,155 +17,160 @@
 </head>
 
 <body>
-  <div class="container mb-5">
-    <header class="m-5" id="ask" role="button">
-      <h1 class="text-center">Ask Cali</h1>
+  <main>
+    <header>
+      <div class="mt-auto p-3 bg-light text-center">
+        <span class="text-muted">Information last updated on {{last_updated}}</span>
+      </div>
+      <h1 class="m-5 text-center">Ask Cali</h1>
     </header>
-    <div id="content" style="justify-content: center; display: flex;">
-      <section>
-        <div class="text-center">
-          <p><strong>Answering question: </strong>{{question}}</p>
-          <p><strong>Context: </strong>{% if context == '' %} None {% else %} {{context}}{% endif %}</p>
-        </div>
-        {% for alert in alerts %}
-        <div class="alert alert-warning alert-dismissible fade show" role="alert">{{alert}}</div>
-        {% endfor %}
-        <div class="card border-primary mb-3">
-          <div class="card-body">
-            {% if main_response %}
-            <zero-md>
-              <script type="text/markdown">{{main_response}}</script>
-            </zero-md>
-            {% else %}
-            <zero-md src="./static/backup_response.md"></zero-md>
-            {% endif %}
-            <hr>
-            <label for="feedback-toggle" class="me-3">Was this response helpful?</label>
-            <div id="feedback-toggle" class="btn-group">
-              <input type="radio" class="btn-check" name="feedback-toggle" id="feedback-yes" autocomplete="off" value="yes">
-              <label for="feedback-yes" class="btn btn-outline-success" type="button" data-bs-toggle="collapse" data-bs-target="#blank" aria-expanded="true" aria-controls="blank">Yes</label>
+    <div class="container mb-5">
+      <div id="content" style="justify-content: center; display: flex;">
+        <section>
+          <div class="text-center">
+            <p><strong>Answering question: </strong>{{question}}</p>
+            <p><strong>Context: </strong>{% if context == '' %} None {% else %} {{context}}{% endif %}</p>
+          </div>
+          {% for alert in alerts %}
+          <div class="alert alert-warning alert-dismissible fade show" role="alert">{{alert}}</div>
+          {% endfor %}
+          <div class="card border-primary mb-3">
+            <div class="card-body">
               {% if main_response %}
-              <input type="radio" class="btn-check" name="feedback-toggle" id="feedback-no" autocomplete="off" value="no">
-              <label for="feedback-no" class="btn btn-outline-danger" type="button" data-bs-toggle="collapse" data-bs-target="#backup-response" aria-expanded="true" aria-controls="backup-response">No</label>
+              <zero-md>
+                <script type="text/markdown">{{main_response}}</script>
+              </zero-md>
               {% else %}
-              <input type="radio" class="btn-check" name="feedback-toggle" id="feedback-no" autocomplete="off" value="no">
-              <label for="feedback-no" class="btn btn-outline-danger" type="button" aria-expanded="true" aria-controls="backup-response">No</label>
+              <zero-md src="./static/backup_response.md"></zero-md>
+              {% endif %}
+              <hr>
+              <label for="feedback-toggle" class="me-3">Was this response helpful?</label>
+              <div id="feedback-toggle" class="btn-group">
+                <input type="radio" class="btn-check" name="feedback-toggle" id="feedback-yes" autocomplete="off" value="yes">
+                <label for="feedback-yes" class="btn btn-outline-success" type="button" data-bs-toggle="collapse" data-bs-target="#blank" aria-expanded="true" aria-controls="blank">Yes</label>
+                {% if main_response %}
+                <input type="radio" class="btn-check" name="feedback-toggle" id="feedback-no" autocomplete="off" value="no">
+                <label for="feedback-no" class="btn btn-outline-danger" type="button" data-bs-toggle="collapse" data-bs-target="#backup-response" aria-expanded="true" aria-controls="backup-response">No</label>
+                {% else %}
+                <input type="radio" class="btn-check" name="feedback-toggle" id="feedback-no" autocomplete="off" value="no">
+                <label for="feedback-no" class="btn btn-outline-danger" type="button" aria-expanded="true" aria-controls="backup-response">No</label>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+
+          <div id="feedback-accordion" class="accordion accordion-flush">
+            <div class="accordion-item border-0">
+              <div class="accordion-collapse collapse" data-bs-parent="#feedback-accordion" id="backup-response">
+                <div class="card mb-3 accordion-body">
+                  <div class="card-body">
+                    <zero-md src="./static/backup_response.md"></zero-md>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="accordion-item">
+              <div class="accordion-collapse collapse" data-bs-parent="#feedback-accordion" id="blank">
+                <div class="card mb-3 accordion-body">
+                  <div class="card-body">
+                    I'm glad that I could help! If you would like to submit some feedback, it will help improve the system.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div id="feedback-form" class="card mb-3">
+            <div class="card-header">
+              Feedback Form
+            </div>
+            <div class="card-body">
+              <div class="alert alert-light" role="alert">
+                Submitting feedback is optional, but will help improve the system. 
+                If you submit feedback, your question and the system response will be anonymously recorded.
+              </div>
+              <form action="/feedback" method="post">
+                <input type="hidden" id="feedback-hidden-helpful" name="feedback-hidden-helpful">
+                <input type="hidden" name="feedback-hidden-question" value="{{question}}">
+                <input type="hidden" name="feedback-hidden-context" value="{{context}}">
+                <input 
+                type="hidden" 
+                name="feedback-hidden-reference-ids" 
+                value="{% for doc in answers %}{{doc.metadata['doc_id']}},{% endfor %}">
+                <input type="hidden" name="feedback-hidden-response" value="{{main_response}}">
+
+                <div class="mt-3">
+                  <div class="input-group mb-3">
+                    <span class="input-group-text" id="inputGroup-sizing-default">Which reference is the most relevant?</span>
+                    <select class="form-select" name="feedback-reference-select" aria-label="Reference Select">
+                      <option selected>None</option>
+                      {% for i in range(docs|length + removed_docs|length) %}
+                        <option value="{{i+1}}">Reference {{i+1}}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+
+                  <div class="mb-3">
+                    <label for="feedback-comments" class="form-label">Include any additional comments:</label>
+                    <textarea id="feedback-comments" class="form-control" name="feedback-comments" cols="40" rows="3"></textarea>
+                  </div>
+        
+                  <div class="col-12">
+                    <button id="feedback-submit" type="submit" class="btn btn-primary">Submit</button>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          {% for doc in docs %}
+          <div class="card mb-3">
+            <div class="card-header">
+              Reference {{loop.index}}
+            </div>
+            <div class="card-body pt-0">
+              {% if 'generated_response' in doc.metadata%}
+              <strong>Generated Response</strong>
+              <p>{{doc.metadata['generated_response']}}</p>
+              {% endif %}
+              <zero-md>
+                <template>
+                  <!-- Define your own styles inside a `<style>` tag -->
+                  <style>
+                    em {
+                      font-style: normal;
+                      background: lightgoldenrodyellow;
+                    }
+                  </style>
+                </template>
+                <script type="text/markdown">{{doc.page_content}}</script>
+              </zero-md>
+              {% if 'keep_reason' in doc.metadata %}
+              <strong>Is this document relevant?</strong>
+              <p> {{doc.metadata['keep_reason']}} </p>
+              {% endif %}
+              <strong>Source</strong>
+              {% if 'source' in doc.metadata %}
+              <p> {{doc.metadata['source']}} </p>
+              {% endif %}
+              <p>Url: <a href="{{doc.metadata['url']}}">{{doc.metadata['url']}}</a></p>
+              {% if 'related_links' in doc.metadata and doc.metadata['related_links']|length > 0 %}
+              <strong>
+                Relevant Links
+              </strong>
+              <ul>
+                {% for title,link,doc_id in doc.metadata['related_links'] %}
+                <li>
+                  <p>{{title}}: <a href="{{link}}">{{link}}</a></p>
+                  {% if doc_id %}
+                  <button id="ask" type="submit" class="btn btn-outline-secondary" onclick="post_form({{doc_id}})">Ask
+                    Cali about this link</button>
+                  {% endif %}
+                </li>
+                {% endfor %}
+              </ul>
               {% endif %}
             </div>
-          </div>
-        </div>
-
-        <div id="feedback-accordion" class="accordion accordion-flush">
-          <div class="accordion-item border-0">
-            <div class="accordion-collapse collapse" data-bs-parent="#feedback-accordion" id="backup-response">
-              <div class="card mb-3 accordion-body">
-                <div class="card-body">
-                  <zero-md src="./static/backup_response.md"></zero-md>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="accordion-item">
-            <div class="accordion-collapse collapse" data-bs-parent="#feedback-accordion" id="blank">
-              <div class="card mb-3 accordion-body">
-                <div class="card-body">
-                  I'm glad that I could help! If you would like to submit some feedback, it will help improve the system.
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div id="feedback-form" class="card mb-3">
-          <div class="card-header">
-            Feedback Form
-          </div>
-          <div class="card-body">
-            <div class="alert alert-light" role="alert">
-              Submitting feedback is optional, but will help improve the system. 
-              If you submit feedback, your question and the system response will be anonymously recorded.
-            </div>
-            <form action="/feedback" method="post">
-              <input type="hidden" id="feedback-hidden-helpful" name="feedback-hidden-helpful">
-              <input type="hidden" name="feedback-hidden-question" value="{{question}}">
-              <input type="hidden" name="feedback-hidden-context" value="{{context}}">
-              <input 
-              type="hidden" 
-              name="feedback-hidden-reference-ids" 
-              value="{% for doc in answers %}{{doc.metadata['doc_id']}},{% endfor %}">
-              <input type="hidden" name="feedback-hidden-response" value="{{main_response}}">
-
-              <div class="mt-3">
-                <div class="input-group mb-3">
-                  <span class="input-group-text" id="inputGroup-sizing-default">Which reference is the most relevant?</span>
-                  <select class="form-select" name="feedback-reference-select" aria-label="Reference Select">
-                    <option selected>None</option>
-                    {% for i in range(docs|length + removed_docs|length) %}
-                      <option value="{{i+1}}">Reference {{i+1}}</option>
-                    {% endfor %}
-                  </select>
-                </div>
-
-                <div class="mb-3">
-                  <label for="feedback-comments" class="form-label">Include any additional comments:</label>
-                  <textarea id="feedback-comments" class="form-control" name="feedback-comments" cols="40" rows="3"></textarea>
-                </div>
-      
-                <div class="col-12">
-                  <button id="feedback-submit" type="submit" class="btn btn-primary">Submit</button>
-                </div>
-              </div>
-            </form>
-          </div>
-        </div>
-
-        {% for doc in docs %}
-        <div class="card mb-3">
-          <div class="card-header">
-            Reference {{loop.index}}
-          </div>
-          <div class="card-body pt-0">
-            {% if 'generated_response' in doc.metadata%}
-            <strong>Generated Response</strong>
-            <p>{{doc.metadata['generated_response']}}</p>
-            {% endif %}
-            <zero-md>
-              <template>
-                <!-- Define your own styles inside a `<style>` tag -->
-                <style>
-                  em {
-                    font-style: normal;
-                    background: lightgoldenrodyellow;
-                  }
-                </style>
-              </template>
-              <script type="text/markdown">{{doc.page_content}}</script>
-            </zero-md>
-            {% if 'keep_reason' in doc.metadata %}
-            <strong>Is this document relevant?</strong>
-            <p> {{doc.metadata['keep_reason']}} </p>
-            {% endif %}
-            <strong>Source</strong>
-            {% if 'source' in doc.metadata %}
-            <p> {{doc.metadata['source']}} </p>
-            {% endif %}
-            <p>Url: <a href="{{doc.metadata['url']}}">{{doc.metadata['url']}}</a></p>
-            {% if 'related_links' in doc.metadata and doc.metadata['related_links']|length > 0 %}
-            <strong>
-              Relevant Links
-            </strong>
-            <ul>
-              {% for title,link,doc_id in doc.metadata['related_links'] %}
-              <li>
-                <p>{{title}}: <a href="{{link}}">{{link}}</a></p>
-                {% if doc_id %}
-                <button id="ask" type="submit" class="btn btn-outline-secondary" onclick="post_form({{doc_id}})">Ask
-                  Cali about this link</button>
-                {% endif %}
-              </li>
-              {% endfor %}
-            </ul>
-            {% endif %}
           </div>
         </div>
         {% endfor %}

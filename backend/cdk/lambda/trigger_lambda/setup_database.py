@@ -64,6 +64,13 @@ def lambda_handler(event, context):
         	"retrieved_doc_ids" VARCHAR,
         	"response" VARCHAR
         );
+        
+        CREATE TABLE IF NOT EXISTS update_logs (
+            "id" BIGSERIAL PRIMARY KEY,
+            "datetime" TIMESTAMPTZ
+        );
+        
+        SET timezone = 0;
     """
 
     cursor.execute(sql)
@@ -77,7 +84,13 @@ def lambda_handler(event, context):
     print(cursor.fetchall())
     
     sql = """
-        SELECT * FROM document_embedding;
+        SELECT * FROM logging;
+    """
+    cursor.execute(sql)
+    print(cursor.fetchall())
+    
+    sql = """
+        SELECT * FROM update_logs;
     """
     cursor.execute(sql)
     print(cursor.fetchall())

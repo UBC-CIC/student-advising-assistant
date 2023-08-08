@@ -1,11 +1,9 @@
 import pandas as pd
-import json
 import ast 
-from tools import write_file
 import numpy as np
-import os
+from typing import Dict
 
-def find_program_options(website_extracts_path: str):
+def find_program_options(website_extracts_path: str) -> Dict:
     """
     Creates a json file of hierarchical program options (faculty, program, specialization)
     From all those available in the list of website extracts
@@ -29,8 +27,4 @@ def find_program_options(website_extracts_path: str):
         #faculties[group[0]] = {'programs': programs, 'doc_ids': group[1]['doc_id'].tolist()}
         faculties[group[0]] = {'programs': programs}
     
-    def writer():
-        with open(f'{os.path.dirname(website_extracts_path)}/faculties.txt','w') as f: 
-            json.dump(faculties,f,indent=4)
-    
-    write_file(writer)
+    return faculties

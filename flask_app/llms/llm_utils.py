@@ -68,8 +68,7 @@ def load_model_and_prompt(endpoint_type: str, endpoint_name: str, model_name: st
     if endpoint_type == 'sagemaker':
         llm = load_sagemaker_endpoint(endpoint_name)
     elif endpoint_type == 'huggingface':
-        param_manager = get_param_manager()
-        os.environ["HUGGINGFACEHUB_API_TOKEN"] = param_manager.get_secret('generator/HUGGINGFACE_API')['API_TOKEN']
+        os.environ["HUGGINGFACEHUB_API_TOKEN"] = get_param_manager().get_secret('generator/HUGGINGFACE_API')['API_TOKEN']
         llm = load_huggingface_endpoint(endpoint_name)
     elif endpoint_type == 'huggingface_qa':
         param_manager = get_param_manager()

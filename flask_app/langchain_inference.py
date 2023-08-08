@@ -1,12 +1,3 @@
-# Loads env variable when running locally
-from dotenv import load_dotenv
-load_dotenv()
-
-## Add parent directory to path for aws_helpers
-import sys
-sys.path.append('..')
-
-# Imports
 from langchain.docstore.document import Document
 from langchain.retrievers.document_compressors import LLMChainExtractor
 import regex as re
