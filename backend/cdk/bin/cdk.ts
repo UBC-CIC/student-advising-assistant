@@ -21,19 +21,25 @@ const app = new cdk.App();
 
   /* For more information, see https://docs.aws.amazon.com/cdk/latest/guide/environments.html */
 
-const identifier = "ai-assist"
+console.log("App region is ", app.region)
+// const identifier = "ai-assist"
 
-const vpcStack = new VpcStack(app, `${identifier}-VpcStack`, {
+// process.env.CDK_DEFAULT_REGION
+const region = "us-west-2"
+
+const vpcStack = new VpcStack(app, "student-advising-VpcStack", {
   env: {
     account: process.env.CDK_DEFAULT_ACCOUNT,
-    region: process.env.CDK_DEFAULT_REGION,
+    // region: process.env.CDK_DEFAULT_REGION,
+    region: region
   },
 });
 
 const databaseStack = new DatabaseStack(app, "student-advising-DatabaseStack", vpcStack, {
   env: {
     account: process.env.CDK_DEFAULT_ACCOUNT,
-    region: process.env.CDK_DEFAULT_REGION
+    // region: process.env.CDK_DEFAULT_REGION
+    region: region
   },
 }); 
 databaseStack.addDependency(vpcStack)
@@ -41,13 +47,15 @@ databaseStack.addDependency(vpcStack)
 const inferenceStack = new InferenceStack(app, "InferenceStack", vpcStack, databaseStack, {
   env: {
     account: process.env.CDK_DEFAULT_ACCOUNT,
-    region: process.env.CDK_DEFAULT_REGION
+    // region: process.env.CDK_DEFAULT_REGION
+    region: region
   }
 });
 
 const hostingStack = new HostingStack(app, "HostingStack", vpcStack, databaseStack, inferenceStack, {
   env: {
     account: process.env.CDK_DEFAULT_ACCOUNT,
-    region: process.env.CDK_DEFAULT_REGION
+    // region: process.env.CDK_DEFAULT_REGION
+    region: region
   }
 });

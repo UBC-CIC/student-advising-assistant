@@ -1,6 +1,7 @@
 # THIS DOCKERFILE IS USED TO BUILD THE DOCUMENT SCRAPING CONTAINER
 # FROM --platform=linux/amd64 public.ecr.aws/docker/library/python:3
-FROM --platform=linux/amd64 python:slim
+# NOTE: python:slim do not have wget, thus either use full python:3 or download wget
+FROM --platform=linux/amd64 python:3
 
 WORKDIR /usr/src/app
 

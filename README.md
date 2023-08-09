@@ -89,7 +89,7 @@ replace `localhost-port` with any port, usually 5000, but can use 5001 or other 
 Run this command when you're in the root folder `student-advising-assistant`
 
 ```bash
-zip -r <zip-file-name>.zip aws_helpers/ flask_app/ Dockerfile -x "*/.*" -x ".*"
+zip -r <zip-file-name>.zip aws_helpers/ flask_app/ Dockerfile -x "*/.*" -x ".*" -x "*__pycache__*"
 ```
 
 ### Dockerize the `document_scraping` and `embeddings` for the ECS and ECR
@@ -121,3 +121,26 @@ docker push <aws-account-number>.dkr.ecr.<aws-region>.amazonaws.com/scraping-con
 ```
 
 Repeat those step for the embedding script. Remember to use the `embedding.Dockerfile`` instead.
+
+### CDK
+
+#### Bootstrap (only required once per AWS region)
+
+```bash
+cdk bootstrap aws://<account-number>/<region> --profile <profile-name>
+```
+
+#### Synth (run before `cdk deploy`)
+
+```bash
+cdk synth --all --profile <profile-name>
+```
+
+#### Deploy
+
+```bash
+cdk deploy --all \
+    --parameters DatabaseStack:dbUsername=<username> \
+    --parameters InferenceStack:retrieverType=<retrieverType> \
+    --profile <profile-name>
+```

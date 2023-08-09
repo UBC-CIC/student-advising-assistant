@@ -17,7 +17,6 @@ COPY aws_helpers/ ./aws_helpers/
 COPY flask_app/ ./flask_app/
 
 WORKDIR /usr/src/app/flask_app
-RUN ls -a
 
 EXPOSE 5000
 

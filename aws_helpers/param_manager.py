@@ -8,7 +8,7 @@ from .get_session import get_session
 class ParamManager():
     # Prefix for this app
     prefix: str = 'student-advising'
-    region: str = 'ca-central-1'
+    region: str = os.environ["AWS_DEFAULT_REGION"] if "AWS_DEFAULT_REGION" in os.environ else 'ca-central-1'
     
     """
     Convenience class to access secret keys from AWS Secrets Manager and 
@@ -67,4 +67,5 @@ def get_param_manager() -> ParamManager:
     global manager
     if not manager:
         manager = ParamManager()
+    print(manager.region)
     return manager

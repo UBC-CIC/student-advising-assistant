@@ -24,7 +24,7 @@ SM_ENDPOINT_NAME = os.environ["SM_ENDPOINT_NAME"] # the name of the endpoint tha
 # container's env variables (copy from the Jumpstart notebook)
 hub = {
     'HF_MODEL_ID': HF_MODEL_ID,
-	'SM_NUM_GPUS': json.dumps(NUM_GPUS),
+	'SM_NUM_GPUS': NUM_GPUS,
     'HF_TASK':'text-generation',
     'MAX_INPUT_LENGTH': json.dumps(1024),  # Max length of input text
     'MAX_TOTAL_TOKENS': json.dumps(2048),  # Max length of the generation (including input text)

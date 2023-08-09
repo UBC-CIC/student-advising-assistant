@@ -1,4 +1,10 @@
-import { Stack, StackProps, Duration, RemovalPolicy, CfnParameter } from "aws-cdk-lib";
+import {
+  Stack,
+  StackProps,
+  Duration,
+  RemovalPolicy,
+  CfnParameter,
+} from "aws-cdk-lib";
 import { Construct } from "constructs";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as iam from "aws-cdk-lib/aws-iam";
@@ -32,11 +38,11 @@ export class InferenceStack extends Stack {
     const vpc = vpcStack.vpc;
 
     // CDK params
-    const retrieverType = new CfnParameter(this, 'retriever', {
-      description: 'Parameter for the type of retriever to use',
-      default: 'pgvector',
-      allowedValues: ['pgvector', 'pinecone'], // allowed values of the parameter
-    }).valueAsString // get the value of the parameter as string
+    const retrieverType = new CfnParameter(this, "retrieverType", {
+      description: "Parameter for the type of retriever to use",
+      default: "pgvector",
+      allowedValues: ["pgvector", "pinecone"], // allowed values of the parameter
+    }).valueAsString; // get the value of the parameter as string
 
     // Bucket for files related to inference
     const inferenceBucket = new s3.Bucket(this, "student-advising-s3bucket", {
@@ -66,7 +72,7 @@ export class InferenceStack extends Stack {
     });
     ecsTaskRole.addManagedPolicy(
       iam.ManagedPolicy.fromAwsManagedPolicyName(
-        "AmazonECSTaskExecutionRolePolicy"
+        "service-role/AmazonECSTaskExecutionRolePolicy"
       )
     );
     ecsTaskRole.addManagedPolicy(
@@ -101,8 +107,9 @@ export class InferenceStack extends Stack {
         executionRole: ecsTaskRole,
         runtimePlatform: {
           operatingSystemFamily: ecs.OperatingSystemFamily.LINUX,
+          cpuArchitecture: ecs.CpuArchitecture.X86_64
         },
-        family: "scraping-and-embedding-16cpu-32gb"
+        family: "scraping-and-embedding-16cpu-32gb",
       }
     );
     const scraping_container = ecsTaskDef.addContainer(
@@ -119,7 +126,11 @@ export class InferenceStack extends Stack {
           streamPrefix: "student-advising",
           logRetention: RetentionDays.ONE_YEAR,
         }),
-        gpuCount: 1,
+        environment: {
+          AWS_DEFAULT_REGION: this.region
+        },
+        essential: false,
+        // gpuCount: 1,
       }
     );
     const embedding_container = ecsTaskDef.addContainer(
@@ -136,10 +147,12 @@ export class InferenceStack extends Stack {
           streamPrefix: "student-advising",
           logRetention: RetentionDays.ONE_YEAR,
         }),
-        cpu: 14
-        // environment: {
-        //   "ECS_ENABLE_GPU_SUPPORT": "true"
-        // }
+        essential: true,
+        cpu: 14336, // 14 vCPU
+        environment: {
+          // ECS_ENABLE_GPU_SUPPORT: "true",
+          AWS_DEFAULT_REGION: this.region
+        }
       }
     );
     // only start the embedding container when the scraping container successfully exit without error
@@ -154,7 +167,7 @@ export class InferenceStack extends Stack {
       {
         functionName: "student-advising-start-ecs-task",
         runtime: lambda.Runtime.PYTHON_3_9,
-        handler: "start-ecs-task.lambda_handler",
+        handler: "start_ecs_task.lambda_handler",
         timeout: Duration.seconds(300),
         memorySize: 512,
         environment: {
@@ -206,7 +219,7 @@ export class InferenceStack extends Stack {
         sources: [
           s3deploy.Source.asset(
             path.join(__dirname, "..", "..", "..", "document_scraping"),
-            { exclude: ["**", "!dump_config.json5"] }
+            { exclude: ["**", ".*", "!dump_config.json5"] }
           ),
         ],
         destinationBucket: inferenceBucket,
@@ -226,7 +239,7 @@ export class InferenceStack extends Stack {
         },
         securityGroups: [clusterSg],
         // CRON: At 01:00 AM, on the first Sunday of the month, only in September, January, and May
-        schedule: events.Schedule.expression("0 0 1 ? SEP,JAN,MAY SUN#1 *"),
+        schedule: events.Schedule.expression("cron(0 0 ? SEP,JAN,MAY SUN#1 *)"),
         subnetSelection: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
       }
     );
@@ -271,7 +284,7 @@ export class InferenceStack extends Stack {
       })
     );
     lambdaRole.addManagedPolicy(
-      iam.ManagedPolicy.fromAwsManagedPolicyName("SSMReadOnlyAccess")
+      iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonSSMReadOnlyAccess")
     );
     this.lambda_rds_role = lambdaRole;
 
@@ -299,6 +312,7 @@ export class InferenceStack extends Stack {
         vpc: vpcStack.vpc,
         code: lambda.Code.fromAsset("./lambda/trigger_lambda"),
         layers: [psycopg2],
+        role: lambdaRole,
       }
     );
 
@@ -333,7 +347,7 @@ export class InferenceStack extends Stack {
           HF_MODEL_ID: HUGGINGFACE_MODEL_ID,
           MODEL_NAME: MODEL_NAME,
           INSTANCE_TYPE: INSTANCE_TYPE,
-          NUM_GPUS: NUM_GPUS
+          NUM_GPUS: NUM_GPUS,
         },
         vpc: vpcStack.vpc,
         vpcSubnets: {
@@ -352,6 +366,19 @@ export class InferenceStack extends Stack {
           "logs:PutLogEvents",
         ],
         resources: ["arn:aws:logs:*:*:*"],
+      })
+    );
+    createSMEndpointLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          "sagemaker:AddTags",
+          "sagemaker:CreateModel",
+          "sagemaker:CreateEndpointConfig",
+          "sagemaker:CreateEndpoint",
+          "iam:PassRole"
+        ],
+        resources: ["*"],
       })
     );
 
@@ -374,8 +401,8 @@ export class InferenceStack extends Stack {
     });
 
     // Create the SSM parameter with the type of the retriever
-    new ssm.StringParameter(this, "RetrieverTypeParameter", {
-      parameterName: "/student-advising/retriever/RETRIEVER_TYPE",
+    new ssm.StringParameter(this, "RetrieverNameParameter", {
+      parameterName: "/student-advising/retriever/RETRIEVER_NAME",
       stringValue: retrieverType,
     });
   }

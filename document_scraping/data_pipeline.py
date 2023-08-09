@@ -173,7 +173,7 @@ def pull_sites(dump_configs: List[DumpConfig], system_os, output_folder = './', 
                 check_call([wget_exe_path, f'--config={wget_config_path}', f'--output-file={log_file}', '--recursive', 
                             f'--directory-prefix={output_folder}', regex_rule_arg, dump_config.base_url], stderr=STDOUT)
             elif system_os in ["Darwin", "Linux"]:
-                check_call(["wget", f'--config={wget_config_path}', f'--output-file={log_file}', '--recursive', 
+                check_call(['wget', f'--config={wget_config_path}', f'--output-file={log_file}', '--recursive', 
                             f'--directory-prefix={output_folder}', regex_rule_arg, dump_config.base_url], stderr=STDOUT)
             else:
                 logging.error(f"OS {system_os} is not currently supported. Currently supported OS are Windows, Darwin and Linux")
@@ -274,8 +274,8 @@ def main(recreate_faculties: bool = False):
     logging.info(f"System OS: {system_os}")
 
     doc_extractor, dump_configs = load_config(CONFIG_FILEPATH)
-    #pull_sites(dump_configs, system_os=system_os, output_folder = BASE_DUMP_PATH, wget_exe_path=WGET_EXE_PATH, wget_config_path=WGET_CONFIG_PATH)
-    #process_site_dumps.process_site_dumps(doc_extractor, dump_configs, redirect_map_path=REDIRECT_FILEPATH, out_path=OUTPUT_PROCESSED_PATH)
+    pull_sites(dump_configs, system_os=system_os, output_folder = BASE_DUMP_PATH, wget_exe_path=WGET_EXE_PATH, wget_config_path=WGET_CONFIG_PATH)
+    process_site_dumps.process_site_dumps(doc_extractor, dump_configs, redirect_map_path=REDIRECT_FILEPATH, out_path=OUTPUT_PROCESSED_PATH)
 
     # Upload the website_extracts.csv and website_graph.txt
     upload_file_to_s3(os.path.join(OUTPUT_PROCESSED_PATH, "website_extracts.csv"), "documents/website_extracts.csv")

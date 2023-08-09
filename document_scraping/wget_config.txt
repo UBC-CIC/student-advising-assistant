@@ -1,5 +1,3 @@
-header = From: Tien Nguyen <nhantienn@ubc.ca>
-
 timestamping = on
 robots = off
 wait = 1
