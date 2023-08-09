@@ -30,8 +30,8 @@ application = Flask(__name__)
 app_title = None
 faculties = {}
 last_updated_time = None
-run_chain = None
-store_feedback = None
+langchain_inference_module = None
+store_feedback_module = None
 
 # Helper functions
 def read_text(filename: str, as_json = False):
@@ -49,7 +49,7 @@ def log_question(question: str, context: str, answer: str, reference_ids: List[i
     payload = json.dumps(dict(zip(fields, data)))
     
     try:
-        response = store_feedback(json_payload=payload, logging_only=True)
+        response = feedback_module.store_feedback(json_payload=payload, logging_only=True)
         print(response)
     except Exception as e:
         # Handle any exceptions that occur during the Lambda invocation
@@ -70,7 +70,7 @@ def get_last_updated_time():
         
 @application.route('/', methods=['GET'])
 def home():
-    if not run_chain:
+    if not langchain_inference_module:
         # App is not yet initialized
         return render_template('not_initialized.html')
     
@@ -79,7 +79,7 @@ def home():
 
 @application.route('/answer', methods=['POST'])
 async def answer():
-    if not run_chain:
+    if not langchain_inference_module:
         # App is not yet initialized
         return render_template('not_initialized.html',title=app_title)
     
@@ -95,7 +95,7 @@ async def answer():
         start_doc = int(start_doc)
 
     # Run the model inference
-    docs, main_response, alerts, removed_docs = await run_chain(program_info,topic,question,start_doc=start_doc)
+    docs, main_response, alerts, removed_docs = await langchain_inference_module.run_chain(program_info,topic,question,start_doc=start_doc)
     
     # Log the question
     context_str = ' : '.join(list(program_info.values()) + [topic])
@@ -116,7 +116,7 @@ async def feedback():
     payload = json.dumps(dict(zip(fields, data)))
 
     try:
-        response = store_feedback(json_payload=payload)
+        response = feedback_module.store_feedback(json_payload=payload)
         print(response)
     except Exception as e:
         # Handle any exceptions that occur during the Lambda invocation
@@ -131,17 +131,14 @@ def initialize():
     Imports files and runs all initial setup of the app
     Exists as an endpoint so that configuration can be reloaded on demand
     """
-    global run_chain, store_feedback
+    global langchain_inference_module, feedback_module
     
-    if not run_chain:
-        import langchain_inference
-        import feedback
+    if not langchain_inference_module:
+        import langchain_inference as langchain_inference_module
+        import feedback as feedback_module
     else:
-        reload(langchain_inference)
-        reload(feedback)
-    
-    run_chain = langchain_inference.run_chain
-    store_feedback = feedback.store_feedback
+        reload(langchain_inference_module)
+        reload(feedback_module)
     
     # Upon loading, load the available settings for the form
     global app_title, faculties, last_updated_time
