@@ -70,7 +70,7 @@ spell_correct_chain = llms.load_spell_chain(base_llm, generator_config['MODEL_NA
 combine_documents_chain = load_qa_chain(llm=detailed_llm, chain_type="stuff", prompt=qa_prompt)
 
 # Document compressors
-filter, filter_question_fn = llms.load_chain_filter(concise_llm, generator_config['MODEL_NAME'])
+filter, filter_question_fn = llms.load_chain_filter(detailed_llm, generator_config['MODEL_NAME'])
 compressor = LLMChainExtractor.from_llm(concise_llm)
 
 # Retriever
