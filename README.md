@@ -1,91 +1,85 @@
-# UBC Science Advising AI Assistant
+# Student Advising Assistant
 
-## 1. Introduction
-Objective: enhance the accessibility of the Academic Calendar, which is often difficult to parse systematically and confusing to read to students. Building a solution for Science Advising that leverages information from the Academic Calendar and other reliable UBC sources will give students a tool that responds to inquiries 24 hours a day. This will allow Science Advisors to redirect their focus from routine inquiries and provide better support to students. 
+This is a prototype question answering system for the purpose of student advising at higher education institutions. It performs [retrieval augmented generation](https://docs.aws.amazon.com/sagemaker/latest/dg/jumpstart-foundation-models-customize-rag.html) using university websites as information sources. 
+For more information visit the [CIC Website](https://cic.ubc.ca/).
 
-## 2. Overview of the Solution
+| Index                                               | Description                                             |
+| :-------------------------------------------------- | :------------------------------------------------------ |
+| [High Level Architecture](#high-level-architecture) | High level overview illustrating component interactions |
+| [Deployment](#deployment-guide)                     | How to deploy the project                               |
+| [User Guide](#user-guide)                           | The working solution                                    |
+| [Developer Guide](#user-guide)                      | Information for further developers                      |
+| [Changelog](#changelog)                             | Any changes post publish                                |
+| [Credits](#credits)                                 | Meet the team behind the solution                       |
+| [License](#license)                                 | License details                                         |
 
-### Preprocessing pipeline:
+## High Level Architecture
 
-1. The solution pulls information from the following websites:
-    1. UBC Academic Calendar: https://vancouver.calendar.ubc.ca/
-    2. UBC Science Distillation Blog: https://science.ubc.ca/students/blog
-2. Website pages are processed into document extracts
-3. Document extracts are embedded into vector representation
+The following architecture diagram illustrates the various AWS components utilized to deliver the solution. For an in-depth explanation of the frontend and backend stacks, refer to the [Architecture Design](docs/ArchitectureDesign.md).
 
-### Query answering:
+![Alt text](docs/images/../diagrams/Architecture.drawio.png)
 
-1. The query is embedded, and compared against all documents by cosine similarity
-2. The most similar documents are returned
-3. Additional pipeline steps involving generative LLMs will be introduced
+## Deployment Guide
 
-## 3. Demo App
+To deploy this solution, please follow the steps laid out in the [Deployment Guide](docs/DeploymentGuide.md)
 
-The repo includes a demo flask app under flask_app, which runs the model for inference.
+## User Guide
 
-Prerequisites:
+For instructions on how to navigate the web app interface, refer to the [Web App User Guide](docs/UserGuide.md).
 
-- Requires an S3 bucket containing the processed documents in a 'documents' folder and the document indexes in a 'indexes' folder
+## Developer Guide
 
-### Running the Demo App Locally
-Some setup will be required if you want to run the app locally for development.
-- Create a `.env` file under `/flask_app`
-    - File contents:
-    ```
-    AWS_PROFILE_NAME=<insert AWS SSO profile name>
-    MODE=dev
-    ```
-    - 'MODE=dev' activates verbose LLMs and uses the /dev versions of secrets and SSM parameters
-- Create a conda env with the command `conda env create -f environment.yml` from the flask_app directory
-- Activate the environment with `conda activate flaskenv` (or whichever name you chose for the environment)
-- Ensure your AWS profile is logged in via `aws sso login --profile <profile name>`
-- Run `flask --app application --debug run` to run the app in debug mode (specify the port with `-p <port num>`)
+For instructions on how to develop the application, refer to the [Developer Guide](docs/DeveloperGuide.md).
 
-### Using PGVector locally
-If using the RDS PGVector to store documents, some setup will be required to access the it while developing locally since the DB is within a VPC.
-- Modify the `.env` file in the root of `/flask_app`
-    - Add these variables:
-        ```
-        EC2_PUBLIC_IP=<insert ip>
-        EC2_USERNAME=<insert username>
-        SSH_PRIV_KEY=bastion-host.pem
-        ```
-    - Also ensure that `MODE=dev` is in the `.env`
-- Add the `bastion-host.pem` file in the root of `/flask_app`
-    - *details about how to get the file*
-- Connect to a VPN within the set of allowed IP addresses for your bastion host
-    - *details about this*
-- Restart the flask app, it should now be able to use the `pgvector` retriever with connection to RDS
+## Directories
 
-### Building docker container and run locally for the flask app
-
-The default platform intended for the container is `--platform=linux/amd64`. Might be able to run on MacOS. For Windows,
-you probably have to get rid of the flag inside the Dockerfile before building.
-
-Make sure you're in the root directory (`student-advising-assistant/`)and have Docker running on your computer
-
-To build the container, replace `image-name` with the image name of your choice:
-
-```docker
-docker build -t <image-name>:latest
 ```
-
-Run the container: 
-
-Here we're mounting the aws credentials directory so that the container have access to the aws cli profiles
-
-```docker
-docker run -v ${HOME}/.aws/credentials:/root/.aws/credentials:ro --env-file .env -d -p <localhost-port>:5000 <image-name>:latest
+├───aws_helpers
+├───backend
+│   └───cdk
+│       ├───bin
+│       ├───lambda
+│       │   ├───start_ecs
+│       │   ├───store_feedback
+│       │   └───trigger_lambda
+│       ├───layers
+│       ├───lib
+│       └───test
+├───document_scraping
+├───embeddings
+└───flask_app
+    ├───documents
+    ├───embeddings
+    ├───filters
+    ├───llms
+    ├───prompts
+    ├───retrievers
+    ├───static
+    └───templates
 ```
+1. `/aws_helpers`: Contains utilities classes / functions for connecting to AWS Services, used across the other portions of the app
+2. `/backend/cdk`: Contains the deployment code for the app's AWS infrastructure
+    - `/lambda`: Contains the scripts for all lambda functions
+    - `/lib`: Contains the deployment code for all 4 stacks of the infrastructre
+3. `/document_scraping`: Contains the scripts that run to scrape text from the information source websites
+4. `/embeddings`: Contains the scripts that convert the scraped texts to embeddings, then uploads them to the vectorstore
+5. `/flask_app`: Contains the inference and user interface code for the prototype question answering system
+    - `/documents`: Functions relating to document loading
+    - `/embeddings`: Classes relating to embeddings
+    - `/filters`: Classes relating to document filters
+    - `/llms`: Classes relating to LLMs, adapters to connect to LLMs, and helpers to load LLMs
+    - `/prompts`: Prompt template definitions
+    - `/retrievers`: Retriever classes for PGVector and Pinecone
+    - `/static`: Static web content as .md or .json
+    - `/templates`: HTML files with Jinja2 templates for the web app's pages
 
-The docker run command mount the directory which contains the aws cli credentials into the container, which is the only way make it run locally. On the cloud, every boto3 called will be called with the service's IAM role.
+## Changelog
+N/A
 
-replace `localhost-port` with any port, usually 5000, but can use 5001 or other if 5000 is already used by other processes.
+## Credits
 
-### Zipping modules for Beanstalk
+This application was architected and developed by Arya Stevinson and Tien Nguyen, with project assistance by Victoria Li. A special thanks to the UBC Cloud Innovation Centre Technical and Project Management teams for their guidance and support.
 
-Run this command when you're in the root folder `student-advising-assistant`
+## License
 
-```bash
-zip -r demo-app-v2.zip aws_helpers/ flask_app/ Dockerfile -x "*/.*" -x ".*"
-``````
+This project is distributed under the [MIT License](LICENSE).
