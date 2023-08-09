@@ -83,24 +83,63 @@ At the front end of the question answering system, a user enters a question, and
 **Semantic Search**
 The system combines the user-inputted context with the question and embeds the text. The embedded text is sent to the vectorstore to perform a search for semantically similar extracts using the embedded query. The semantic search filters on metadata for faculty and/or program, if provided, so that only extracts within the user’s selected faculty and/or program will be returned. If the user includes their specialization and year level, this is included in the query used for semantic search, but the system does not strictly filter extracts on these fields.
 
-See below for more details depending on the chosen retriever: PGVector or Pinecone.
+See below for more details depending on the chosen retriever: pgvector or Pinecone.
 ___
-**RDS with PGVector**
-If the admin chose to use the PGVector retriever, then the embedded query is sent to the RDS DB and compared with all vectors in the DB by cosine similarity search. If the user provides their faculty and/or program, only entries matching the faculty and program are returned. 
+**RDS with pgvector**
+
+If the admin chose to use the pgvector retriever, then the embedded query is sent to the RDS DB and compared with all vectors in the DB by cosine similarity search. If the user provides their faculty and/or program, only entries matching the faculty and program are returned. 
 ___
 **Pinecone.io**
+
 If the admin chose to use the Pinecone retriever, then the system also computes the BM25 sparse vector of the query, then sends both the sparse and dense (embedded) vectors for the query to Pinecone servers via the Pinecone API. Pinecone performs hybrid search over the vectorstore, by combining the dot product similarity scores of the sparse and dense vectors. The advantage of the hybrid search is that it takes into account both semantic similarity (dense vector) and keyword similarity (sparse vector).
 ___
 
 **LLM Filter**
-The documents returned by the retriever are the most semantically similar to the user’s question, but this does not necessarily mean they will be relevant to answer the question. The system then performs a second level of filtering using the LLM, by prompting the LLM to predict whether each extract is relevant to answer the question or not. If not, it is removed from the pool. This step helps to remove irrelevant information and reduce hallucinations in the answer generation step. Depending on the LLM model used, the LLM may respond to the prompt with an explanation in addition to its yes/no answer. The system will record and display the reasoning if given.
+
+The documents that the retriever returns are the most semantically similar to the user’s question, but this does not necessarily mean they will be relevant to answer the question. The system then performs a second level of filtering using the LLM, by prompting the LLM to predict whether each extract is relevant to answer the question or not. If not, it is removed from the pool. This step helps to remove irrelevant information and reduce hallucinations in the answer generation step. Depending on the LLM model used, the LLM may respond to the prompt with an explanation in addition to its yes/no answer. The system will record and display the reasoning if given.
 
 **Context Zooming**
+
 If the filter step removes all returned documents, then the system removes some of the provided context and redoes the semantic search, effectively ‘zooming out’ the context, in case the answer lies in a more general section of the information sources. For example, a student in a particular program may ask a question where the answer lies under the general University policies, rather than in the pages specifically for their program. By zooming out the context, the system can retrieve the relevant information.
 
 #### Answer Generation
+
 Using the remaining filtered extracts as context, the system prompts the LLM to generate a response that answers the user’s query. The prompt is engineered to encourage the LLM to use the provided context to answer the question and no prior knowledge, but it is always possible that a generative model will hallucinate, or misinterpret the given context.
 
-As an alternative, the system can use an ‘extractive question answering’ model, which does not create a generative answer, but rather extracts a portion of the text that answers the question. This limits the system to answering only questions where the answer exists explicitly in the text, and it cannot perform reasoning or summarization tasks. However, it removes the risk of hallucination as seen with generative models.
-
 Finally, the system displays the generated answer in the web UI. Since the generated answer is more experimental, it also displays the extracts that it used as references, and links to their original webpages. 
+
+**LLM Model Comparison**
+
+By default, the system uses the Vicuna 7b LLM published by [lmsys](https://lmsys.org/). 
+When choosing a model, the following requirements were taken into account:
+- Open source and viable for commercial use
+    - For public institutions such as Universities, permission for commercial use is not required, but the commercial use clause allows additional safety and generalizability of the system
+- 7B (7 billion) parameters or less, to reduce cost of running the LLM
+    - Models with larger number of parameters require more expensive cloud instances
+
+The [Open LLM Leaderboard](https://huggingface.co/spaces/HuggingFaceH4/open_llm_leaderboard) by huggingface lists open source LLMs ranked by several metrics. At the time of writing (August 2023), the leading models of size 7B or less are:
+- LLaMa-2 Variants
+    - [StableBeluga-7B](https://huggingface.co/stabilityai/StableBeluga-7B), fine-tuned on an Orca-style dataset (non-commercial)
+    - [Nous-Hermes-llama-2-7b](https://huggingface.co/NousResearch/Nous-Hermes-llama-2-7b), fine-tuned on an instruction-following dataset
+    - [Llama2-7B-sharegpt4](https://huggingface.co/beaugogh/Llama2-7b-sharegpt4), finetuned on the ShareGPT dataset, which consists of user-shared conversations with ChatGPT
+    - [Vicuna-7B](https://huggingface.co/lmsys/vicuna-7b-v1.5), also finetuned using the ShareGPT dataset
+        - https://huggingface.co/Lajonbot/vicuna-7b-v1.5-PL-lora_unload
+        - Other versions and variants of Vicuna-7B are also high ranking in the leaderboard
+        - v1.3 is tuned from LLaMa-1 and thus non-commercial, but v1.5 is tuned from LLaMa-2 and viable for commercial use
+    - [Manatee-7B](https://huggingface.co/ashercn97/manatee-7b), finetuned on Orca datasets (non-commercial)
+    - [Llama-2-7b-chat](https://huggingface.co/meta-llama/Llama-2-7b-chat-hf), plain Llama-2 chat version
+    - [Airoboros-7b](https://huggingface.co/jondurbin/airoboros-l2-7b-gpt4-1.4.1), finetuned on synthetic data generated by GPT4
+    - ... The list of LLaMa-2 variants continues, and is in constant development. This list is limited to those with an average score of 55 or higher
+- [MPT-7B-chat](https://huggingface.co/mosaicml/mpt-7b-chat) (non-commercial)
+    - This model is more difficult to deploy on SageMaker endpoints, and as such was not considered, since it could not be deployed in a 'plug and play' manner like the other models
+- [Falcon-7B Instruct](https://huggingface.co/tiiuae/falcon-7b)
+
+Note that all LLaMA-2 variants are not 100% open source since they are subject to the [LLAMA 2 COMMUNITY LICENSE AGREEMENT](https://github.com/facebookresearch/llama/blob/main/LICENSE), which allows for commercial use, but places some restrictions such as the requirement that the model not be used for illegal purposes.
+
+With average scores of 49.95 and 47 respectively, MPT-7B and Falcon-7B fall considerably behind the LLaMa-2-7B variants which have scores up to 59. MPT is not supported out of the box for Sagemaker Inference Endoints, so it was not tested. Falcon-7B was tested, and despite prompt engineering, it had a high tendency for hallucinations.
+
+There is also a leaderboard of models ranked by human evaluation in the [lmsys chatbot arena](https://huggingface.co/spaces/lmsys/chatbot-arena-leaderboard). Some models that perform well according to automatic metrics may not perform well when ranked by human evaluators, and vice versa. As of August 2023, the leading <= 7B model in this leaderboard is Vicuna-7B, though the other Llama-2 variants listed in the Open LLM leaderboard were not included in the comparison. 
+
+According to another leaderboard, [Alpaca Eval](https://tatsu-lab.github.io/alpaca_eval/), Vicuna-7B is also the leading 7B model. This leaderboard uses GPT4 and Claude to automatically rank models by the quality of their responses.
+
+As a result, Vicuna 7B was chosen as the system’s LLM. Additional testing with the other LLaMa-2 variants listed in the Open LLM Leaderboard could be productive.
