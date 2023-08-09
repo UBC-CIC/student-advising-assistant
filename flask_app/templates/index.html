@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-  <title>Ask Cali Demo</title>
+  <title>{{title}}</title>
   <script type="module" src="https://cdn.jsdelivr.net/gh/zerodevx/zero-md@2/dist/zero-md.min.js"></script>
   <!-- jQuery -->
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.4/jquery.min.js"></script>
@@ -22,7 +22,7 @@
       <div class="mt-auto p-3 bg-light text-center">
         <span class="text-muted">Information last updated on {{last_updated}}</span>
       </div>
-      <h1 class="m-5 text-center">Ask Cali</h1>
+      <h1 class="m-5 text-center">{{title}}</h1>
     </header>
     <div class="container mb-5">
       <div class="accordion mb-3" id="info-accordion">
@@ -60,7 +60,7 @@
           Ask a Question
         </div>
         <div class="card-body">
-          <form action="/answer" method="post">
+          <form id="question-form" action="/answer" method="post">
             <div class="col-12">
               <div class="input-group mb-3">
                 <span class="input-group-text">Faculty</span>
@@ -86,31 +86,44 @@
                 </datalist>
               </div>
 
-              <div class="input-group mb-3">
-                <span class="input-group-text">Specialization</span>
-                <input type="search" id="specialization" class="form-control" name="specialization"
-                  list="specialization_list" placeholder="All Specializations" autocomplete="off">
-                <datalist id="specialization_list">
-                  {% for faculty in faculties.keys() %}
-                  {% for program in faculties[faculty]['programs'].keys() %}
-                  {% for specialization in faculties[faculty]['programs'][program]['specializations'].keys() %}
-                  <option value="{{specialization}}" data-program="{{program}}" disabled hidden>{{specialization}}
-                  </option>
-                  {% endfor %}
-                  {% endfor %}
-                  {% endfor %}
-                </datalist>
+              <div class="mb-3">
+                <div class="input-group">
+                  <span class="input-group-text">Specialization</span>
+                  <input type="search" id="specialization" class="form-control" name="specialization"
+                    list="specialization_list" placeholder="All Specializations" autocomplete="off">
+                  <datalist id="specialization_list">
+                    {% for faculty in faculties.keys() %}
+                    {% for program in faculties[faculty]['programs'].keys() %}
+                    {% for specialization in faculties[faculty]['programs'][program]['specializations'].keys() %}
+                    <option value="{{specialization}}" data-program="{{program}}" disabled hidden>{{specialization}}
+                    </option>
+                    {% endfor %}
+                    {% endfor %}
+                    {% endfor %}
+                  </datalist>
+                </div>
+                <small id="specialization-help-block" class="form-text text-muted">
+                  Including the 'specialization' field will make the system search for information matching the
+                  specialization.
+                  For more general questions, you may find better results by leaving this blank.
+                </small>
               </div>
 
-              <div class="input-group mb-3">
-                <span class="input-group-text">Year Level</span>
-                <input type="search" id="year" class="form-control" name="year" list="year_list" placeholder="All Years"
-                  autocomplete="off">
-                <datalist id="year_list">
-                  {% for year in ["First Year","Second Year","Third Year","Fourth Year","Fifth Year"] %}
-                  <option value="{{year}}">{{year}}</option>
-                  {% endfor %}
-                </datalist>
+              <div class="mb-3">
+                <div class="input-group">
+                  <span class="input-group-text">Year Level</span>
+                  <input type="search" id="year" class="form-control" name="year" list="year_list" placeholder="All Years"
+                    autocomplete="off">
+                  <datalist id="year_list">
+                    {% for year in ["First Year","Second Year","Third Year","Fourth Year","Fifth Year"] %}
+                    <option value="{{year}}">{{year}}</option>
+                    {% endfor %}
+                  </datalist>
+                </div>
+                <small id="year-help-block" class="form-text text-muted">
+                  Including the 'year level' field will make the system search for information matching the year level.
+                  For more general questions, you may find better results by leaving this blank.
+                </small>
               </div>
             </div>
 
@@ -129,7 +142,11 @@
             </div>
 
             <div class="col-12">
-              <button id="submit" type="submit" class="btn btn-primary">Submit</button>
+              <button id="submit" type="submit" class="btn btn-primary">
+                <span id="submit-loading" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"
+                  hidden></span>
+                Submit
+              </button>
             </div>
           </form>
         </div>
@@ -137,12 +154,15 @@
     </div>
   </main>
   <script type="text/javascript">
+    let default_faculty = "{{defaults['faculty']}}"
+    let default_program = "{{defaults['program']}}"
+
     // <![CDATA[
     function preloader() {
-      submit = document.getElementById("submit")
-      submit.addEventListener('click', function () {
-        submit.classList.add("loading");
-      }, false);
+      $('#question-form').on('submit', function (e) {
+        $('#submit-loading').prop('hidden', false)
+        $('#submit').prop('disabled', true)
+      });
 
       $('#faculty').on('change', function () {
         $("#program").val('');
@@ -178,10 +198,10 @@
         });
       });
 
-      $("#faculty").val('The Faculty of Science');
+      $("#faculty").val(default_faculty);
       $('#faculty').trigger('change');
 
-      $("#program").val('Bachelor of Science');
+      $("#program").val(default_program);
       $('#program').trigger('change');
 
       $('.has-clear input[type="text"]').on('input propertychange', function () {

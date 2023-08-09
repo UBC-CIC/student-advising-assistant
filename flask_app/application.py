@@ -21,10 +21,13 @@ from aws_helpers.rds_tools import execute_and_fetch
 
 ### Constants
 FACULTIES_PATH = os.path.join('data','documents','faculties.json')
+TITLE_PATH = os.path.join('static','app_title.txt')
+DEFAULTS_PATH = os.path.join('static','defaults.json')
 DEV_MODE = 'MODE' in os.environ and os.environ.get('MODE') == 'dev'
 
 ### Globals (set upon load)
 application = Flask(__name__)
+app_title = None
 faculties = {}
 last_updated_time = None
 run_chain = None
@@ -72,13 +75,13 @@ def home():
         return render_template('not_initialized.html')
     
     # Render the form template
-    return render_template('index.html', faculties=faculties, last_updated=last_updated_time)
+    return render_template('index.html',title=app_title,faculties=faculties,last_updated=last_updated_time,defaults=defaults)
 
 @application.route('/answer', methods=['POST'])
 async def answer():
     if not run_chain:
         # App is not yet initialized
-        return render_template('not_initialized.html')
+        return render_template('not_initialized.html',title=app_title)
     
     # Submission from the form template
     topic = request.form['topic']
@@ -99,7 +102,7 @@ async def answer():
     log_question(question, context_str, main_response, [doc.metadata['doc_id'] for doc in docs])
     
     # Render the results
-    return render_template('ans.html',question=question,context=context_str,docs=docs,
+    return render_template('ans.html',title=app_title,question=question,context=context_str,docs=docs,
                            form=request.form.to_dict(), main_response=main_response, alerts=alerts,
                            removed_docs=removed_docs, last_updated=last_updated_time)
 
@@ -120,10 +123,10 @@ async def feedback():
         print(f"ERROR occurs when submitting the feedback to the database: {e}")
             
     # Render the results
-    return render_template('feedback.html')
+    return render_template('feedback.html',title=app_title)
 
 @application.route('/initialize', methods=['GET'])
-def setup():
+def initialize():
     """
     Imports files and runs all initial setup of the app
     Exists as an endpoint so that configuration can be reloaded on demand
@@ -141,11 +144,21 @@ def setup():
     store_feedback = feedback.store_feedback
     
     # Upon loading, load the available settings for the form
-    global faculties, last_updated_time
+    global app_title, faculties, last_updated_time
     faculties = read_text(FACULTIES_PATH,as_json=True)
     last_updated_time = get_last_updated_time()
     
     return "Successfully initialized the system"
+
+def setup():
+    """
+    Setup to perform on load, before initialization
+    """
+    global app_title, defaults
+    app_title = read_text(TITLE_PATH, as_json=False)
+    defaults = read_text(DEFAULTS_PATH, as_json=True)
+
+setup()
 
 # Run the application
 # must be like this to run from container

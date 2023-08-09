@@ -2,7 +2,7 @@
 <html>
 
 <head>
-  <title>Ask Cali Demo</title>
+  <title>{{title}}</title>
   <script type="module" src="https://cdn.jsdelivr.net/gh/zerodevx/zero-md@2/dist/zero-md.min.js"></script>
   <!-- jQuery -->
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.4/jquery.min.js"></script>
@@ -22,7 +22,7 @@
       <div class="mt-auto p-3 bg-light text-center">
         <span class="text-muted">Information last updated on {{last_updated}}</span>
       </div>
-      <h1 class="m-5 text-center">Ask Cali</h1>
+      <h1 class="m-5 text-center">{{title}}</h1>
     </header>
     <div class="container mb-5">
       <div id="content" style="justify-content: center; display: flex;">
@@ -174,6 +174,7 @@
           </div>
           {% endfor %}
 
+          {% if removed_docs|length > 0 %}
           <h3 class='mt-5'>Additional References</h3>
           <p>These references were filtered out and ignored for answer generation, but may still contain relevant information.</p>
           <div id="removed-docs-accordion" class="accordion">
@@ -198,19 +199,20 @@
                     <script type="text/markdown">{{doc.page_content}}</script>
                   </zero-md>
                   {% if 'keep_reason' in doc.metadata %}
-                  <strong>Is this document relevant?</strong>
-                  <p> {{doc.metadata['keep_reason']}} </p>
-                  {% endif %}
-                  <strong>Source</strong>
-                  {% if 'source' in doc.metadata %}
-                  <p> {{doc.metadata['source']}} </p>
-                  {% endif %}
-                  <p>Url: <a href="{{doc.metadata['url']}}">{{doc.metadata['url']}}</a></p>
+                    <strong>Is this document relevant?</strong>
+                    <p> {{doc.metadata['keep_reason']}} </p>
+                    {% endif %}
+                    <strong>Source</strong>
+                    {% if 'source' in doc.metadata %}
+                    <p> {{doc.metadata['source']}} </p>
+                    {% endif %}
+                    <p>Url: <a href="{{doc.metadata['url']}}">{{doc.metadata['url']}}</a></p>
+                  </div>
                 </div>
               </div>
+              {% endfor %}
             </div>
-            {% endfor %}
-          </div>
+            {% endif %}
         </section>
       </div>
     </main>
