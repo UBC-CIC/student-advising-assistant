@@ -193,11 +193,6 @@ export class HostingStack extends cdk.Stack {
     appVersionProps.addDependency(app);
 
     // Create the SSM parameter with the url of the elastic beanstalk web app
-    // const regionLongName: string = ssm.StringParameter.valueFromLookup(
-    //   this,
-    //   `/aws/service/global-infrastructure/regions/${this.region}/longName`
-    // );
-
     new ssm.StringParameter(this, "S3BucketNameParameter", {
       parameterName: "/student-advising/BEANSTALK_URL",
       stringValue: cnamePrefix + "." + this.region + ".elasticbeanstalk.com",
