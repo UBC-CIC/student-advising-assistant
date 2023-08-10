@@ -22,7 +22,7 @@
       <div class="mt-auto p-3 bg-light text-center">
         <span class="text-muted">Information last updated on {{last_updated}}</span>
       </div>
-      <h1 class="m-5 text-center">{{title}}</h1>
+      <h1 id="ask" class="m-5 text-center">{{title}}</h1>
     </header>
     <div class="container mb-5">
       <div id="content" style="justify-content: center; display: flex;">
@@ -216,7 +216,6 @@
         </section>
       </div>
     </main>
-</body>
 
 <script type="text/javascript">
   let form_params = {{ form | tojson | safe}}
@@ -258,9 +257,9 @@
       let feedbackToggleVal = $("input[name='feedback-toggle']:checked").val();
       $("#feedback-hidden-helpful").val(feedbackToggleVal)
     });
-   });
+  });
   
   // ]]>
 </script>
-
+</body>
 </html>
