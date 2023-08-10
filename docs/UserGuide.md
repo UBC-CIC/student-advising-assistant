@@ -38,7 +38,7 @@ The data pipeline needs a configuration file to specify which websites to pull i
 6. The data pipeline will be triggered, and it may take several hours. Once complete, the processed documents will be available in the web app.
 
 ### Automatic Reruns
-The data pipeline is scheduled to rerun every -> **X** <- months, to pull any refreshed web content.
+By default, the data pipeline is scheduled to rerun on the first Sunday of every September, January, and May. 
 
 ### Manual Reruns
 If the data pipeline needs to be rerun outside of the scheduled times, it can be triggered by the Lambda function `start_ecs_task`
