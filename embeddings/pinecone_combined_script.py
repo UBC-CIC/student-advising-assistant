@@ -159,7 +159,7 @@ def create_index():
     Creates new pinecone index
     """
     metadata_config = {
-        "indexed": ["faculty","program"]
+        "indexed": ["faculty","program","specialization"]
     }
 
     pinecone.create_index(
