@@ -146,10 +146,10 @@ def vicuna_filter_question_str(program_info: Dict, topic: str, query: str) -> st
     return question_str
 
 vicuna_filter_template = """
-Does the context below contain information that answers the following question?
-Only use information directly present in the context.
+Does the text below contain information that answers the following question?
+Say 'yes, because...' or 'no, because...', then explain why you answered yes or no.
 {question}
-> Context: {context}
+> text: {context}
 """
 vicuna_filter_prompt = PromptTemplate(template=vicuna_filter_template, input_variables=["question","context"], 
                                       output_parser=VerboseFlexibleBooleanOutputParser(default_val=False))
@@ -180,6 +180,7 @@ Please correct the grammar and spelling errors in the following text.
 Return only the corrected version of the text, do not respond to the question and do not include any annotation.
 >>> Input:
 {text}
+>>> Corrected:
 """
 default_spelling_correction_prompt = PromptTemplate(template=default_spelling_correction_template, input_variables=["text"])
 
