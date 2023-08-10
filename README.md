@@ -83,3 +83,34 @@ This application was architected and developed by Arya Stevinson and Tien Nguyen
 ## License
 
 This project is distributed under the [MIT License](LICENSE).
+
+Licenses of libraries and tools used by the system are listed below:
+
+[PostgreSQL license](https://www.postgresql.org/about/licence/)
+- For PostgreSQL and pgvector
+- "a liberal Open Source license, similar to the BSD or MIT licenses."
+
+[BSD 3-clause](https://opensource.org/license/bsd-3-clause/)
+- For Networkx, Flask, and Pytorch
+
+[Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0)
+- For Transformers, Sentence-transformers, and Fschat
+
+[GNU General Public License](https://www.gnu.org/licenses/gpl-3.0.en.html)
+- For wget
+	
+[GNU Lesser General Public License](https://www.gnu.org/licenses/lgpl-3.0.en.html)
+- For Psycopg2-binary
+
+[MIT License](LICENSE)
+- For Spacy and Dictdiffer
+
+[HFOIL 1.0](https://github.com/huggingface/text-generation-inference/blob/bde25e62b33b05113519e5dbf75abda06a03328e/LICENSE)
+- For Huggingface text-generation-inference, used by the DLC container for the sagemaker inference endpoint
+- "HFOIL is not a true open source license because we added a restriction: to sell a hosted or managed service built on top of TGI, we now require a separate agreement."
+
+[LLaMa 2 Community License Agreement](https://github.com/facebookresearch/llama/blob/main/LICENSE)
+- For Vicuna 1.5, tuned off Llama 2
+- Not true open source due to some restrictions regarding inappropriate use
+- "Your use of the Llama Materials must comply with applicable laws and regulations"
+- Also includes restrictions on solutions that have "700 million monthly active users"

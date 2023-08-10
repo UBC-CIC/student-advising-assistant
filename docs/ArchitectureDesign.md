@@ -11,20 +11,20 @@ This document provides a more in-depth explanation of the system's architecture 
         2. [Answer Generation](#answer-generation)
 3. [AWS Infrastructure](#aws-infrastructure)
 
-## Introduction
+# Introduction
 
-## System Overview
+# System Overview
 
 This section will introduce the main components of the system.
 ![High Level Diagram](./images/high_level_diagram.png)
 - The data ingestion / processing pipeline is shown by the green ‘preprocessing’ section in the diagram above, see more details in [Data Processing](#data-processing)
 - The question answering system includes the ‘retrieval’ and ‘generation’ sections in the diagram above, more details in [Document Retrieval](#document-retrieval) and [Answer Generation](#answer-generation)
 
-### Data Processing
+## Data Processing
 
 The data ingestion / processing step scrapes the websites that the Admin specifies as information sources, then segments and preprocesses the contents for use by the question answering system. This step is performed only occasionally, when the information needs to be updated from the source websites.
 
-#### Website Scraping
+### Website Scraping
 
 The pipeline recursively downloads all child pages of the web pages specified in the configuration file. It keeps track of any redirects that occur, so that the processing step can identify link relationships between pages. It imposes a wait time between page downloads, as not to overburden the target websites.
 Preprocessing
@@ -76,11 +76,11 @@ Both services can perform similarity search, hybrid search, and metadata filteri
 
 The system uploads the vector embeddings with a set of metadata such as titles, text content (un-embedded), and url.
 
-### Question Answering System
+## Question Answering System
 
 At the front end of the question answering system, a user enters a question, and may include optional additional context (faculty, program, specialization, year level, and/or topic).
 
-#### Document Retrieval
+### Document Retrieval
 
 **Semantic Search**
 The system combines the user-inputted context with the question and embeds the text. The embedded text is sent to the vectorstore to perform a search for semantically similar extracts using the embedded query. The semantic search filters on metadata for faculty and/or program, if provided, so that only extracts within the user’s selected faculty and/or program will be returned. If the user includes their specialization and year level, this is included in the query used for semantic search, but the system does not strictly filter extracts on these fields.
@@ -104,7 +104,7 @@ The documents that the retriever returns are the most semantically similar to th
 
 If the filter step removes all returned documents, then the system removes some of the provided context and redoes the semantic search, effectively ‘zooming out’ the context, in case the answer lies in a more general section of the information sources. For example, a student in a particular program may ask a question where the answer lies under the general University policies, rather than in the pages specifically for their program. By zooming out the context, the system can retrieve the relevant information.
 
-#### Answer Generation
+### Answer Generation
 
 Using the remaining filtered extracts as context, the system prompts the LLM to generate a response that answers the user’s query. The prompt is engineered to encourage the LLM to use the provided context to answer the question and no prior knowledge, but it is always possible that a generative model will hallucinate, or misinterpret the given context.
 
@@ -115,14 +115,17 @@ Finally, the system displays the generated answer in the web UI. Since the gener
 By default, the system uses the Vicuna 7b LLM published by [lmsys](https://lmsys.org/). 
 When choosing a model, the following requirements were taken into account:
 - Open source and viable for commercial use
-    - For public institutions such as Universities, permission for commercial use is not required, but the commercial use clause allows additional safety and generalizability of the system
-- 7B (7 billion) parameters or less, to reduce cost of running the LLM
-    - Models with larger number of parameters require more expensive cloud instances
+    - For public institutions such as Universities, permission for commercial use may not be required, but the commercial use clause allows more safety and flexibility
+- 7B (7 billion) parameters or less, to reduce cost of running the LLM.
+    - Models with larger number of parameters require more expensive cloud instances, which may cause the system to be out of budget.
+    - 7B is the minimum size for most leading LLMs as of the time of writing (August 2023).
+
+The more traditional, non-generative models based on BERT were considered first, since they are smaller than modern generative LLMs would be far more cost-effective to run. However, these models demonstrate a lack of general language and logic understanding necessary to answer complex questions. See **LLM Sample Questions** below, for some sample responses from `distilbert-base-cased-distilled-squad`, a BERT-type model that is finetuned for extractive question answering. The answers demonstrate that the model is not strong enough for this purpose.
 
 The [Open LLM Leaderboard](https://huggingface.co/spaces/HuggingFaceH4/open_llm_leaderboard) by huggingface lists open source LLMs ranked by several metrics. At the time of writing (August 2023), the leading models of size 7B or less are:
 - LLaMa-2 Variants
     - [StableBeluga-7B](https://huggingface.co/stabilityai/StableBeluga-7B), fine-tuned on an Orca-style dataset (non-commercial)
-    - [Nous-Hermes-llama-2-7b](https://huggingface.co/NousResearch/Nous-Hermes-llama-2-7b), fine-tuned on an instruction-following dataset
+    - [Nous-Hermes-llama-2-7b](https://huggingface.co/NousResearch/Nous-Hermes-llama-2-7b), fine-tuned on an instruction-following dataset, also synthetic from GPT-4
     - [Llama2-7B-sharegpt4](https://huggingface.co/beaugogh/Llama2-7b-sharegpt4), finetuned on the ShareGPT dataset, which consists of user-shared conversations with ChatGPT
     - [Vicuna-7B](https://huggingface.co/lmsys/vicuna-7b-v1.5), also finetuned using the ShareGPT dataset
         - Other versions of Vicuna-7B are also high ranking in the leaderboard
@@ -137,11 +140,13 @@ The [Open LLM Leaderboard](https://huggingface.co/spaces/HuggingFaceH4/open_llm_
 
 With average scores of 49.95 and 47 respectively, MPT-7B and Falcon-7B fall considerably behind the LLaMa-2-7B variants which have scores up to 59. MPT is not supported out of the box for Sagemaker Inference Endoints, so it was not tested. Falcon-7B was tested, and despite prompt engineering, it had a high tendency for hallucinations.
 
-There is also a leaderboard of models ranked by human evaluation in the [lmsys chatbot arena](https://huggingface.co/spaces/lmsys/chatbot-arena-leaderboard). Some models that perform well according to automatic metrics may not perform well when ranked by human evaluators, and vice versa. As of August 2023, the leading <= 7B model in this leaderboard is Vicuna-7B, though the other Llama-2 variants listed in the Open LLM leaderboard were not included in the comparison. 
+There is also a leaderboard of models ranked by human evaluation in the [lmsys chatbot arena](https://huggingface.co/spaces/lmsys/chatbot-arena-leaderboard). Some models that perform well according to automatic metrics may not perform well when ranked by human evaluators, and vice versa. As of August 2023, the leading <= 7B model in this leaderboard is `Vicuna-7b`, though the other Llama-2 variants listed in the Open LLM leaderboard were not included in the comparison. 
 
-According to another leaderboard, [Alpaca Eval](https://tatsu-lab.github.io/alpaca_eval/), Vicuna-7B is also the leading 7B model. This leaderboard uses GPT4 and Claude to automatically rank models by the quality of their responses.
+According to another leaderboard, [Alpaca Eval](https://tatsu-lab.github.io/alpaca_eval/), `Vicuna-7b` is also the leading 7B model. This leaderboard uses GPT4 and Claude to automatically rank models by the quality of their responses.
 
-As a result, Vicuna 7B was chosen as the system’s LLM. Additional testing with the other LLaMa-2 variants listed in the Open LLM Leaderboard could be productive.
+**LLM Sample Questions**
+
+See the [Model Comparison](./Model%20Comparison.xlsx) worksheet for a list of sample questions asked on different contexts. The models tested were `Vicuna-7b`, `Nous-Hermes-llama-2-7b`, and `Llama-2-7b-chat` since they are leading `7b` models with licenses allowing for commercial use. Also included was `distilbert-base-cased-distilled-squad`, a non-generative question answering model that responds to questions by extracting a portion of the provided context.
 
 **LLM Licenses**
 
