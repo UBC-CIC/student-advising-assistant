@@ -1,8 +1,9 @@
 import json
 from aws_helpers.get_session import get_session
+import os
 
-LAMBDA_FUNCTION_NAME = "store-feedback-to-db"
-AWS_DEFAULT_REGION = "ca-central-1"
+LAMBDA_FUNCTION_NAME = os.environ["FEEDBACK_LAMBDA"]
+AWS_DEFAULT_REGION = os.environ["AWS_DEFAULT_REGION"]
 
 def store_feedback(json_payload: str, logging_only: bool = False):
     """

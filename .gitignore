@@ -12,6 +12,7 @@ demo-app*.zip
 freeze_mac_m1.txt
 **.pem
 bastion-host.pem
+document_scraping/proccessed
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

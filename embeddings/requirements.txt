@@ -1,10 +1,12 @@
 # General requirements
+boto3
 huggingface_hub 
 transformers
 langchain==0.0.240
 pandas
 sentence-transformers
 python-dotenv
+sshtunnel
 
 # PGVector requirements
 pgvector

@@ -84,7 +84,10 @@ export class VpcStack extends Stack {
       subnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
     });
 
-    // // Sagemaker Endpoints for VPC
+    // Sagemaker Endpoints for VPC, these allow access to the RDS 
+    // from a sagemaker studio notebook. Uncomment if you need
+    // this for dev purposes.
+
     // this.vpc.addInterfaceEndpoint("Sagemaker-API-Endpoint", {
     //   service: ec2.InterfaceVpcEndpointAwsService.SAGEMAKER_API,
     //   subnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },

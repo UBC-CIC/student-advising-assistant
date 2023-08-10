@@ -57,6 +57,7 @@ For instructions on how to develop the application, refer to the [Developer Guid
     ├───static
     └───templates
 ```
+
 1. `/aws_helpers`: Contains utilities classes / functions for connecting to AWS Services, used across the other portions of the app
 2. `/backend/cdk`: Contains the deployment code for the app's AWS infrastructure
     - `/lambda`: Contains the scripts for all lambda functions
