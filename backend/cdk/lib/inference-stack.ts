@@ -44,6 +44,12 @@ export class InferenceStack extends Stack {
       allowedValues: ["pgvector", "pinecone"], // allowed values of the parameter
     }).valueAsString; // get the value of the parameter as string
 
+    const llmMode = new CfnParameter(this, "llmMode", {
+      description: "If true, enables the LLM. If false, disables all LLM features and does not deploy LLM.",
+      default: "true",
+      allowedValues: ["true", "false"], // allowed values of the parameter
+    }).valueAsString; // get the value of the parameter as string
+
     // Bucket for files related to inference
     const inferenceBucket = new s3.Bucket(this, "student-advising-s3bucket", {
       removalPolicy: RemovalPolicy.DESTROY,
@@ -316,71 +322,76 @@ export class InferenceStack extends Stack {
       }
     );
 
-    // Role for Sagemaker
-    // this role will be used for both task role and task execution role
-    const smRole = new iam.Role(this, "sagemaker-role", {
-      assumedBy: new iam.ServicePrincipal("sagemaker.amazonaws.com"),
-      description: "Role for Sagemaker to create inference endpoint",
-    });
-    smRole.addManagedPolicy(
-      iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonSagemakerFullAccess")
-    );
-
+    // LLM configuration
     const HUGGINGFACE_MODEL_ID = "lmsys/vicuna-7b-v1.5";
     const MODEL_NAME = "vicuna";
     const INSTANCE_TYPE = "ml.g5.2xlarge";
     const NUM_GPUS = "1";
     this.SM_ENDPOINT_NAME = MODEL_NAME + "-inference";
-    const createSMEndpointLambda = new triggers.TriggerFunction(
-      this,
-      "student-advising-create-sm-endpoint",
-      {
-        functionName: "student-advising-create-sagemaker-endpoint",
-        runtime: lambda.Runtime.PYTHON_3_9,
-        handler: "create_sagemaker_endpoint.lambda_handler",
-        timeout: Duration.seconds(300),
-        memorySize: 512,
-        environment: {
-          SM_ENDPOINT_NAME: this.SM_ENDPOINT_NAME,
-          SM_REGION: this.region || "us-west-2",
-          SM_ROLE_ARN: smRole.roleArn,
-          HF_MODEL_ID: HUGGINGFACE_MODEL_ID,
-          MODEL_NAME: MODEL_NAME,
-          INSTANCE_TYPE: INSTANCE_TYPE,
-          NUM_GPUS: NUM_GPUS,
-        },
-        vpc: vpcStack.vpc,
-        vpcSubnets: {
-          subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
-        },
-        code: lambda.Code.fromAsset("./lambda/create_sagemaker_endpoint"),
-      }
-    );
-    createSMEndpointLambda.addToRolePolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: [
-          // CloudWatch Logs
-          "logs:CreateLogGroup",
-          "logs:CreateLogStream",
-          "logs:PutLogEvents",
-        ],
-        resources: ["arn:aws:logs:*:*:*"],
-      })
-    );
-    createSMEndpointLambda.addToRolePolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: [
-          "sagemaker:AddTags",
-          "sagemaker:CreateModel",
-          "sagemaker:CreateEndpointConfig",
-          "sagemaker:CreateEndpoint",
-          "iam:PassRole"
-        ],
-        resources: ["*"],
-      })
-    );
+
+    // Create the SM Inference Endpoint only if LLM mode is enabled
+    if (llmMode == 'true') {
+      // Role for Sagemaker
+      // this role will be used for both task role and task execution role
+      const smRole = new iam.Role(this, "sagemaker-role", {
+        assumedBy: new iam.ServicePrincipal("sagemaker.amazonaws.com"),
+        description: "Role for Sagemaker to create inference endpoint",
+      });
+      smRole.addManagedPolicy(
+        iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonSagemakerFullAccess")
+      );
+
+      const createSMEndpointLambda = new triggers.TriggerFunction(
+        this,
+        "student-advising-create-sm-endpoint",
+        {
+          functionName: "student-advising-create-sagemaker-endpoint",
+          runtime: lambda.Runtime.PYTHON_3_9,
+          handler: "create_sagemaker_endpoint.lambda_handler",
+          timeout: Duration.seconds(300),
+          memorySize: 512,
+          environment: {
+            SM_ENDPOINT_NAME: this.SM_ENDPOINT_NAME,
+            SM_REGION: this.region || "us-west-2",
+            SM_ROLE_ARN: smRole.roleArn,
+            HF_MODEL_ID: HUGGINGFACE_MODEL_ID,
+            MODEL_NAME: MODEL_NAME,
+            INSTANCE_TYPE: INSTANCE_TYPE,
+            NUM_GPUS: NUM_GPUS,
+          },
+          vpc: vpcStack.vpc,
+          vpcSubnets: {
+            subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
+          },
+          code: lambda.Code.fromAsset("./lambda/create_sagemaker_endpoint"),
+        }
+      );
+      createSMEndpointLambda.addToRolePolicy(
+        new iam.PolicyStatement({
+          effect: iam.Effect.ALLOW,
+          actions: [
+            // CloudWatch Logs
+            "logs:CreateLogGroup",
+            "logs:CreateLogStream",
+            "logs:PutLogEvents",
+          ],
+          resources: ["arn:aws:logs:*:*:*"],
+        })
+      );
+      createSMEndpointLambda.addToRolePolicy(
+        new iam.PolicyStatement({
+          effect: iam.Effect.ALLOW,
+          actions: [
+            "sagemaker:AddTags",
+            "sagemaker:CreateModel",
+            "sagemaker:CreateEndpointConfig",
+            "sagemaker:CreateEndpoint",
+            "iam:PassRole"
+          ],
+          resources: ["*"],
+        })
+      );
+    }
 
     // Create the SSM parameter with the string value of the sagemaker inference endpoint name
     new ssm.StringParameter(this, "SmEndpointNameParameter", {
@@ -404,6 +415,12 @@ export class InferenceStack extends Stack {
     new ssm.StringParameter(this, "RetrieverNameParameter", {
       parameterName: "/student-advising/retriever/RETRIEVER_NAME",
       stringValue: retrieverType,
+    });
+
+    // Create the SSM parameter with the llm mode
+    new ssm.StringParameter(this, "LlmMode", {
+      parameterName: "/student-advising/LLM_MODE",
+      stringValue: llmMode,
     });
   }
 }
