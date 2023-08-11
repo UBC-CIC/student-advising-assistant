@@ -1,6 +1,8 @@
 # Developer Guide
 
-### Local Flask app deployment
+## Local Development of Flask App
+
+### Local Flask deployment
 Some additional steps are required to deploy the web app locally for development
 
 1. Clone the git repo
@@ -33,7 +35,9 @@ If using the RDS PGVector to store documents, some setup will be required to acc
     - *details about this*
 - Restart the flask app, it should now be able to use the `pgvector` retriever with connection to RDS
 
-### Building docker container and run locally for the flask app
+### Building docker container and running locally
+
+These instructions are to test the docker container that will run the Flask app on Elastic Beanstalk. If not developing the docker container, you can skip this step and move directly to "Uploading the app to beanstalk".
 
 The default platform intended for the container is `--platform=linux/amd64`. Might be able to run on MacOS. For Windows,
 you probably have to get rid of the flag inside the Dockerfile before building.
@@ -60,71 +64,30 @@ replace `localhost-port` with any port, usually 5000, but can use 5001 or other 
 
 ### Zipping modules for Beanstalk
 
-Run this command when you're in the root folder `student-advising-assistant`
+Run this bash command when you're in the root folder `student-advising-assistant`L
 
 ```bash
 zip -r demo-app-v2.zip aws_helpers/ flask_app/ Dockerfile -x "*/.*" -x ".*"
 ```
 
+### Uploading the app to Beanstalk
+To upload the current version of the flask app to beanstalk, use the `deploy_beanstalk.sh` script in the root `student_advising_assistant`.
+From the `student_advising_assistant` folder, call the script through terminal in Linux, or WSL in windows. 
+In Linux, this may require installing the zip tool: `sudo apt install zip`
+In Windows, the command can only be run using WSL.
 
-# -----------------------------------------------
-
-### Running the Demo App Locally
-
-Some setup will be required if you want to run the app locally for development.
-- Create a `.env` file under `/flask_app`
-    - File contents:
-    ```
-    AWS_PROFILE_NAME=<insert AWS SSO profile name>
-    MODE=dev
-    ```
-    - 'MODE=dev' activates verbose LLMs and uses the /dev versions of secrets and SSM parameters
-- Create a conda env with the command `conda env create -f environment.yml` from the flask_app directory
-- Activate the environment with `conda activate flaskenv` (or whichever name you chose for the environment)
-- Ensure your AWS profile is logged in via `aws sso login --profile <profile name>`
-- Run `flask --app application --debug run` to run the app in debug mode (specify the port with `-p <port num>`)
-
-### Using PGVector locally
-
-If using the RDS PGVector to store documents, some setup will be required to access the it while developing locally since the DB is within a VPC. Follow this [guide](https://reflectoring.io/connect-rds-byjumphost/) here to create the bastion host only. At the step where you create the keypair, name your key-pair `bastion-host` so that a file called `bastion-host.pem` can be downloaded to your local machine. Make sure you create the ec2 bastion host in a public subnet, with public ipv4 address enabled. In the bastion host's security group, only allow inbound connection from your local device's public ipv4 address. To do that, type "What's my ip" in google search and you will see the ip address. Then in the security group, specify `<your-ip>/32` as Source. If you change your location, or your ip address is not static, you would have to update that value with the correct value.
-
-- Modify the `.env` file in the root of `/flask_app`
-    - Add these variables:
-
-        ```bash
-        EC2_PUBLIC_IP=<public-ipv4-of-the-bastion-host>
-        EC2_USERNAME=ec2-user # default ec2 username
-        SSH_PRIV_KEY=bastion-host.pem
-        ```
-
-    - Also ensure that `MODE=dev` is in the `.env`
-- Add the `bastion-host.pem` file in the root of `/flask_app`
-- Restart the flask app, it should now be able to use the `pgvector` retriever with connection to RDS
-
-### Building docker container and run locally for the flask app
-
-The default platform intended for the container is `--platform=linux/amd64`. Might be able to run on MacOS. For Windows,
-you probably have to get rid of the flag inside the Dockerfile before building.
-
-Make sure you're in the root directory (`student-advising-assistant/`)and have Docker running on your computer
-
-To build the container, replace `image-name` with the image name of your choice:
-
-```bash
-docker build . -t <image-name>:latest
+```
+./deploy_beanstalk.sh \
+	AWS_PROFILE_NAME=<enter profile name> \
+	AWS_PROFILE_REGION=<enter region> \
+	BUNDLE_NAME=student-advising-app \
+	BUNDLE_VER=<enter unique version name> \
+	BEANSTALK_BUCKET=<enter name of the beanstalk s3 bucket> \
+	APP_NAME=student-advising-demo-app \
+	APP_ENV_NAME=student-advising-demo-app-env
 ```
 
-Run the container: 
-
-Here we're mounting the aws credentials directory so that the container have access to the aws cli profiles
-
-```bash
-docker run -v ${HOME}/.aws/credentials:/root/.aws/credentials:ro --env-file .env -d -p <localhost-port>:5000 <image-name>:latest
-
-<<<<<<< HEAD
-```bash
-zip -r <zip-file-name>.zip aws_helpers/ flask_app/ Dockerfile -x "*/.*" -x ".*" -x "*__pycache__*"
-```
+## Development of `document_scraping` and `embeddings`
 
 ### Dockerize the `document_scraping` and `embeddings` for the ECS and ECR
 
@@ -156,21 +119,21 @@ docker push <aws-account-number>.dkr.ecr.<aws-region>.amazonaws.com/scraping-con
 
 Repeat those step for the embedding script. Remember to use the `embedding.Dockerfile`` instead.
 
-### CDK
+## CDK
 
-#### Bootstrap (only required once per AWS region)
+### Bootstrap (only required once per AWS region)
 
 ```bash
 cdk bootstrap aws://<account-number>/<region> --profile <profile-name>
 ```
 
-#### Synth (run before `cdk deploy`)
+### Synth (run before `cdk deploy`)
 
 ```bash
 cdk synth --all --profile <profile-name>
 ```
 
-#### Deploy
+### Deploy
 
 ```bash
 cdk deploy --all \

@@ -55,7 +55,7 @@ else
     # Check the user's response
     if [[ "$choice" =~ ^[Yy]$ ]]; then
         echo "Continuing the script..."
-        # zip -r $COMBINE_FILENAME aws_helpers/ flask_app/ Dockerfile -x "*/.*" -x ".*"
+        zip -r $COMBINE_FILENAME aws_helpers/ flask_app/ Dockerfile -x "*/.*" -x ".*" || echo "Failed to zip file"
         echo "Created new zip bundle $COMBINE_FILENAME"
     else
         echo "Exiting the script."
