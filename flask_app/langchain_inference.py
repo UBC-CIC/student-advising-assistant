@@ -24,7 +24,17 @@ MAX_TOKENS = 900 # Max input tokens
 
 ### LOAD AWS CONFIG
 param_manager = get_param_manager()
+
+use_llm = None
+try:
+    use_llm = param_manager.get_parameter('USE_LLM') == 'true'
+except:
+    use_llm = True
+    
+print(f"Use llm mode: {'true' if use_llm else 'false'}")
+
 retriever_config = param_manager.get_parameter('retriever')
+
 generator_config = param_manager.get_parameter('generator')
 
 ### LOAD FILES
@@ -59,19 +69,21 @@ download_all_dirs(retriever_config['RETRIEVER_NAME'])
 data_source_annotations = read_text(os.path.join('static','data_source_annotations.json'), as_json=True)
 
 ### LOAD MODELS 
+detailed_llm = spell_correct_chain = combine_documents_chain = filter = filter_question_fn = compressor = None
 
-# LLMs
-base_llm, qa_prompt = llms.load_model_and_prompt(generator_config['ENDPOINT_TYPE'], generator_config['ENDPOINT_NAME'], generator_config['MODEL_NAME'])
-concise_llm = llms.load_fastchat_adapter(base_llm, generator_config['MODEL_NAME'], prompts.fastchat_system_concise)
-detailed_llm = llms.load_fastchat_adapter(base_llm, generator_config['MODEL_NAME'], prompts.fastchat_system_detailed)
+if use_llm:
+    # LLMs
+    base_llm, qa_prompt = llms.load_model_and_prompt(generator_config['ENDPOINT_TYPE'], generator_config['ENDPOINT_NAME'], generator_config['MODEL_NAME'])
+    concise_llm = llms.load_fastchat_adapter(base_llm, generator_config['MODEL_NAME'], prompts.fastchat_system_concise)
+    detailed_llm = llms.load_fastchat_adapter(base_llm, generator_config['MODEL_NAME'], prompts.fastchat_system_detailed)
 
-# Chains
-spell_correct_chain = llms.load_spell_chain(base_llm, generator_config['MODEL_NAME'])
-combine_documents_chain = load_qa_chain(llm=detailed_llm, chain_type="stuff", prompt=qa_prompt)
+    # Chains
+    spell_correct_chain = llms.load_spell_chain(base_llm, generator_config['MODEL_NAME'])
+    combine_documents_chain = load_qa_chain(llm=detailed_llm, chain_type="stuff", prompt=qa_prompt)
 
-# Document compressors
-filter, filter_question_fn = llms.load_chain_filter(detailed_llm, generator_config['MODEL_NAME'])
-compressor = LLMChainExtractor.from_llm(concise_llm)
+    # Document compressors
+    filter, filter_question_fn = llms.load_chain_filter(detailed_llm, generator_config['MODEL_NAME'])
+    compressor = LLMChainExtractor.from_llm(concise_llm)
 
 # Retriever
 retriever: Retriever = load_retriever(retriever_config['RETRIEVER_NAME'], dev_mode=DEV_MODE, 
@@ -288,32 +300,51 @@ def backoff_retrieval(retriever: Retriever, program_info: Dict, topic: str, quer
     removed_docs = [doc for doc in removed_docs if doc.metadata['doc_id'] not in doc_ids]
     return docs, removed_keys, removed_docs
 
-async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=None,
-                    combine_with_sibs:bool=False, spell_correct:bool=True, 
-                    do_filter:bool=True, compress:bool=False, 
-                    generate_by_document:bool=False,
-                    generate_combined:bool=True, k:int=3):
+default_config = {
+    'start_doc': None,
+    'combine_with_sibs': False, 
+    'spell_correct': use_llm, 
+    'do_filter': use_llm,
+    'compress': False, 
+    'generate_by_document': False,
+    'generate_combined': use_llm, 
+    'k': 3
+}
+def consolidate_config(config: Dict, default_config: Dict = default_config):
+    """
+    Combine the default config options with any provided config options
+    Provided options will overwrite defaults
+    """
+    consolidated_config = copy.copy(default_config)
+    for key,val in config.items():
+        consolidated_config[key] = val
+    return consolidated_config
+
+async def run_chain(program_info: Dict, topic: str, query: str, config: Dict):
 
     """
     Run the question answering chain with the given context and query
     - program_info: Dict of values describe the faculty, program, specialization, and/or year
     - topic: Topic of the question
     - query: The text query
-    - start_doc: If provided, will start searching with the provided document index rather than performing similarity search
-    - combine_with_sibs: If true, combines all documents with their immediate sibling documents
-    - spell_correct: If true, prompts a LLM to fix spelling and grammar of the prompt
-    - do_filter: If true, applies a LLM filter step to the retrieved documents to remove irrelevant documents
-    - compress: If true, applies a LLM compres step to compress documents, extracting relevant sections
-    - generate_by_document: If true, generates a response for each final document
-    - generate_combined: If true, generates a reponse using the combined documents
+    
+    - config: A dict of optional settings for retrieval:
+        - start_doc: If provided, will start searching with the provided document index rather than performing similarity search
+        - combine_with_sibs: If true, combines all documents with their immediate sibling documents
+        - spell_correct: If true, prompts a LLM to fix spelling and grammar of the prompt
+        - do_filter: If true, applies a LLM filter step to the retrieved documents to remove irrelevant documents
+        - compress: If true, applies a LLM compres step to compress documents, extracting relevant sections
+        - generate_by_document: If true, generates a response for each final document
+        - generate_combined: If true, generates a reponse using the combined documents
+        - k: Number of documents to retrieve
     """
-
+    config = consolidate_config(config)
     main_response: str = None
     alerts: str = []
     removed_docs: List[Document] = []
     
     # Spell correct the query if the option is turned on
-    if spell_correct:
+    if config['spell_correct']:
         corrected_query = spell_correct_chain.run(query)
         if query.lower() != corrected_query.lower(): alerts.append(f'Used spell/grammar corrected query: {corrected_query}')
         query = corrected_query
@@ -322,42 +353,43 @@ async def run_chain(program_info: Dict, topic: str, query:str, start_doc:int=Non
     
     docs = []
     ignored_keys = []
-    if start_doc:
+    if config['start_doc']:
         # If given a document id to start with, retrieve that document
-        docs += retriever.docs_from_ids([start_doc])
+        docs += retriever.docs_from_ids([config['start_doc']])
     else:
         # Peform retrieval
-        result, ignored_keys, removed_docs = backoff_retrieval(retriever, program_info, topic, query, k=k, do_filter=do_filter)
+        result, ignored_keys, removed_docs = backoff_retrieval(retriever, program_info, topic, query, k=config['k'], do_filter=config['do_filter'])
         docs += result
 
-    if combine_with_sibs: combine_sib_docs(retriever, docs)
+    if config['combine_with_sibs']: combine_sib_docs(retriever, docs)
 
     # Perform compression step if the option is turned on
     compressed_docs = None
-    if compress: 
+    if config['compress']: 
         compressed_docs = compressor.compress_documents(docs, llm_query)
         get_related_links_from_compressed(docs, compressed_docs)
 
     # Perform a combined generation if the option is turned on
-    if generate_combined:
+    if config['generate_combined']:
         input_docs = compressed_docs if compressed_docs else docs
         if len(input_docs) > 0:
-            print(combine_documents_chain.prompt_length(input_docs, question=llm_query))
             while combine_documents_chain.prompt_length(input_docs, question=llm_query) > MAX_TOKENS:
+                # Remove documents if the resulting input would be too long
                 print(combine_documents_chain.prompt_length(input_docs, question=llm_query))
                 last_doc = input_docs[-1]
                 removed_docs.insert(0,last_doc)
                 input_docs.remove(last_doc)
+                
             combined_answer = combine_documents_chain.run(input_documents=input_docs, question=llm_query)
             main_response = combined_answer
     
     for doc in docs:    
         # Generate a response from this document onlys, if the option is turned on
-        if generate_by_document:
+        if config['generate_by_document']:
             generated = detailed_llm.run(doc=doc,query=query)
             doc.metadata['generated_response'] = generated
     
-        if compress:
+        if config['compress']:
             # Add markings to highlight the compressed section of the document in the UI
             compressed_content = [c_doc.page_content for c_doc in compressed_docs if c_doc.metadata['doc_id'] == doc.metadata['doc_id']]
             if len(compressed_content) > 0: 

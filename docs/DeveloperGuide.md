@@ -1,10 +1,32 @@
 # Developer Guide
 
-## Local Development of Flask App
+This guide contains some additional instructions for developing the system.
+
+## Table of Contents
+- [Requirements](#requirements)
+- [Local App Development](#local-app-development)
+- [Development of `document_scraping` and `embeddings`](#development-of-document_scraping-and-embeddings)
+- [CDK](#cdk)
+
+## Requirements
+
+To develop the system, you must have the following installed on your device:
+
+- [git](https://git-scm.com/downloads)
+- [git lfs](https://git-lfs.com/)
+- [AWS Account](https://aws.amazon.com/account/)
+- [GitHub Account](https://github.com/)
+- [AWS CLI](https://aws.amazon.com/cli/)
+- [AWS CDK](https://docs.aws.amazon.com/cdk/latest/guide/cli.html)
+- [Python 3+](https://www.python.org/downloads/)
+
+If you are on a Windows device, it is recommended to install the [Windows Subsystem For Linux](https://docs.microsoft.com/en-us/windows/wsl/install), which lets you run a Linux terminal on your Windows computer natively. Some of the steps will require its use. [Windows Terminal](https://apps.microsoft.com/store/detail/windows-terminal/9N0DX20HK701) is also recommended for using WSL.
+
+
+## Local App Development
+To develop the Flask app locally, some additional steps are required.
 
 ### Local Flask deployment
-Some additional steps are required to deploy the web app locally for development
-
 1. Clone the git repo
 2. Create a `.env` file under `/flask_app`
     - File contents:
@@ -35,7 +57,7 @@ If using the RDS PGVector to store documents, some setup will be required to acc
     - *details about this*
 - Restart the flask app, it should now be able to use the `pgvector` retriever with connection to RDS
 
-### Building docker container and running locally
+### Docker Container
 
 These instructions are to test the docker container that will run the Flask app on Elastic Beanstalk. If not developing the docker container, you can skip this step and move directly to "Uploading the app to beanstalk".
 
@@ -62,20 +84,18 @@ The docker run command mount the directory which contains the aws cli credential
 
 replace `localhost-port` with any port, usually 5000, but can use 5001 or other if 5000 is already used by other processes.
 
-### Zipping modules for Beanstalk
-
-Run this bash command when you're in the root folder `student-advising-assistant`L
-
-```bash
-zip -r demo-app-v2.zip aws_helpers/ flask_app/ Dockerfile -x "*/.*" -x ".*"
-```
-
 ### Uploading the app to Beanstalk
-To upload the current version of the flask app to beanstalk, use the `deploy_beanstalk.sh` script in the root `student_advising_assistant`.
-From the `student_advising_assistant` folder, call the script through terminal in Linux, or WSL in windows. 
-In Linux, this may require installing the zip tool: `sudo apt install zip`
-In Windows, the command can only be run using WSL.
+To deploy the current version of the Flask app on Elastic Beanstalk, use the `deploy_beanstalk.sh` script in the root `student_advising_assistant`.
 
+Linux:
+1. Install the zip tool: `sudo apt install zip`
+
+Windows:
+1. Install [WSL](https://learn.microsoft.com/en-us/windows/wsl/install)
+2. In WSL, install the zip tool: `sudo apt install zip`
+3. In WSL, navigate to the `student_advising_assistant`
+
+From the `student_advising_assistant` folder, call the script:
 ```
 ./deploy_beanstalk.sh \
 	AWS_PROFILE_NAME=<enter profile name> \
@@ -86,6 +106,10 @@ In Windows, the command can only be run using WSL.
 	APP_NAME=student-advising-demo-app \
 	APP_ENV_NAME=student-advising-demo-app-env
 ```
+- When prompted to create the zip file, enter `Y` to zip the files
+- When prompted to deploy the app, enter `1` to upload and deploy to Elastic Beanstalk
+
+For future deployments of the app, make sure to update the BUNDLE_VER argument. The new version name must be unique.
 
 ## Development of `document_scraping` and `embeddings`
 

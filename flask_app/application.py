@@ -87,7 +87,7 @@ async def answer():
     topic = request.form['topic']
     question = request.form['question']
     filter_elems = ['faculty','program','specialization','year']
-    program_info = {filter_elem: request.form[filter_elem] for filter_elem in filter_elems if request.form[filter_elem] != ''}
+    program_info = {filter_elem: request.form[filter_elem] for filter_elem in filter_elems}
     
     # Checks if the form was submitted with a starting document id
     start_doc = request.args.get('doc')
@@ -95,7 +95,10 @@ async def answer():
         start_doc = int(start_doc)
 
     # Run the model inference
-    docs, main_response, alerts, removed_docs = await langchain_inference_module.run_chain(program_info,topic,question,start_doc=start_doc)
+    config = {
+        'start_doc': start_doc
+    }
+    docs, main_response, alerts, removed_docs = await langchain_inference_module.run_chain(program_info,topic,question,config)
     
     # Log the question
     context_str = ' : '.join(list(program_info.values()) + [topic])
@@ -156,6 +159,7 @@ def setup():
     defaults = read_text(DEFAULTS_PATH, as_json=True)
 
 setup()
+initialize()
 
 # Run the application
 # must be like this to run from container

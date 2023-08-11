@@ -13,6 +13,10 @@ This document provides a more in-depth explanation of the system's architecture 
 
 # Introduction
 
+The student advising assistant is a system intended to help students find answers to academic and policy related questions, by referencing official university documentation and synthesizing an answer using large language models. 
+
+At a high level, this is achieved using [Retrieval Augmented Generation](https://docs.aws.amazon.com/sagemaker/latest/dg/jumpstart-foundation-models-customize-rag.html). The system preprocesses specified information websites, and then fetches relevant sections when a user inputs a question through the web UI. Given these references, the system uses a large language model to generate an informed response to the user's question.
+
 # System Overview
 
 This section will introduce the main components of the system.
@@ -157,3 +161,43 @@ Also note that any models finetuned using outputs from OpenAI models have a some
 > (c) Restrictions. You may not [...] (iii) use output from the Services to develop models that compete with OpenAI;
 
 As a result, there is some legal ambiguity when using these models. The student advising assistant is not intended to compete with OpenAI.
+
+# AWS Infrastructure
+
+This section provides an overview of the AWS components used in the system architecture.
+
+## Architecture Diagram 
+
+![Architecture Diagram](./images/architecture_diagram.png)
+
+**Amazon Virtual Private Cloud (VPC)**
+Various components of the infrastructure are placed inside a VPC for a more isolated and secure cloud environment.
+
+**Question Answering**
+
+1. A user (eg. a student) interacts with the web UI of the application hosted on AWS Elastic Beanstalk, and submits a query. 
+2. Using semantic search over the embedded documents in the Amazon RDS PostgreSQL database, the app fetches documents that are most closely related to the user’s query.
+    1. The diagram illustrates the case where documents are stored in Amazon RDS. In the case that the system is using the Pinecone retriever, the app would instead make a request to the Pinecone.io API.
+3. The app invokes an Amazon SageMaker Inference Endpoint hosting a LLM, prompting it to respond to the user’s query using the retrieved documents from step 2 as context. It then displays the response and the reference documents to the user in the web UI.
+4. The system logs all questions and answers, storing them in the Amazon RDS PostgreSQL database by making a request to an AWS Lambda Function as a proxy. Users can provide feedback to help improve the solution, which is also stored in the Amazon RDS PostgreSQL database using the AWS Lambda Function.
+
+**Data Processing**
+
+5. When an Admin wants to configure the underlying settings of the data processing pipeline (eg. website scraping settings), they can modify and upload a config file to the predetermined folder on an Amazon S3 Bucket.
+6. The S3 Bucket triggers an invocation of an AWS Lambda Function to start a Task with the container cluster on Amazon ECS.
+7. This container cluster starts a Task that first performs web scraping of the configured websites, then processes the pages into extracts, and computes the vector embedding of the extracts. Finally, it stores the embeddings in the Amazon RDS PostgreSQL database (with pgvector support enabled). The Task is also scheduled to run every 4 months by default with a CRON-expression scheduler. An Admin/Developer can modify the schedule on-demand via the ECS console.
+    1. The diagram illustrates the case where documents are stored in Amazon RDS. In the case that the system is using the Pinecone retriever, the Task would instead send the embedded extracts to the Pinecone API.
+
+## Database Schema
+
+Below is the schema for the AWS RDS PostgreSQL database.
+
+![Database Schema](./images/database_schema.png)
+
+- feedback: stores the feedback provided by users
+- logging: stores inputted questions and the system-generated responses
+- update_logs: record the latest date that the system updated the data (pulled from information websites)
+
+
+There are other tables automatically created and maintained by the Langchain library to store and manage the document embeddings with PGVector. These are not included in the schema since they are managed by Langchain and subject to change with new Langchain versions.
+
