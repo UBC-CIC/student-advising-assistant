@@ -159,7 +159,6 @@ def setup():
     defaults = read_text(DEFAULTS_PATH, as_json=True)
 
 setup()
-initialize()
 
 # Run the application
 # must be like this to run from container

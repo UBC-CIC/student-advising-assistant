@@ -120,19 +120,16 @@ cdk bootstrap aws://YOUR_AWS_ACCOUNT_ID/YOUR_ACCOUNT_REGION --profile your-profi
 
 **Deploy the CDK stacks**
 
-You may  run the following command to deploy the stacks all at once. Please replace `<profile-name>` with the appropriate AWS profile used earlier. Choose the appropriate command depending on whether you are using pgvector or Pinecone retriever.
+You may  run the following command to deploy the stacks all at once. Please replace `<profile-name>` with the appropriate AWS profile used earlier. 
 
-If using pgvector retriever:
+If using pgvector retriever, replace <retriever-type> with pgvector, or omit the retrieverType parameter. If using pinecone retriever, replace <retriever-type> with pinecone.
+
+If you would prefer not to deploy the LLM (eg. for cost reasons), replace `llmMode=true` with `llmMode=false`. The system will not deploy a LLM endpoint, and it will return references from the information sources only, without generated responses.
+
 ```bash
 cdk deploy --all \
-    --parameters InferenceStack:retrieverType=pgvector \
-    --profile <profile-name>
-```
-
-If using Pinecone retriever:
-```bash
-cdk deploy --all \
-    --parameters InferenceStack:retrieverType=pinecone \
+    --parameters InferenceStack:retrieverType=<retriever-type> \
+    --parameters InferenceStack:llmMode=true \
     --profile <profile-name>
 ```
 

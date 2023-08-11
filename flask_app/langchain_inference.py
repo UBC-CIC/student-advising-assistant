@@ -310,6 +310,7 @@ default_config = {
     'generate_combined': use_llm, 
     'k': 3
 }
+
 def consolidate_config(config: Dict, default_config: Dict = default_config):
     """
     Combine the default config options with any provided config options
@@ -402,4 +403,7 @@ async def run_chain(program_info: Dict, topic: str, query: str, config: Dict):
     if len(ignored_keys) > 0:
         alerts.append(f"Did not find answer specific to {', '.join([program_info[key] for key in ignored_keys])}")
     
+    if not use_llm:
+        main_response = "See the references below for relevant information that may help answer your question."
+        
     return docs, main_response, alerts, removed_docs
