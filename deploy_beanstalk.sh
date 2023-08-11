@@ -26,20 +26,22 @@ echo "The S3 bucket for AWS Elastic Beanstalk app deployment file is: $BEANSTALK
 echo "The name of the Beanstalk app: $APP_NAME"
 echo "The environment name of the Beanstalk app: $APP_ENV_NAME"
 
-COMBINE_FILENAME="$3-$4.zip"
+COMBINE_FILENAME="$BUNDLE_NAME-$BUNDLE_VER.zip"
 
 if [ -f "$COMBINE_FILENAME" ]; then
     echo "Zip file exists: $COMBINE_FILENAME"
-    options="Overwrite Quit"
+    options="Overwrite Keep-Existing Quit"
     PS3="Select any option: "
     select o in $options; do
         if [ $o == 'Quit' ]; then
             echo "Exiting the script."
-            exit 1
+            exit 0
+        elif [ $o == 'Overwrite' ]; then
+            echo "Create new zip file with same name, overwriting $COMBINE_FILENAME..."
+            zip -r $COMBINE_FILENAME aws_helpers/ flask_app/ Dockerfile -x "*/.*" -x ".*" || echo "Failed to zip file"
+            echo "Created new zip bundle $COMBINE_FILENAME"
         fi
-        echo "Create new zip file with same name, overwriting $COMBINE_FILENAME..."
-        zip -r $COMBINE_FILENAME aws_helpers/ flask_app/ Dockerfile -x "*/.*" -x ".*"
-        echo "Created new zip bundle $COMBINE_FILENAME"
+        break
     done
 else
     echo "Zip file does not exist: $COMBINE_FILENAME"
@@ -57,7 +59,7 @@ else
         echo "Created new zip bundle $COMBINE_FILENAME"
     else
         echo "Exiting the script."
-        exit 1
+        exit 0
     fi
 fi
 
@@ -78,7 +80,7 @@ select o in $options; do
     echo "Creating application version $BUNDLE_VER for app $APP_NAME, in region $AWS_PROFILE_REGION ..."
     aws elasticbeanstalk create-application-version --application-name $APP_NAME \
         --version-label $BUNDLE_VER \
-        --source-bundle S3Bucket="$BUCKET_NAME",S3Key="$COMBINE_FILENAME" \
+        --source-bundle S3Bucket=$BEANSTALK_BUCKET,S3Key=$COMBINE_FILENAME \
         --profile $AWS_PROFILE_NAME \
         --region $AWS_PROFILE_REGION
     
@@ -91,6 +93,7 @@ select o in $options; do
         --region $AWS_PROFILE_REGION
 
     echo "Deployment successful. Exiting the script"
+    exit 0
 done
 
 # aws elasticbeanstalk create-application-version --application-name my-app --version-label 12345 --source-bundle S3Bucket="mybucket",S3Key="deploy.zip"
