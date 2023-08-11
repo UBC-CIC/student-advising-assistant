@@ -162,6 +162,12 @@ Also note that any models finetuned using outputs from OpenAI models have a some
 
 As a result, there is some legal ambiguity when using these models. The student advising assistant is not intended to compete with OpenAI.
 
+**No-LLM Mode**
+
+There is also the option to run the system without the use of an LLM at all. This could be for safety reasons (eg. to avoid the potential inaccuracy of a generated response), or for cost reasons (the majority of the cost of provisioning the system is due to hosting the LLM model).
+
+The Deployment Guide explains how to deploy the system in no-llm mode.
+
 # AWS Infrastructure
 
 This section provides an overview of the AWS components used in the system architecture.
