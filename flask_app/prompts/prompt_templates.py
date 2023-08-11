@@ -140,7 +140,7 @@ def vicuna_filter_question_str(program_info: Dict, topic: str, query: str) -> st
     context_str = filter_context_str(program_info, topic)
     
     if context_str:
-        question_str += f'If the context is not about {context_str}, then say no and explain why the context is not relevant.'
+        question_str += f'If the text is not about {context_str}, then say no because it is not relevant.'
         
     question_str += f'\n> Question: {query}\n'
     return question_str
@@ -149,7 +149,7 @@ vicuna_filter_template = """
 Does the text below contain information that answers the following question?
 Say 'yes, because...' or 'no, because...', then explain why you answered yes or no.
 {question}
-> text: {context}
+> Text: {context}
 """
 vicuna_filter_prompt = PromptTemplate(template=vicuna_filter_template, input_variables=["question","context"], 
                                       output_parser=VerboseFlexibleBooleanOutputParser(default_val=False))
