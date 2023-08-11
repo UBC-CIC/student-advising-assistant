@@ -86,7 +86,7 @@ aws secretsmanager create-secret \
 
 ## Deployment 
 
-## Step 1: Clone The Repository
+### Step 1: Clone The Repository
 
 First, clone the GitHub repository onto your machine. To do this:
 
@@ -104,7 +104,7 @@ The code should now be in the folder you created. Navigate into the root folder 
 cd student-advising-assistant
 ``` 
 
-## Step 2: CDK Deployment
+### Step 2: CDK Deployment
 
 It's time to set up everything that goes on behind the scenes! For more information on how the backend works, feel free to refer to the Architecture Deep Dive, but an understanding of the backend is not necessary for deployment.
 
@@ -136,7 +136,7 @@ cdk deploy --all \
     --profile <profile-name>
 ```
 
-### Extra: Taking down the deployed stacks
+#### **Extra: Taking down the deployed stacks**
 
 To take down the deployed stack for a fresh redeployment in the future, navigate to AWS Cloudformation, click on the stack(s) and hit Delete. Please wait for the stacks in each step to be properly deleted before deleting the stack downstream. The deletion order is as followed:
 

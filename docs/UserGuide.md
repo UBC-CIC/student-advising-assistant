@@ -14,9 +14,9 @@ Once you have deployed the solution, the following user guide will help you navi
 
 ### Updating the Configuration File
 The data pipeline needs a configuration file to specify which websites to pull information from.
-1. In the AWS Console, navigate to the S3 bucket, then to the `document_scraping` folder
+1. In the [S3 Console](https://s3.console.aws.amazon.com/s3/home?region=us-west-2#), navigate to the bucket named `student-advising-s3bucket`, then to the `document_scraping` folder
 ![AWS S3 bucket](./images/s3_bucket_config.png)
-2. Download the file `dump_config.json5`
+2. Download the file `dump_config.json5`, which should already exist in the folder
 3. Open `dump_config.json5` in any text editor
 4. The file contains an example dump config entry, with comments explaining all fields. To add a new site to the dump, copy the example dump config and fill in the required fields. For a minimal configuration, use the following template:
 - ```
@@ -35,11 +35,18 @@ The data pipeline needs a configuration file to specify which websites to pull i
     - Specify the identifying attribute(s) in the main_content_attrs. For example: `main_content_attrs: { id: "primary-content" }`
 - Specifying additional fields of the dump_config can improve the preprocessing, but is best done by a developer. Details about the fields are included in the example config in `dump_config.json5`
 5. Save the `dump_config.json5` file and in the AWS Console, click 'upload' and drag and drop the updated file.
-6. The data pipeline will be triggered, and it may take several hours. Once complete, the processed documents will be available in the web app.
+6. The data pipeline will be triggered, and it may take several hours to complete. Once complete, the processed documents will be available in the web app, and the web app will display a banner with the date that the pipeline was run.
 
 ### Automatic Reruns
-By default, the data pipeline is scheduled to rerun on the first Sunday of every September, January, and May. 
+The data pipeline is scheduled to automatically rerun on the first Sunday of every September, January, and May. 
 
 ### Manual Reruns
-If the data pipeline needs to be rerun outside of the scheduled times, it can be triggered by the Lambda function `start_ecs_task`
-**-> Include more information on how to trigger this <-**
+If the data pipeline needs to be rerun outside of the scheduled times, it can be triggered by reuploading the `dump_config.json5` as described above, or it can be triggered by the Lambda function `student-advising-start-ecs-task`:
+1. Run the command below, replacing `<profile-name>` with your AWS profile name.
+```bash
+aws lambda invoke \
+    --function-name student-advising-start-ecs-task \
+    --profile <profile-name> 
+    student-advising-start-ecs-task-log.txt
+```
+2. The rerun will take several hours to complete. Once it is complete, the web app will display the time that the pipeline finished.
