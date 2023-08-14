@@ -3,7 +3,7 @@
 **/__pycache__/
 **__pycache__/
 */site_dumps
-*/test.py
+**/test.py
 *.wget-hsts
 /flask_app/data/*
 **/.DS_Store
@@ -14,6 +14,8 @@ freeze_mac_m1.txt
 bastion-host.pem
 document_scraping/processed
 **/.vscode/
+**/log.txt
+**/*.zip
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

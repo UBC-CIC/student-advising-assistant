@@ -6,15 +6,16 @@
 
 Once you have deployed the solution, the following user guide will help you navigate the functions available.
 
-| Index                                        | Description                                           |
-| :------------------------------------------  | :---------------------------------------------------- |
-| [Data Pipeline](#data-pipeline)              | Rerun the pipeline to update information sources      |
+| Index                                                                               | Description                                           |
+| :---------------------------------------------------------------------------------  | :---------------------------------------------------- |
+| [Data Pipeline](#data-pipeline)                                                     | Rerun the pipeline to update information sources      |
+| [Pruning the Faculties and Programs List](#pruning-the-faculties-and-programs-list) | Clean the list of faculties and programs              |
 
 ## Data Pipeline
 
 ### Updating the Configuration File
 The data pipeline needs a configuration file to specify which websites to pull information from.
-1. In the [S3 Console](https://s3.console.aws.amazon.com/s3/home?region=us-west-2#), navigate to the bucket named `student-advising-s3bucket`, then to the `document_scraping` folder
+1. In the [S3 Console](https://s3.console.aws.amazon.com/s3), navigate to the bucket named `inferencestack-studentadvisings3bucket...`, then to the `document_scraping` folder
 ![AWS S3 bucket](./images/s3_bucket_config.png)
 2. Download the file `dump_config.json5`, which should already exist in the folder
 3. Open `dump_config.json5` in any text editor
@@ -50,3 +51,39 @@ aws lambda invoke \
     student-advising-start-ecs-task-log.txt
 ```
 2. The rerun will take several hours to complete. Once it is complete, the web app will display the time that the pipeline finished.
+
+## Pruning the Faculties and Programs List
+
+The data processing step automatically identifies the available faculties, programs, and specializations available by regex matching
+on the titles of extracts. This can result in some false positives, or false negatives.
+
+This list of available faculties / programs / specializations is used to populate the suggestions in the dropdown of the Web UI:
+![Web UI Programs Dropdown](./images/ui_program_dropdown.PNG)
+
+The list may need manual pruning after the data processing is first run, to remove 'false positives'. To do this, go through the following steps:
+1. In the [S3 Console](https://s3.console.aws.amazon.com/s3), navigate to the bucket named `inferencestack-studentadvisings3bucket...`, then to the `documents` folder
+    1. If the `documents` folder doesn't exist, then the data processing pipeline likely hasn't yet completed.
+2. Download the file `faculties.json`, which should already exist in the folder. Be sure to download `faculties.json`, and not `faculties_unpruned.json`
+    1. `faculties_unpruned.json` keeps the original faculty and programs list, before pruning
+3. Open `faculties.json` in any text editor. The format of the document is:
+```
+{
+    "<faculty-name>": {
+        "programs": {
+            "<program-name>": {
+                "specializations": {
+                    "<specialization-name>": {},
+                    ...
+                }
+            },
+            ...
+        }
+    },
+    ...
+}
+```
+4. Remove any faculties, programs, or specializations that should not be listed as options for the Web UI's dropdowns. Be careful to preserve the json formatting of the file.
+5. You can also add or modify specialization names, but be careful not to modify faculty or program names since they are used as filters for the document retrieval step.
+6. Save the `faculties.json` file and in the AWS Console, click 'upload' and drag and drop the updated file.
+
+Future runs of the data processing pipeline will reapply any changes that you made to this file. If the data sources are updated, you may need to manually check the `faculties.json` file again through the same process.
