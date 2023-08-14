@@ -61,6 +61,14 @@ The files under `/flask_app/static` are customizable:
 - The root url should be a section of the url that is present for all pages in the intended data source, eg "university.website.ca"
 - Different subsections of the same site could have different annotations by specifying a subdirectory in the root url, eg "university.website.ca/undergrad" and "university.website.ca/graduate"
 - The website urls should align with the websites chosen for download, see [User Guide](UserGuide#data-pipeline) for more details
+7. `defaults.json`: Specifies the default faculty and program to autofill the dropdown menu of the UI with. If the system is to be used for a particular faculty's advising, then specify these defaults.
+- File format:
+```
+{
+    "faculty": "<enter default faculty name>",
+    "program": "<enter default program name>"
+}
+```
 
 ### Set Up Pinecone Index **(Optional)**
 This step is only necessary if you choose to use the Pinecone retriever instead of PGVector.
