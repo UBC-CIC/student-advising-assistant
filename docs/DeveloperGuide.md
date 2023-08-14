@@ -4,6 +4,7 @@ This guide contains some additional instructions for developing the system.
 
 ## Table of Contents
 - [Requirements](#requirements)
+- [Development Considerations](#development-considerations)
 - [Local App Development](#local-app-development)
 - [Development of `document_scraping` and `embeddings`](#development-of-document_scraping-and-embeddings)
 - [CDK](#cdk)
@@ -24,6 +25,18 @@ To develop the system, you must have the following installed on your device:
 
 If you are on a Windows device, it is recommended to install the [Windows Subsystem For Linux](https://docs.microsoft.com/en-us/windows/wsl/install), which lets you run a Linux terminal on your Windows computer natively. Some of the steps will require its use. [Windows Terminal](https://apps.microsoft.com/store/detail/windows-terminal/9N0DX20HK701) is also recommended for using WSL.
 
+## Development Considerations
+
+This section includes aspects that should by considered when setting up this system for a particular University / Faculty. Ideally, these should be modified by a developer, hence including them in the Developer Guide rather than the User Guide.
+
+**Zoom-out Retrieval**
+By default, during the document retrieval step, the system performs a ‘zoom-out’ retrieval. The code for this is in `flask_app/langchain_inference.py`. If the system fails to find any relevant documents with the full user-provided context, it will successively remove parts of the context to see if the relevant documents are in a more general section of the information sources. This way, it will check faculty-specific policies first, then zoom out to University-wide policies if it does not find the answer there.
+If a University or faculty has a different policy hierarchy, they will need to change this behaviour.
+
+**Faculty & Program Titles**
+By default, the data processing script identifies the faculty, program, and specialization titles using a regular expression matching on the titles of scraped webpages. You may need to modify the regex in `./document_scraping/processing_functions.py` to better suit 
+This step may have some false positives (eg. identifies ‘Major Programs’ as the name of a major), and these positives need to be pruned from the list of programs (see the [User Guide](./UserGuide.md#pruning-the-faculties-and-programs-list)).
+This step could be improved if the University has an index of all faculties, programs, and specializations which can be used instead. However, you will have to ensure that the names of faculties and programs aligns with the names of faculties and programs in the extract metadata, in order for the metadata filtering to work during document retrieval.
 
 ## Local App Development
 To develop the Flask app locally, some additional steps are required.
