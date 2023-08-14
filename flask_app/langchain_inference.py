@@ -69,21 +69,21 @@ download_all_dirs(retriever_config['RETRIEVER_NAME'])
 data_source_annotations = read_text(os.path.join('static','data_source_annotations.json'), as_json=True)
 
 ### LOAD MODELS 
-detailed_llm = spell_correct_chain = combine_documents_chain = filter = filter_question_fn = compressor = None
+spell_correct_chain = combine_documents_chain = filter = compressor = None
 
 if use_llm:
     # LLMs
-    base_llm, qa_prompt = llms.load_model_and_prompt(generator_config['ENDPOINT_TYPE'], generator_config['ENDPOINT_NAME'], generator_config['MODEL_NAME'])
-    concise_llm = llms.load_fastchat_adapter(base_llm, generator_config['MODEL_NAME'], prompts.fastchat_system_concise)
-    detailed_llm = llms.load_fastchat_adapter(base_llm, generator_config['MODEL_NAME'], prompts.fastchat_system_detailed)
+    base_llm, qa_prompt = llms.load_model_and_prompt(generator_config['ENDPOINT_TYPE'], generator_config['ENDPOINT_NAME'], 
+                                                     generator_config['MODEL_NAME'])
+    base_llm.verbose = VERBOSE_LLMS
 
     # Chains
-    spell_correct_chain = llms.load_spell_chain(base_llm, generator_config['MODEL_NAME'])
-    combine_documents_chain = load_qa_chain(llm=detailed_llm, chain_type="stuff", prompt=qa_prompt)
+    spell_correct_chain = llms.load_spell_chain(base_llm, generator_config['MODEL_NAME'], verbose=VERBOSE_LLMS)
+    combine_documents_chain = load_qa_chain(llm=base_llm, chain_type="stuff", prompt=qa_prompt, verbose=VERBOSE_LLMS)
 
     # Document compressors
-    filter, filter_question_fn = llms.load_chain_filter(detailed_llm, generator_config['MODEL_NAME'])
-    compressor = LLMChainExtractor.from_llm(concise_llm)
+    filter = llms.load_chain_filter(base_llm, generator_config['MODEL_NAME'], verbose=VERBOSE_LLMS)
+    compressor = LLMChainExtractor.from_llm(base_llm)
 
 # Retriever
 retriever: Retriever = load_retriever(retriever_config['RETRIEVER_NAME'], dev_mode=DEV_MODE, 
@@ -191,7 +191,7 @@ def format_docs_for_display(docs: List[Document]):
         if doc.page_content.startswith('*'): doc.page_content = '  ' + doc.page_content
 
         # Replace any occurrence of 4 spaces, since it will be interepreted as a code block in markdown
-        doc.page_content = doc.page_content.replace('    ', '   ')
+        doc.page_content = doc.page_content.replace('    ', '\t')
         
         # Render links in markdown
         for title,(link,_) in doc.metadata['links'].items():
@@ -212,8 +212,7 @@ def llm_filter_docs(docs: List[Document], program_info: Dict, topic: str, query:
     """
     
     # Run the filter chain
-    query = filter_question_fn(program_info, topic, query)
-    filtered, removed = filter.compress_documents(docs, query)
+    filtered, removed = filter.compress_documents(docs, query, program_info = program_info, topic = topic)
     if return_removed:
         return filtered, removed
     else:
@@ -387,7 +386,7 @@ async def run_chain(program_info: Dict, topic: str, query: str, config: Dict):
     for doc in docs:    
         # Generate a response from this document onlys, if the option is turned on
         if config['generate_by_document']:
-            generated = detailed_llm.run(doc=doc,query=query)
+            generated = combine_documents_chain.run(input_documents=[doc], question=llm_query)
             doc.metadata['generated_response'] = generated
     
         if config['compress']:

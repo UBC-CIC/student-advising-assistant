@@ -1,15 +1,19 @@
 from langchain.retrievers.document_compressors import LLMChainFilter
-from typing import Optional, Sequence, Tuple
+from typing import Optional, Sequence, Tuple, Any
 from langchain.schema import Document
 from langchain.callbacks.manager import Callbacks
 from langchain import LLMChain
+from langchain.schema import BasePromptTemplate
+from langchain.schema.language_model import BaseLanguageModel
 
 class VerboseFilter(LLMChainFilter):
     """
     Filter that uses an LLM to drop documents that aren't relevant to the query.
-    Returns the list of relevant documents, and the irrelevant documents.
-    Adds metadata with an explanation for why the LLM thinks they are 
-    relevant/irrelevant, if provided.
+    Has the following additional properties:
+        - Returns both the list of relevant documents, and the irrelevant documents.
+        - Adds metadata with an explanation for why the LLM thinks they are 
+          relevant/irrelevant, if provided.
+        - Supports verbose mode for the LLMChain
     """
     
     reason_metadata_key: str = 'keep_reason'
@@ -40,3 +44,25 @@ class VerboseFilter(LLMChainFilter):
             else:
                 removed_docs.append(doc)
         return filtered_docs, removed_docs
+    
+    @classmethod
+    def from_llm(
+        cls,
+        llm: BaseLanguageModel,
+        prompt: Optional[BasePromptTemplate] = None,
+        verbose: bool = False,
+        **kwargs: Any
+    ) -> "VerboseFilter":
+        """Create a VerboseFilter from a language model.
+
+        Args:
+            llm: The language model to use for filtering.
+            prompt: The prompt to use for the filter.
+            verbose: Sets the chain to verbose if true
+            **kwargs: Additional arguments to pass to the constructor.
+
+        Returns:
+            A VerboseFilter that uses the given language model.
+        """
+        llm_chain = LLMChain(llm=llm, prompt=prompt, verbose=verbose)
+        return cls(llm_chain=llm_chain, **kwargs)

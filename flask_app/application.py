@@ -159,6 +159,9 @@ def setup():
     defaults = read_text(DEFAULTS_PATH, as_json=True)
 
 setup()
+if DEV_MODE:
+    # In dev mode, run initialization automatically for convenience
+    initialize()
 
 # Run the application
 # must be like this to run from container

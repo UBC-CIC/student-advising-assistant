@@ -9,7 +9,6 @@ flask[async]
 pinecone-client 
 pinecone-text
 boto3
-fschat
 psycopg2-binary
 pgvector
 sshtunnel

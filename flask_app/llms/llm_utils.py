@@ -11,8 +11,7 @@ import json
 from typing import Tuple, Dict, Callable
 import os 
 import prompts
-from filters import VerboseFilter
-from .fastchat_adapter import FastChatLLM
+from filters import VerboseFilter, FilterWithContext
 from .huggingface_qa import HuggingFaceQAEndpoint
 from .sagemaker_endpoint import MySagemakerEndpoint
 from aws_helpers.param_manager import get_param_manager
@@ -36,22 +35,6 @@ class ContentHandler(LLMContentHandler):
         return response_json[0]["generated_text"]
     
 ### MODEL LOADING FUNCTIONS
-
-fastchat_models = {
-    'vicuna': 'vicuna_v1.1',
-    'falcon': 'falcon'
-}
-
-def load_fastchat_adapter(base_llm: BaseLLM, model_name: str, system_instruction: str) -> BaseLLM:
-    """
-    Loads a fastchat adapter for the given base model, with the provided system instruction
-    """
-    
-    if model_name not in fastchat_models:
-        print(f'Warning: {model_name} is not supported for FastChat')
-        return base_llm
-
-    return FastChatLLM.from_base_llm(base_llm, fastchat_models[model_name], system_instruction=system_instruction)
     
 def load_model_and_prompt(endpoint_type: str, endpoint_name: str, model_name: str) -> Tuple[BaseLLM,Prompt]:
     """
@@ -123,29 +106,22 @@ def load_huggingface_qa_endpoint(name: str) -> BaseLLM:
     llm = HuggingFaceQAEndpoint(repo_id=name)
     return llm
 
-def load_chain_filter(base_llm: BaseLLM, model_name: str) -> Tuple[LLMChainFilter, Callable[[Dict,str,str],str]]:
+def load_chain_filter(base_llm: BaseLLM, model_name: str, verbose: bool = False) -> FilterWithContext:
     """
     Loads a chain filter using the given base llm for the given model name
-    Returns: a tuple of the filter, and a function to generate a question string
-        - The function should be called to generate the query to pass to the filter chain
-        - Function inputs are: program_info: Dict, topic: str, query: str
+    Returns: FilterWithContext, wrapping a chain filter. 
+             Expects the following inputs to the compress_documents function: docs, query, program_info, topic
     """
     if model_name == 'vicuna':
-        return VerboseFilter.from_llm(base_llm,prompt=prompts.vicuna_filter_prompt), prompts.vicuna_filter_question_str
-    elif model_name == 'falcon':
-        return VerboseFilter.from_llm(base_llm,prompt=prompts.vicuna_filter_prompt), prompts.vicuna_filter_question_str
+        return FilterWithContext(VerboseFilter.from_llm(base_llm,prompt=prompts.vicuna_filter_prompt,verbose=verbose), prompts.filter_context_str)
     else:
-        return VerboseFilter.from_llm(base_llm,prompt=prompts.default_filter_prompt), prompts.basic_filter_question_str
+        return FilterWithContext(VerboseFilter.from_llm(base_llm,prompt=prompts.default_filter_prompt,verbose=verbose), prompts.filter_context_str)
     
-def load_spell_chain(base_llm: BaseLLM, model_name: str) -> LLMChain:
+def load_spell_chain(base_llm: BaseLLM, model_name: str, verbose: bool = False) -> LLMChain:
     """
     Loads a spelling correction chain using the given base llm
     Chooses a prompts based on the model name
     Returns: A LLMChain for spelling correction
     """
     prompt = prompts.default_spelling_correction_prompt
-    
-    if model_name == 'falcon':
-        prompt = prompts.falcon_spelling_correction_prompt
-        
-    return LLMChain(llm=base_llm,prompt=prompt)
+    return LLMChain(llm=base_llm,prompt=prompt,verbose=verbose)
