@@ -24,8 +24,8 @@ const app = new cdk.App();
 console.log("App region is ", app.region)
 // const identifier = "ai-assist"
 
-// process.env.CDK_DEFAULT_REGION
-const region = "us-west-2"
+const region = process.env.CDK_DEFAULT_REGION
+// const region = "us-west-2"
 
 const vpcStack = new VpcStack(app, "student-advising-VpcStack", {
   env: {
