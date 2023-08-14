@@ -168,10 +168,19 @@ cdk synth --all --profile <profile-name>
 
 ```bash
 cdk deploy --all \
-    --parameters DatabaseStack:dbUsername=<username> \
-    --parameters InferenceStack:retrieverType=<retrieverType> \
+    --parameters InferenceStack:retrieverType=<retriever-type> \
+    --parameters InferenceStack:llmMode=true \
     --profile <profile-name>
 ```
+
+#### **Extra: Taking down the deployed stacks**
+
+To take down the deployed stack for a fresh redeployment in the future, navigate to AWS Cloudformation, click on the stack(s) and hit Delete. Please wait for the stacks in each step to be properly deleted before deleting the stack downstream. The deletion order is as followed:
+
+1. HostingStack
+2. InferenceStack
+3. student-advising-DatabaseStack
+4. student-advising-VpcStack
 
 ## Architecture Diagram and Database Schema
 
