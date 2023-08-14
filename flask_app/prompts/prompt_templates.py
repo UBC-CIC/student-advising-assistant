@@ -37,22 +37,22 @@ def llm_query(program_info: Dict, topic: str, query: str):
 ### GENERAL PROMPT TEMPLATES
 # Some models prefer to receive inputs in a particular format
 
-vicuna_template = """{system}\n\nUSER:{input}\n\nASSISTANT:\n"""
+vicuna_template = """{system}\n\nUSER:\n{input}\n\nASSISTANT:\n"""
 vicuna_full_prompt = PromptTemplate(template=vicuna_template, input_variables=["system","input"])
 
 ### SYSTEM PROMPTS
 # These are prompts to tell the system 'who it is' when using fastchat adapter
 
 system_concise = PromptTemplate(template="""
-    A chat between a user and an artificial intelligence assistant.
-    The assistant is for the University of British Columbia (UBC). 
-    The assistant follows instructions precisely and gives concise answers.""",
-    input_variables=[])
+A chat between a user and an artificial intelligence assistant.
+The assistant is for the University of British Columbia (UBC). 
+The assistant follows instructions precisely and gives concise answers.""",
+input_variables=[])
 
 system_detailed = PromptTemplate(template="""
-    A chat between a University of British Columbia (UBC) student and an artificial intelligence assistant. 
-    The assistant gives helpful, detailed, and polite answers to the user's questions.""",
-    input_variables=[])
+A chat between a University of British Columbia (UBC) student and an artificial intelligence assistant. 
+The assistant gives helpful, detailed, and polite answers to the user's questions.""",
+input_variables=[])
 
 ### FILTER PROMPTS
 
@@ -137,7 +137,7 @@ default_filter_prompt = PromptTemplate(template=default_filter_template, input_v
 
 vicuna_filter_system_template = """
 A chat between a UBC student and an artificial intelligence assistant.
-The user wants to answer the question: {% if context and context != 'None' %} For {{ context }}, {% endif %} {{ question }}?
+The user wants to answer the question: {% if context and context != 'None' %} For {{ context }}, {% endif %} {{ question }}
 {% if context and context != 'None' %}\nThe user doesn't want any information that is not specifically about {{context}}.
 Note that combined majors, honours, and majors are all different programs.\n{% endif %}
 """
@@ -145,7 +145,7 @@ Note that combined majors, honours, and majors are all different programs.\n{% e
 vicuna_filter_system_prompt = PromptTemplate(template=vicuna_filter_system_template, input_variables=["context","question"], template_format="jinja2")
 
 vicuna_filter_input_template = """
-{% if context and context != 'None' %}Is the text below about {{ context }} and contains information that answers the question?{% else %}Does the text below contain information that answers the question?{% endif %}
+{% if context and context != 'None' %}Is the text below about {{ context }} and contain information relevant to answer the question?{% else %}Does the text below contain information relevant to answer the question?{% endif %}
 Say 'yes, because...' or 'no, because...', then explain why you answered yes or no.
 {% if context and context != 'None' %}If the text is not about {{ context }}, say no because it is not relevant.\n{% endif %}
 > Text: 
@@ -163,20 +163,33 @@ vicuna_filter_prompt = PipelinePromptTemplate(
 
 ### QA PROMPTS
 
-# Template for Vicuna question answering
-qa_input_template = """
+default_qa_template = """
 Please answer the question based on the context below.
 Use only the context provided to answer the question, and no other information.
 If the context doesn't have enough information to answer, explain what information is missing.\n
-Context:{context}\n
-Question:{question}""".strip()
-default_qa_prompt = PromptTemplate(template=qa_input_template, input_variables=["context","question"])
+Context:\n{context}\n
+Question:\n{question}""".strip()
+default_qa_prompt = PromptTemplate(template=default_qa_template, input_variables=["context","question"])
+
+vicuna_qa_system_template = """A chat between a University of British Columbia (UBC) student and an academic advising assistant.
+The assistant gives helpful, detailed, and polite answers to the user's questions.
+The assistant only uses the information below to answer questions, and never makes up information.
+If the assistant isn't sure how to answer a question, it explains what information it is missing.
+
+Here is the information that the assistant knows:
+
+{context}
+"""
+vicuna_qa_system_prompt = PromptTemplate(template=vicuna_qa_system_template, input_variables=["context"])
+
+vicuna_qa_input_template = """{question}""".strip()
+vicuna_qa_input_prompt = PromptTemplate(template=vicuna_qa_input_template, input_variables=["question"])
 
 vicuna_qa_prompt = PipelinePromptTemplate(
     final_prompt=vicuna_full_prompt, 
     pipeline_prompts=[
-        ("system", system_detailed),
-        ("input", default_qa_prompt)
+        ("system", vicuna_qa_system_prompt),
+        ("input", vicuna_qa_input_prompt)
     ])
 
 # Template for huggingface endpoints of the 'question answering' type (eg BERT, not text generation)

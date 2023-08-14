@@ -75,7 +75,6 @@ if use_llm:
     # LLMs
     base_llm, qa_prompt = llms.load_model_and_prompt(generator_config['ENDPOINT_TYPE'], generator_config['ENDPOINT_NAME'], 
                                                      generator_config['MODEL_NAME'])
-    base_llm.verbose = VERBOSE_LLMS
 
     # Chains
     spell_correct_chain = llms.load_spell_chain(base_llm, generator_config['MODEL_NAME'], verbose=VERBOSE_LLMS)
