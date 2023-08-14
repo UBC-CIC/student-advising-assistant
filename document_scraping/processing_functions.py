@@ -1,33 +1,37 @@
-from bs4 import BeautifulSoup
-import json
+from bs4 import Tag
 import logging
-from tools import write_file
-import copy 
+import copy
 import regex as re
-from typing import List
-import os
-import website_dump_doc_extractor
-from website_dump_doc_extractor import make_tag, DumpConfig, DocExtractor
+from typing import List, Dict, Callable, Tuple, Optional
+from website_dump_doc_extractor import make_tag, DEFAULT_SPLIT_CLASS, DEFAULT_TITLE_TAGS
 
 """
-Contains website dump processing functions specific to the data sources:
-- UBC Academic Calendar
-- UBC Science Undergrad site
+Contains processing functions for the website dump processing
 
-Uses the DocExtractor class from website_dump_doc_extractor
+These functions can be referred to by name in the file 'dump_config.json5'.
+You can use these existing functions, or add your own.
+
+This file contains processing functions specific to UBC Science Advising
 """
 
 log = logging.getLogger(__name__)
-unhandled_tables = {}
-error_tables = {}
 
 ### REPLACEMENT FUNCTIONS
+"""
+These are functions to convert a BeautifulSoup Tag into another Tag
+They are applied to Tags that match certain attributes, as defined
+in dump_config.json5
+"""
 
-def convert_table(table: BeautifulSoup, url: str) -> BeautifulSoup:
+def convert_table(table: Tag, url: str) -> Tag:
     """
     Converts any table in the page to a more machine readable format
-    Specifically converts degree requirements tables, and attempts to convert all others
-    - soup: BeautifulSoup object for the page
+    Includes special processing functions for the following table types:
+    - Degree requirements table
+    - Continuation requirements table
+      eg. https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-science/bachelor-science/academic-performance-review-and-continuation#18568
+    - Promotion courses table
+      eg. https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-science/bachelor-science/bsc-specialization-specific-courses-required-promotion
     """
     if not table.find():
         # Empty table, ignore it
@@ -53,18 +57,27 @@ def convert_table(table: BeautifulSoup, url: str) -> BeautifulSoup:
     else:
         log.info(f' No specific function provided to handle the table (will try to handle as a generic table): \n - URL: {url} \n - Title: {table_title}')
 
-        add_elem_to_dict(unhandled_tables,url,table_title)
-
         try:
             new_table = table_conversion_function(table,convert_general_table_row)
         except Exception as e:
             log.error(f'Could not handle table: "{table_title}". Please add a method to handle this type of table.')
             log.debug(f'Error msg: {str(e)}')
-            add_elem_to_dict(error_tables,url,table_title)
             return table
     return new_table
 
-def table_conversion_function(table: BeautifulSoup, handle_row) -> BeautifulSoup:
+def table_conversion_function(table: Tag, handle_row: Callable[[List[Tag], Dict, List[Tuple[Tag,str]]],Tag]) -> Tag:
+    """
+    Converts a table tag by applying the handle_row function to all data rows
+    
+    Definition for the handle_row function:
+    Inputs:
+    - cells: List[Tag], the list of cell tags in the row
+    - footnotes: Dict, a dict of footnotes extracted from the table, if there are any
+    - headers: List[Tuple[Tag,str]]], a list of tuples with each header's footnote, and text
+               if there is no footnote in a header, the first element of the tuple is None.
+    Outputs:
+    - Outputs a single Tag object, should be a 'li' tag to insert into the output list
+    """
     current_list = make_tag('ul')
     output = make_tag('div', current_list)
     headers = None
@@ -78,7 +91,7 @@ def table_conversion_function(table: BeautifulSoup, handle_row) -> BeautifulSoup
     while row and table in row.parents:
         if title := row.find(['h1','h2','h3','h4']): 
             # row is a title row
-            output.append(make_tag('p',title.text.strip(),{'class': website_dump_doc_extractor.DEFAULT_SPLIT_CLASS}))
+            output.append(make_tag('p',title.text.strip(),{'class': DEFAULT_SPLIT_CLASS}))
             current_list = make_tag('ul')
             output.append(current_list)
         else:
@@ -89,14 +102,14 @@ def table_conversion_function(table: BeautifulSoup, handle_row) -> BeautifulSoup
                 # row with single heading becomes start of new list
                 th = cells[0]
                 footnote = combine_cell_footnotes(th, footnotes,remove_sup=True)
-                p = make_tag('p',make_tag('div',th.text.strip(),{'class': website_dump_doc_extractor.DEFAULT_SPLIT_CLASS})) # title
+                p = make_tag('p',make_tag('div',th.text.strip(),{'class': DEFAULT_SPLIT_CLASS})) # title
                 if footnote: p.extend(['(', *footnote.contents, ')']) # footnote
                 
                 ul = make_tag('ul')
                 current_list = ul
                 output.extend([p,ul])
             elif subtable := cells[0].find('table'):
-                # nested table, seen in some pages eg. https://vancouver.calendar.ubc.ca/emeriti-staff 'Librarians' section
+                # nested table
                 output.append(table_conversion_function(subtable, handle_row))
                 subtable.decompose()
             elif cells[0].name == 'th':
@@ -120,7 +133,7 @@ def handle_footnotes_only_table(footnotes):
         ul.append(make_tag('li',['[',num,'] ', *note.contents]))
     return ul
 
-def convert_degree_requirements_row(cells: list[BeautifulSoup], footnotes: list[BeautifulSoup], *_) -> BeautifulSoup:
+def convert_degree_requirements_row(cells: list[Tag], footnotes: list[Tag], *_) -> Tag:
     """
     Converts a row from the degree requirements table from the academic calendar to a 
     more machine-understandable format
@@ -135,7 +148,7 @@ def convert_degree_requirements_row(cells: list[BeautifulSoup], footnotes: list[
     else:
         return make_tag('li', cells[0].contents)
 
-def convert_continuation_requirements_row(cells: list[BeautifulSoup], *_) -> BeautifulSoup:
+def convert_continuation_requirements_row(cells: list[Tag], *_) -> Tag:
     """
     Converts a row from the continuation requirements table from the academic calendar to a 
     more machine-understandable format
@@ -153,7 +166,7 @@ def convert_continuation_requirements_row(cells: list[BeautifulSoup], *_) -> Bea
     
     return make_tag('li',[p,ul])
 
-def convert_promotion_courses_row(cells: list[BeautifulSoup], _, headers) -> BeautifulSoup:
+def convert_promotion_courses_row(cells: list[Tag], _, headers: List[Tuple[Tag,str]]) -> Tag:
     """
     Converts row from a promotion courses table from the academic calendar to a 
     more machine-understandable format
@@ -173,9 +186,9 @@ def convert_promotion_courses_row(cells: list[BeautifulSoup], _, headers) -> Bea
             make_tag('li', f'{headers[2][1]}: {cells[2].text.strip()}')])
         return make_tag('li',[p,ul])
 
-def convert_cell(cell, footnotes):
+def convert_cell(cell: Tag, footnotes: Dict) -> List[Tag]:
     """
-    Creates a list of contents for a generic cell and inserts footnotes if applicable
+    Creates a list of contents from a generic cell and inserts footnotes if applicable
     """
     cell_footnote = combine_cell_footnotes(cell,footnotes,remove_sup=True)
     output = [*cell.contents]
@@ -183,7 +196,7 @@ def convert_cell(cell, footnotes):
         output.extend([' (',*cell_footnote.contents,')'])
     return output
 
-def convert_cell_and_header(cell, header, footnotes):
+def convert_cell_and_header(cell: Tag, header: Tuple[Tag, str], footnotes: Dict) -> List[Tag]:
     """
     Creates a list of contents for a generic cell and its corresponding header
     Inserts footnotes if applicable
@@ -197,10 +210,9 @@ def convert_cell_and_header(cell, header, footnotes):
         output.extend([' (',*copy_footnote.contents,')'])
     return output
 
-def convert_general_table_row(cells: list[BeautifulSoup], footnotes: dict, headers: list[str]) -> BeautifulSoup:
+def convert_general_table_row(cells: list[Tag], footnotes: Dict, headers: list[str]) -> Tag:
     """
-    Converts row from a generic table from the academic calendar to a 
-    more machine-understandable format
+    Converts row from a generic table to a list entry
     """
     li = make_tag('li')
     if not headers and len(cells) == 2:
@@ -225,7 +237,7 @@ def convert_general_table_row(cells: list[BeautifulSoup], footnotes: dict, heade
                 li.append('; ')
     return li
 
-def convert_double_indexed_row(cells: list[BeautifulSoup], footnotes: dict, headers: list[str]):
+def convert_double_indexed_row(cells: list[Tag], footnotes: dict, headers: list[str]) -> Tag:
     """
     Converts row from a generic double indexed table from the academic calendar to a 
     more machine-understandable format
@@ -240,7 +252,7 @@ def convert_double_indexed_row(cells: list[BeautifulSoup], footnotes: dict, head
 
     return make_tag('li',[p,ul])
 
-def collect_footnotes(table):
+def collect_footnotes(table: Tag) -> Dict:
     """
     Finds all footnotes in the table, removes them from the table,
     and returns a dict of footnote indices and contents
@@ -261,7 +273,7 @@ def collect_footnotes(table):
     
     return footnotes
 
-def inject_footnote(cell, footnotes, prefix: str =' Note: ', suffix: str = ''):
+def inject_footnote(cell: Tag, footnotes: Dict, prefix: str =' Note: ', suffix: str = ''):
     """
     Injects the cell's footnote in place of a <sup> tag
     - cell: the cell to inject footnote into
@@ -274,18 +286,18 @@ def inject_footnote(cell, footnotes, prefix: str =' Note: ', suffix: str = ''):
         sup = cell.find('sup')
         sup.replace_with(make_tag('div',[prefix, note, suffix]))
 
-def is_footnote_cell(tag):
+def is_footnote_cell(tag: Tag):
     """
-    Filter function returns true if the tag is a footnote cell of a requirements table
+    Filter function returns true if the tag is a footnote cell
     """
     if not tag or not (tag.name in ['td','p']): return False
-    if tag.get('class') == 'footnote': return True
+    if tag.get('class') == 'footnote': return True # tag's class is footnote
     for child in tag.contents:
-        if child and child.name == 'sup': return True
+        if child and child.name == 'sup': return True # tag's first child is superscript
         if child.text and child.text.strip() != '': return False
     return False
 
-def get_footnotes_for_indexes(indexes,footnotes,strip_newlines=True):
+def get_footnotes_for_indexes(indexes: List[int], footnotes: Dict, strip_newlines=True) -> List[Tag]:
     """
     Returns the list of footnote contents for the given indexes,
     if they exist in the footnotes dict.
@@ -306,7 +318,7 @@ def get_footnotes_for_indexes(indexes,footnotes,strip_newlines=True):
             notes.append(copy_footnote)
     return notes
 
-def find_cell_footnotes(cell,footnotes,remove_sup=False):
+def find_cell_footnotes(cell: Tag, footnotes: Dict, remove_sup=False) -> Optional[List[Tag]]:
     """
     If the given table cell contains a footnote index in <sup> tag, then returns
     the corresponding notes from the footnotes dict.
@@ -320,7 +332,7 @@ def find_cell_footnotes(cell,footnotes,remove_sup=False):
         return notes
     return None
 
-def combine_cell_footnotes(cell,footnotes,remove_sup=False):
+def combine_cell_footnotes(cell: Tag, footnotes: Dict, remove_sup=False) -> Tag:
     """
     If the given table cell contains a footnote index in <sup> tag, then returns
     the corresponding notes from the footnotes dict, combined into one tag.
@@ -336,27 +348,22 @@ def combine_cell_footnotes(cell,footnotes,remove_sup=False):
 
 ### UTILITIES FOR REPLACEMENT FUNCTIONS
 
-def add_elem_to_dict(dict, url, title):
-    """
-    Adds the given title to dict, indexed by the url
-    If there is already an element in the dict at this url, appends the new title
-    """
-    if url not in dict:
-        dict[url] = []
-    dict[url].append(title)
-
-def get_row_cells(row: BeautifulSoup) -> list[BeautifulSoup]:
+def get_row_cells(row: Tag) -> list[Tag]:
     """
     Gets the list of cells in the row
     Removes trailing empty cells
     """
-    cells: list[BeautifulSoup] = row.find_all(['td','th'])
+    cells: list[Tag] = row.find_all(['td','th'])
     for cell in reversed(cells):
         if cell.text.strip() == '': cells.remove(cell)
         else: break
     return cells
 
 ### METADATA EXTRACTION FUNCTIONS
+"""
+These functions extract metadata for extracts.
+They are specified by name on a site-by-site basis in the dump_config.json5 file.
+"""
 
 faculty_prefixes = ['The Faculty of', 'The School of']
 faculty_suffixes = ['College(s)?', 'School of \w+']
@@ -376,7 +383,11 @@ specialization_prefix_regex = f"({'|'.join(specialization_prefixes)}).+"
 specialization_suffix_regex = f".+({'|'.join(specialization_suffixes)})"
 specialization_regex = re.compile(f"^({specialization_prefix_regex}|{specialization_suffix_regex})$")
 
-def calendar_extract_metadata(url: str, titles: List[str], parent_titles: List[str], text: str):
+def default_extract_metadata(url: str, titles: List[str], parent_titles: List[str], text: str):
+    """
+    Extracts metadata from titles, if any title elements match the
+    faculty, program, or specialization regex.
+    """
     metadata = {}
     for subtitle in parent_titles + titles:
         if 'faculty' not in metadata and re.match(faculty_regex, subtitle):
@@ -387,34 +398,34 @@ def calendar_extract_metadata(url: str, titles: List[str], parent_titles: List[s
             if 'specialization' not in metadata:
                 metadata['specialization'] = []
             metadata['specialization'].append(subtitle)
+    return metadata
+    
+def calendar_extract_metadata(url: str, titles: List[str], parent_titles: List[str], text: str):
+    metadata = default_extract_metadata(url, titles, parent_titles, text)
 
     if re.search('\- \d+ credits of ', text):
         if 'specialization' in metadata:
-            metadata['context'] = f"This is a list of degree requirements for {metadata['specialization']}.\n"
+            metadata['context'] = f"This is a list of degree requirements for {','.join(metadata['specialization'])}.\n"
         else: metadata['context'] = f'This is a list of degree requirements.\n'
                 
     return metadata
 
-def blog_extract_metadata(url: str, titles: List[str], parent_titles: List[str], text: str):
-    metadata = {'faculty': 'The Faculty of Science', 'program': 'Bachelor of Science'}
-    for subtitle in parent_titles + titles:
-        if re.match(specialization_regex, subtitle):
-            if 'specialization' not in metadata:
-                metadata['specialization'] = []
-            metadata['specialization'].append(subtitle)
-        
-    return metadata
-
 ### SPLIT TAG PREDICATES 
+"""
+These are predicates that identify tags that will be used for splitting the page.
+The predicate functions are necessary only if you need more complicated logic
+than can be specified with attributes.
+The predicates are indicated by name under the split_tags for a site in dump_configs.json5
+"""
 
-def is_h3_or_split_class(tag: BeautifulSoup):
+def is_h3_or_split_class(tag: Tag) -> bool:
     """
     Returns true if a tag is a h3 tag 
     OR it has the split class applied
     """
-    return tag.name == 'h3' or website_dump_doc_extractor.DEFAULT_SPLIT_CLASS in tag.get_attribute_list('class')
+    return tag.name == 'h3' or DEFAULT_SPLIT_CLASS in tag.get_attribute_list('class')
 
-def strong_tag_title(tag: BeautifulSoup) -> bool:
+def strong_tag_title(tag: Tag) -> bool:
     """
     Identifier of titles indicated by <strong> tags
     """
@@ -430,10 +441,15 @@ def strong_tag_title(tag: BeautifulSoup) -> bool:
     next_sib = tag.next_sibling
     parents = tag.parents
     for parent in parents:
-        if parent.name in (website_dump_doc_extractor.DEFAULT_TITLE_TAGS + ['table','ul']): return False
+        if parent.name in (DEFAULT_TITLE_TAGS + ['table','ul']): return False
     return next_sib == None
 
 ### CONTEXT EXTRACTION FUNCTIONS
+"""
+These functions identify 'context' text in a parent extract, that should be included
+with child extracts. The context is included in the 'context' column of child extracts.
+The functions will be applied on a site-by-site basis as defined in dump_configs.json5
+"""
 
 def parent_context_extractor(url: str, titles: List[str], parent_titles: List[str], text: str) -> str:
     """
@@ -446,35 +462,3 @@ def parent_context_extractor(url: str, titles: List[str], parent_titles: List[st
     if len(text) < 400 and any(keyword in text for keyword in keywords): 
         return text
     return None
-
-### MAIN FUNCTION
-
-def process_site_dumps(doc_extractor: DocExtractor, dump_configs: list[DumpConfig], 
-                       redirect_map_path: str, out_path: str):
-    """
-    Process predownloaded website dumps to extracts
-    - dump_configs: List of dump config classes for the downloaded websites
-    - redirect_map_path: filepath to the redirect map
-    """
-    # Read the redirect map
-    if redirect_map_path:
-        with open(redirect_map_path,'r') as f:
-            redirect_map = json.loads(f.read())
-            doc_extractor.link_redirects = redirect_map
-
-    doc_extractor.parse_folder(dump_configs,out_path)
-
-    def writer():
-        os.makedirs("processed", exist_ok=True)
-        unhandled_tables_file = os.path.join(out_path,'unhandled_tables.txt')
-        error_tables_file = os.path.join(out_path,'error_tables.txt')
-        with open(unhandled_tables_file,'w') as f:
-            json.dump(unhandled_tables,f, indent=4)
-        with open(error_tables_file,'w') as f:
-            json.dump(error_tables,f, indent=4)
-    
-    try:
-        write_file(writer)
-        log.info(" Wrote titles of unhandled and error tables to 'unhandled_tables.txt', 'error_tables.txt'")
-    except:
-        log.error(" Couldn't save record of unhandled and error table")

@@ -207,7 +207,11 @@
                 {name: 'h4'}
             ],
             mandatory_splits: 2,
-            metadata_extractor: 'blog_extract_metadata',
+            metadata: {
+                faculty: "The Faculty of Science",
+                program: "Bachelor of Science"
+            },
+            metadata_extractor: 'calendar_extract_metadata',
             parent_context_extractor: 'parent_context_extractor',
         }
     }
