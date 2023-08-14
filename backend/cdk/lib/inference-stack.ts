@@ -4,6 +4,8 @@ import {
   Duration,
   RemovalPolicy,
   CfnParameter,
+  CfnCondition,
+  Fn,
 } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
@@ -330,7 +332,15 @@ export class InferenceStack extends Stack {
     this.SM_ENDPOINT_NAME = MODEL_NAME + "-inference";
 
     // Create the SM Inference Endpoint only if LLM mode is enabled
-    if (llmMode == 'true') {
+
+    new CfnCondition(this, "llm-mode-boolean", {
+      expression: Fn.conditionEquals(llmMode, "true")
+    });
+
+    const llmFlag = Fn.conditionIf("llm-mode-boolean", true , false);
+    console.log(llmFlag)
+    
+    if (llmFlag) {
       // Role for Sagemaker
       // this role will be used for both task role and task execution role
       const smRole = new iam.Role(this, "sagemaker-role", {

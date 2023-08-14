@@ -21,12 +21,11 @@ const app = new cdk.App();
 
   /* For more information, see https://docs.aws.amazon.com/cdk/latest/guide/environments.html */
 
-console.log("App region is ", app.region)
 // const identifier = "ai-assist"
 
 const region = process.env.CDK_DEFAULT_REGION
 // const region = "us-west-2"
-
+console.log("App region is ", region)
 const vpcStack = new VpcStack(app, "student-advising-VpcStack", {
   env: {
     account: process.env.CDK_DEFAULT_ACCOUNT,
