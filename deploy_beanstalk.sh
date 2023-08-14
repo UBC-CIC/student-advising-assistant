@@ -38,7 +38,7 @@ if [ -f "$COMBINE_FILENAME" ]; then
             exit 0
         elif [ $o == 'Overwrite' ]; then
             echo "Create new zip file with same name, overwriting $COMBINE_FILENAME..."
-            zip -r $COMBINE_FILENAME aws_helpers/ flask_app/ Dockerfile -x "*/.*" -x ".*" || echo "Failed to zip file"
+            zip -r $COMBINE_FILENAME aws_helpers/ flask_app/ Dockerfile -x "*/.*" -x ".*" -x "*.env" -x "__pycache__*" || echo "Failed to zip file"
             echo "Created new zip bundle $COMBINE_FILENAME"
         fi
         break
@@ -55,7 +55,7 @@ else
     # Check the user's response
     if [[ "$choice" =~ ^[Yy]$ ]]; then
         echo "Continuing the script..."
-        zip -r $COMBINE_FILENAME aws_helpers/ flask_app/ Dockerfile -x "*/.*" -x ".*" || echo "Failed to zip file"
+        zip -r $COMBINE_FILENAME aws_helpers/ flask_app/ Dockerfile -x "*/.*" -x ".*" -x "*.env" -x "__pycache__*" || echo "Failed to zip file"
         echo "Created new zip bundle $COMBINE_FILENAME"
     else
         echo "Exiting the script."

@@ -96,6 +96,12 @@ Windows:
 2. In WSL, install the zip tool: `sudo apt install zip`
 3. In WSL, navigate to the `student_advising_assistant`
 
+To simply create a zip file to inspect, make sure you under `student-advising-assistant` folder and run:
+
+``` bash
+zip -r <file-name>.zip aws_helpers/ flask_app/ Dockerfile -x "*/.*" -x ".*" -x "*.env" -x "__pycache__*"
+```
+
 From the `student_advising_assistant` folder, call the script:
 ```
 ./deploy_beanstalk.sh \
