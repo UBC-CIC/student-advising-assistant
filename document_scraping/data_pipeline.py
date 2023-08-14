@@ -8,14 +8,14 @@ from subprocess import check_call, STDOUT, CalledProcessError
 import logging
 from typing import Dict, List, Tuple, Any
 from tools import write_file
-import process_site_dumps
+import processing_functions
 from website_dump_doc_extractor import DumpConfig, DocExtractor
-from program_options_manager import find_program_options
+from program_options_manager import find_program_options, apply_previous_difs
 from dotenv import load_dotenv
-from dictdiffer import diff, patch
 load_dotenv()
 sys.path.append('..')
 from aws_helpers.s3_tools import upload_file_to_s3, download_single_file, download_s3_directory
+from aws_helpers.logging import set_boto_log_levels
 
 """
 Script to download the data sources using wget, and then split all pages into document extracts for 
@@ -25,22 +25,20 @@ downstream tasks.
 ### CONSTANTS
 # Input files
 CONFIG_FILEPATH = 'dump_config.json5' # Filepath to the dump config file in current working dir
-download_single_file(f"document_scraping/{CONFIG_FILEPATH}", CONFIG_FILEPATH)
-
 WGET_EXE_PATH = "wget.exe" # Wget executable used on non-unix systems
 WGET_CONFIG_PATH = 'wget_config.txt' # Config file for wget calls
 
 # Output files
 BASE_DUMP_PATH = 'site_dumps' # Directory where site dump files are saved
-OUTPUT_PROCESSED_PATH = 'processed' # Directory where processed extracts are saved
+DOCUMENTS_DIR = 'documents' # Directory where processed extracts are saved
 REDIRECT_FILEPATH = os.path.join(BASE_DUMP_PATH,'redirects.txt') # Filepath for dict of redirects
-FACULTIES_UNPRUNED_FILEPATH = os.path.join(OUTPUT_PROCESSED_PATH, "faculties_unpruned.json")
-FACULTIES_FILEPATH = os.path.join(OUTPUT_PROCESSED_PATH, "faculties.json")
+FACULTIES_UNPRUNED_FILEPATH = os.path.join(DOCUMENTS_DIR, "faculties_unpruned.json")
+FACULTIES_FILEPATH = os.path.join(DOCUMENTS_DIR, "faculties.json")
 
 # Other constants
 redirect_log_re = re.compile('http[^\n]*(\n[^\n]*){2}301 Moved Permanently\nLocation:\s[^\n\s]*')
 # ^ regex matches entries in the wget logs that indicate a redirect
-function_refs_file = process_site_dumps
+function_refs_file = processing_functions
 # ^ file to search in for functions referenced by name in the config file
 
 ### Functions to load configuration from json file
@@ -244,12 +242,6 @@ def get_redirects_from_log(log_file, redirects):
     return total_num
 
 ### Main
-
-def load_json_file(filepath: str) -> Dict:
-    # Helper function to read file contents to json
-    with open(filepath) as f:
-        # Use json5, more lenient with trailing commas
-        return json5.load(f)
     
 def write_json_file(filepath: str, item: Dict):
     # Helper function to write json to file
@@ -258,56 +250,49 @@ def write_json_file(filepath: str, item: Dict):
             json.dump(item,f,indent=4)
     
     write_file(writer)
-            
-def main(recreate_faculties: bool = False):
-    """
-    - recreate_faculties: if True, recreates the faculties.txt file
-                be careful, because the results may have to be
-                manually pruned after (remove unnecessary specializations)
-    """
     
-    logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+def process_site_dumps(doc_extractor: DocExtractor, dump_configs: list[DumpConfig], 
+                       redirect_map_path: str, out_path: str):
+    
+    # Read the redirect map
+    if redirect_map_path:
+        with open(redirect_map_path,'r') as f:
+            redirect_map = json.loads(f.read())
+            doc_extractor.link_redirects = redirect_map
 
-    # check the system OS since Windows Machine requires a wget.exe
-    # darwin (OS X) and Linux probably not
+    doc_extractor.parse_folder(dump_configs,out_path)
+
+def main():
+    logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+    set_boto_log_levels(logging.INFO) # Quiet boto logs, debug clogs up stdout
+    
+    # Download the config file from s3
+    download_single_file(f"document_scraping/{CONFIG_FILEPATH}", CONFIG_FILEPATH)
+    
+    # Check the system OS since Windows Machine requires wget.exe
+    # darwin (OS X) and Linux probably already have wget
     system_os = platform.system()
     logging.info(f"System OS: {system_os}")
 
     doc_extractor, dump_configs = load_config(CONFIG_FILEPATH)
     pull_sites(dump_configs, system_os=system_os, output_folder = BASE_DUMP_PATH, wget_exe_path=WGET_EXE_PATH, wget_config_path=WGET_CONFIG_PATH)
-    process_site_dumps.process_site_dumps(doc_extractor, dump_configs, redirect_map_path=REDIRECT_FILEPATH, out_path=OUTPUT_PROCESSED_PATH)
+    process_site_dumps(doc_extractor, dump_configs, redirect_map_path=REDIRECT_FILEPATH, out_path=DOCUMENTS_DIR)
 
     # Upload the website_extracts.csv and website_graph.txt
-    upload_file_to_s3(os.path.join(OUTPUT_PROCESSED_PATH, "website_extracts.csv"), "documents/website_extracts.csv")
-    upload_file_to_s3(os.path.join(OUTPUT_PROCESSED_PATH, "website_graph.txt"), "documents/website_graph.txt")
+    upload_file_to_s3(os.path.join(DOCUMENTS_DIR, "website_extracts.csv"), f"{DOCUMENTS_DIR}/website_extracts.csv")
+    upload_file_to_s3(os.path.join(DOCUMENTS_DIR, "website_graph.txt"), f"{DOCUMENTS_DIR}/website_graph.txt")
     
     # Find the diff between the previous iteration of faculties.json, if the files exist
-    download_s3_directory('documents')
-    old_faculties_diff = None
-    try:
-        old_unpruned_faculties = load_json_file(FACULTIES_UNPRUNED_FILEPATH)
-        old_faculties = load_json_file(FACULTIES_FILEPATH)
-        old_faculties_diff = diff(old_unpruned_faculties,old_faculties)
-    except Exception as e:
-        logging.error('Error while reading faculties files')
-        logging.error(e)
-        
-        # The faculties files don't already exist, the diff is none
-        old_faculties_diff = diff({}, {})
-        
-    # Filter for removal diffs only
-    old_faculties_diff = [(type,key,val) for (type,key,val) in old_faculties_diff if type == 'remove']
-            
-    # Create new faculties json and apply dif
-    new_unpruned_faculties = find_program_options(os.path.join(OUTPUT_PROCESSED_PATH, "website_extracts.csv"))
-    new_pruned_faculties = patch(old_faculties_diff, new_unpruned_faculties)
+    download_s3_directory(DOCUMENTS_DIR)
+    new_unpruned_faculties = find_program_options(os.path.join(DOCUMENTS_DIR, "website_extracts.csv"))
+    new_pruned_faculties = apply_previous_difs(new_unpruned_faculties, FACULTIES_UNPRUNED_FILEPATH, FACULTIES_FILEPATH)
     
     # Upload faculties files
     write_json_file(FACULTIES_UNPRUNED_FILEPATH,new_unpruned_faculties)
     write_json_file(FACULTIES_FILEPATH,new_pruned_faculties)
-    upload_file_to_s3(FACULTIES_UNPRUNED_FILEPATH, "documents/faculties_unpruned.json")
-    upload_file_to_s3(FACULTIES_FILEPATH, "documents/faculties.json")
+    upload_file_to_s3(FACULTIES_UNPRUNED_FILEPATH, f"{DOCUMENTS_DIR}/faculties_unpruned.json")
+    upload_file_to_s3(FACULTIES_FILEPATH, f"{DOCUMENTS_DIR}/faculties.json")
 
 if __name__ == '__main__':
-    main(recreate_faculties=True)
+    main()
  

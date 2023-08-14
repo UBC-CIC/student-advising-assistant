@@ -4,7 +4,7 @@ from urllib.parse import urljoin
 from enum import IntEnum
 import regex as re
 from typing import Callable, Tuple
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 import html2text
 import networkx as nx
 import pandas as pd
@@ -70,6 +70,7 @@ DEFAULT_MANDATORY_SPLITS = 3
 DEFAULT_IGNORE_EMPTY_SPLIT_TAGS = True
 DEFAULT_ALLOW_LINK_SPLITS = False
 DEFAULT_NO_TITLE_SPLITS = []
+DEFAULT_METADATA = {}
 DEFAULT_METADATA_EXTRACTOR = None
 DEFAULT_PARENT_CONTEXT_EXTRACTOR = None
 
@@ -106,8 +107,10 @@ class DumpConfig:
     # - attrs: a dict of attributes to match a tag against
     # - function: a function that consumes the tag and site url,
     #             and returns a tag to replace the original tag with
-    #             type: Callable[[BeautifulSoup,str],BeautifulSoup]
+    #             type: Callable[[Tag,str],Tag]
     replacements: List[Dict]
+    # Dict of metadata to be applied to all extracts in this site
+    metadata: Dict
     # function that will return any additional metadata to be added to a document
     # inputs: page url, page titles. titles of parent pages, text content for the document
     metadata_extractor: Callable[[str,List[str],List[str],str],Dict]
@@ -146,6 +149,7 @@ class DumpConfig:
         self.ignore_empty_split_tags = DEFAULT_IGNORE_EMPTY_SPLIT_TAGS
         self.allow_link_splits = DEFAULT_ALLOW_LINK_SPLITS
         self.no_title_splits = DEFAULT_NO_TITLE_SPLITS
+        self.metadata = DEFAULT_METADATA
         self.metadata_extractor = DEFAULT_METADATA_EXTRACTOR
         self.parent_context_extractor = DEFAULT_PARENT_CONTEXT_EXTRACTOR
 
@@ -381,7 +385,7 @@ class DocExtractor:
         base_idx = docs[0]['doc_id']
         return (base_idx,docs)
     
-    def preprocess(self, soup: BeautifulSoup, url: str, dump_config: DumpConfig) -> BeautifulSoup:
+    def preprocess(self, soup: BeautifulSoup, url: str, dump_config: DumpConfig) -> Tag:
         """
         Applies any preprocessing steps to the BeautifulSoup for the page, 
         and returns the processed soup
@@ -485,10 +489,10 @@ class DocExtractor:
                 extracts[-1] += ' ' + sent.text
         return extracts
 
-    def split_page_by_tag(self, soup_orig, split_tag_index: int, dump_config: DumpConfig) -> list[dict]:
+    def split_page_by_tag(self, soup_orig: Tag, split_tag_index: int, dump_config: DumpConfig) -> list[dict]:
         """
         Splits page by the tags specified by split_attrs, hierarchically, into extracts
-        - soup_orig: the BeautifulSoup object for the page to be split. The object will be copied, not modified.
+        - soup_orig: the BeautifulSoup Tag object for the page to be split. The object will be copied, not modified.
         - split_tag_index: index of the split_attrs list to begin splitting the document on
         """
         
@@ -585,7 +589,7 @@ class DocExtractor:
         self.add_extract(extracts, extract, current_title, current_anchor_link, extract_links, split_tag_index, dump_config)
         return extracts
 
-    def should_split_on_tag(self, tag: BeautifulSoup, dump_config: DumpConfig):
+    def should_split_on_tag(self, tag: Tag, dump_config: DumpConfig):
         """
         For a tag that matched the split attributes, check if the tag should be used as a split
         tag depending on the dump configuration
@@ -600,7 +604,7 @@ class DocExtractor:
                 return False
         return True
         
-    def add_extract(self, extracts: list[dict], extract: BeautifulSoup, title: str, anchor_link: str, 
+    def add_extract(self, extracts: list[dict], extract: Tag, title: str, anchor_link: str, 
                     extract_links: dict, split_tag_index: int, dump_config: DumpConfig) -> None:
         """
         Helper function for split_page: finds sub-extracts for the given extract, and adds result
@@ -674,6 +678,11 @@ class DocExtractor:
                     relation = DocRelation.SIBLING_SPLIT_EXTRACT if split_idx > 0 else DocRelation.SIBLING_EXTRACT
                     add_page_relation(self.graph, previous_sib_id, idx, relation) 
 
+                metadata = {}
+                if dump_config.metadata_extractor:
+                    metadata = {**dump_config.metadata_extractor(url,extract_titles,parent_titles,text)}
+                metadata = {**metadata, **dump_config.metadata}
+                
                 docs.append({
                     'doc_id': idx, 
                     'url': url, 
@@ -684,7 +693,7 @@ class DocExtractor:
                     'parent_titles': parent_titles,
                     'context': parent_context,
                     'split_idx': split_idx,
-                    **dump_config.metadata_extractor(url,extract_titles,parent_titles,text)})
+                    **metadata})
                 previous_sib_id = idx
 
             parent_context = ''
@@ -694,7 +703,7 @@ class DocExtractor:
             docs.extend(self.handle_extracts(extract['children'],url,first_page_idx,extract_titles,parent_titles,parent_context,dump_config))
         return docs
     
-    def html_to_text(self, html: BeautifulSoup) -> str:
+    def html_to_text(self, html: Tag) -> str:
         """
         Convert BeautifulSoup object to text
         """
