@@ -7,6 +7,7 @@ This guide contains some additional instructions for developing the system.
 - [Local App Development](#local-app-development)
 - [Development of `document_scraping` and `embeddings`](#development-of-document_scraping-and-embeddings)
 - [CDK](#cdk)
+- [Architecture Diagram and Database Schema](#architecture-diagram-and-database-schema)
 
 ## Requirements
 
@@ -19,6 +20,7 @@ To develop the system, you must have the following installed on your device:
 - [AWS CLI](https://aws.amazon.com/cli/)
 - [AWS CDK](https://docs.aws.amazon.com/cdk/latest/guide/cli.html)
 - [Python 3+](https://www.python.org/downloads/)
+- [Docker Desktop](https://docs.docker.com/desktop/) (make sure to install the correct version for you machine's operating system).
 
 If you are on a Windows device, it is recommended to install the [Windows Subsystem For Linux](https://docs.microsoft.com/en-us/windows/wsl/install), which lets you run a Linux terminal on your Windows computer natively. Some of the steps will require its use. [Windows Terminal](https://apps.microsoft.com/store/detail/windows-terminal/9N0DX20HK701) is also recommended for using WSL.
 
@@ -42,19 +44,18 @@ To develop the Flask app locally, some additional steps are required.
 5. Run `flask --app application --debug run` to run the app in debug mode (Optionally, specify the port with `-p <port num>`)
 
 ### Using PGVector locally
-If using the RDS PGVector to store documents, some setup will be required to access the it while developing locally since the RDS db is hidden within a VPC.
+
+If using the RDS PGVector to store documents, some setup will be required to access the it while developing locally since the DB is within a VPC. Follow this [guide](https://reflectoring.io/connect-rds-byjumphost/) here to create the bastion host only. At the step where you create the keypair, name your key-pair `bastion-host` so that a file called `bastion-host.pem` can be downloaded to your local machine. Make sure you create the ec2 bastion host in a public subnet, with public ipv4 address enabled. In the bastion host's security group, only allow inbound connection from your local device's public ipv4 address. To do that, type "What's my ip" in google search and you will see the ip address. Then in the security group, specify `<your-ip>/32` as Source. If you change your location, or your ip address is not static, you would have to update that value with the correct value.
+
 - Modify the `.env` file in the root of `/flask_app`
     - Add these variables:
         ```
-        EC2_PUBLIC_IP=<insert ip>
-        EC2_USERNAME=<insert username>
+        EC2_PUBLIC_IP=<public-ipv4-of-the-bastion-host>
+        EC2_USERNAME=ec2-user # default ec2 username
         SSH_PRIV_KEY=bastion-host.pem
         ```
     - Also ensure that `MODE=dev` is in the `.env`
 - Add the `bastion-host.pem` file in the root of `/flask_app`
-    - *details about how to get the file*
-- Connect to a VPN within the set of allowed IP addresses for your bastion host
-    - *details about this*
 - Restart the flask app, it should now be able to use the `pgvector` retriever with connection to RDS
 
 ### Docker Container
@@ -68,15 +69,15 @@ Make sure you're in the root directory (`student-advising-assistant/`)and have D
 
 To build the container, replace `image-name` with the image name of your choice:
 
-```docker
-docker build -t <image-name>:latest
+```bash
+docker build -t <image-name>:latest .
 ```
 
 Run the container: 
 
 Here we're mounting the aws credentials directory so that the container have access to the aws cli profiles
 
-```docker
+```bash
 docker run -v ${HOME}/.aws/credentials:/root/.aws/credentials:ro --env-file .env -d -p <localhost-port>:5000 <image-name>:latest
 ```
 
@@ -141,7 +142,7 @@ docker tag scraping-container-image:latest <aws-account-number>.dkr.ecr.<aws-reg
 docker push <aws-account-number>.dkr.ecr.<aws-region>.amazonaws.com/scraping-container-image:latest
 ```
 
-Repeat those step for the embedding script. Remember to use the `embedding.Dockerfile`` instead.
+Repeat those step for the embedding script. Remember to use the `embedding.Dockerfile` instead.
 
 ## CDK
 
@@ -165,3 +166,8 @@ cdk deploy --all \
     --parameters InferenceStack:retrieverType=<retrieverType> \
     --profile <profile-name>
 ```
+
+## Architecture Diagram and Database Schema
+
+You can find the XML file for the [Draw.io](https://app.diagrams.net/) Architecture Diagram of this project [here](design_artifacts/ArchiectureDiagram.drawio.xml) to make modification. The [DbDiagram](https://dbdiagram.io/home) schema for our PostgreSQL database can also be found inside that folder, you can import into DbDiagram using the SQL file `ScienceAdvisingPostgreSQL.sql` or paste the raw text
+`DbDiagramRawSchema.txt`.

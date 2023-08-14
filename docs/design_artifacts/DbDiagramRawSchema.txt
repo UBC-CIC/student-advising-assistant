@@ -1,0 +1,23 @@
+Table "feedback" {
+  "id" BIGSERIAL [pk, increment]
+  "helpful_response" BOOLEAN [not null]
+  "question" VARCHAR [not null]
+  "context" VARCHAR
+  "retrieved_doc_ids" VARCHAR
+  "response" VARCHAR
+  "most_relevant_doc" INT
+  "comment" VARCHAR
+}
+
+Table "logging" {
+  "id" BIGSERIAL [pk, increment]
+  "question" VARCHAR [not null]
+  "context" VARCHAR
+  "retrieved_doc_ids" VARCHAR
+  "response" VARCHAR
+}
+
+Table "update_logs" {
+  "id" BIGSERIAL [pk, increment]
+  "datetime" timestamptz
+}

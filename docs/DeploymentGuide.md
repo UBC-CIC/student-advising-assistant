@@ -2,15 +2,17 @@
 # Deployment walkthrough
 
 ## Table of Contents
-- [Requirements](#requirements)
-- [Pre-Deployment](#pre-deployment)
-  - [Customize Static Website Content](#customize-static-website-content)
-  - [Set Up Pinecone Index (Optional)](#set-up-pinecone-index-optional)
-- [Deployment](#deployment)
-  - [Step 1: Clone The Repository](#step-1-clone-the-repository)
-  - [Step 2: CDK Deployment](#step-2-cdk-deployment)
-  - [Extra: Taking down the deployed stacks](#extra-taking-down-the-deployed-stacks)
-  - [Step 3: Uploading the configuration file](#step-3-uploading-the-configuration-file)
+- [Deployment walkthrough](#deployment-walkthrough)
+  - [Table of Contents](#table-of-contents)
+  - [Requirements](#requirements)
+  - [Pre-Deployment](#pre-deployment)
+    - [Customize Static Website Content](#customize-static-website-content)
+    - [Set Up Pinecone Index **(Optional)**](#set-up-pinecone-index-optional)
+  - [Deployment](#deployment)
+    - [Step 1: Clone The Repository](#step-1-clone-the-repository)
+    - [Step 2: CDK Deployment](#step-2-cdk-deployment)
+      - [**Extra: Taking down the deployed stacks**](#extra-taking-down-the-deployed-stacks)
+    - [Step 3: Uploading the configuration file](#step-3-uploading-the-configuration-file)
 
 ## Requirements
 
@@ -22,6 +24,7 @@ Before you deploy, you must have the following installed on your device:
 - [GitHub Account](https://github.com/)
 - [AWS CLI](https://aws.amazon.com/cli/)
 - [AWS CDK](https://docs.aws.amazon.com/cdk/latest/guide/cli.html)
+- [Docker Desktop](https://docs.docker.com/desktop/) (make sure to install the correct version for you machine's operating system).
 
 If you are on a Windows device, it is recommended to install the [Windows Subsystem For Linux](https://docs.microsoft.com/en-us/windows/wsl/install), which lets you run a Linux terminal on your Windows computer natively. Some of the steps will require its use. [Windows Terminal](https://apps.microsoft.com/store/detail/windows-terminal/9N0DX20HK701) is also recommended for using WSL.
 
@@ -108,10 +111,12 @@ cd student-advising-assistant
 
 It's time to set up everything that goes on behind the scenes! For more information on how the backend works, feel free to refer to the Architecture Deep Dive, but an understanding of the backend is not necessary for deployment.
 
+**IMPORTANT**: Before moving forward with the deployment, please make sure that your **Docker Desktop** software is running (and the Docker Daemon is running).
+
 Note this CDK deployment was tested in `us-west-2` region only.
 
 **Initialize the CDK stacks**
-(required only if you have not deployed this stack before)
+(required only if you have not deployed any resources with CDK in this region before)
 
 ```bash
 cdk synth --profile your-profile-name
@@ -137,7 +142,10 @@ cdk deploy --all \
 
 To take down the deployed stack for a fresh redeployment in the future, navigate to AWS Cloudformation, click on the stack(s) and hit Delete. Please wait for the stacks in each step to be properly deleted before deleting the stack downstream. The deletion order is as followed:
 
-1. INSERT HERE
+1. HostingStack
+2. InferenceStack
+3. student-advising-DatabaseStack
+4. student-advising-VpcStack
 
 ### Step 3: Uploading the configuration file
 
