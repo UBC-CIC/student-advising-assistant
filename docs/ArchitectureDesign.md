@@ -152,6 +152,58 @@ According to another leaderboard, [Alpaca Eval](https://tatsu-lab.github.io/alpa
 
 See the [Model Comparison](./Model%20Comparison.xlsx) worksheet for a list of sample questions asked on different contexts. The models tested were `Vicuna-7b`, `Nous-Hermes-llama-2-7b`, and `Llama-2-7b-chat` since they are leading `7b` models with licenses allowing for commercial use. Also included was `distilbert-base-cased-distilled-squad`, a non-generative question answering model that responds to questions by extracting a portion of the provided context.
 
+The following prompt was used for the sample questions:
+```
+Please answer the question based on the context below.
+Use only the context provided to answer the question, and no other information.
+If the context doesn't have enough information to answer, explain what information is missing.
+```
+
+The inputted context and question were provided in the format below, with {context} replaced by the context and {question} replacd by the question.
+```
+Context:
+{context}
+
+Question:
+{question}
+```
+
+Each of the LLaMa-based models have a different expected input format. The following formats were used, with {prompt} replaced by the prompt copied above and {input} replaced by the context and question as shown in the template above.
+- `Vicuna-7b`
+```
+USER:
+{prompt}
+{input}
+ASSISTANT:
+```
+- `Nous-Hermes-llama-2-7b`
+```
+### Instruction:
+{prompt}
+
+### Input:
+{input}
+
+### Response:
+```
+- `Llama-2-7b-chat`
+```
+<s>[INST] <<SYS>>
+{prompt}
+<</SYS>>
+{input}
+[/INST]
+```
+
+The model testing was done with SageMaker inference endpoints, and the following parameters:
+```
+"parameters": {
+    "do_sample": False,
+    "max_new_tokens": 200,
+    "temperature": 0.1
+}
+```
+
 **LLM Licenses**
 
 Note that all LLaMA-2 variants are not 100% "open" since they are subject to the [LLAMA 2 COMMUNITY LICENSE AGREEMENT](https://github.com/facebookresearch/llama/blob/main/LICENSE), which allows for commercial use, but places some restrictions such as the requirement that the model not be used for illegal purposes.
