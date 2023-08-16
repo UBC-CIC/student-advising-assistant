@@ -12,7 +12,7 @@ import sys
 sys.path.append('..')
 
 # Imports
-from flask import Flask, request, render_template
+from flask import Flask, request, render_template, Response
 import json
 import os 
 from typing import List
@@ -150,6 +150,10 @@ def initialize():
     
     return "Successfully initialized the system"
 
+@application.route('/health')
+def health():
+    return Response("OK", status=200)
+
 def setup():
     """
     Setup to perform on load, before initialization
@@ -165,5 +169,5 @@ if DEV_MODE:
 
 # Run the application
 # must be like this to run from container
-if __name__ == "__main__":
-    application.run(host="0.0.0.0")
+# if __name__ == "__main__":
+#     application.run(host="0.0.0.0")
