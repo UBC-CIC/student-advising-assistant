@@ -9,6 +9,7 @@ This guide contains some additional instructions for developing the system.
 - [Development of `document_scraping` and `embeddings`](#development-of-document_scraping-and-embeddings)
 - [CDK](#cdk)
 - [Architecture Diagram and Database Schema](#architecture-diagram-and-database-schema)
+- [Miscellaneous Scripts](#miscellaneous-scripts)
 
 ## Requirements
 
@@ -199,3 +200,26 @@ To take down the deployed stack for a fresh redeployment in the future, navigate
 
 You can find the XML file for the [Draw.io](https://app.diagrams.net/) Architecture Diagram of this project [here](design_artifacts/ArchiectureDiagram.drawio.xml) to make modification. The [DbDiagram](https://dbdiagram.io/home) schema for our PostgreSQL database can also be found inside that folder, you can import into DbDiagram using the SQL file `ScienceAdvisingPostgreSQL.sql` or paste the raw text
 `DbDiagramRawSchema.txt`.
+
+## Miscellaneous Scripts
+
+The `/misc` folder contains some additional scripts that may be useful for development. They are described below.
+
+**Convert to Safetensors**
+The `./misc/convert_to_safetensors` folder contains the pip `requirements.txt` and a script `to_safetensors.py` which will clone any public Huggingface Hub model without safetensors, convert the model weights to safetensors, and upload the result to a new Huggingface Hub repo.
+
+This allows a model without safetensors, like `lmsys/vicuna-7b-v1.5`, to be run on a smaller instance, thus saving cost. This is because the conversion from PyTorch weights to safetensors is performed when the model is loaded onto an instance, requires twice as much memory as running the model normally. By precomputing the safetensors, we can run `lmsys/vicuna-7b-v1.5` on AWS EC2 with a `g5.xlarge` instance rather than a `g5.2xlarge` instance.
+
+The `requirements.txt` assumes a CUDA-enabled system, and installs PyTorch for CUDA 11.7 - you may need to modify this for your system.
+The script can be called by command line as follows, replacing `<original-repo-id>` and `<new-repo-id>` with the appropriate values.
+```
+pip install -r requirements.txt
+python to_safetensors.py \
+    --original_repo_id <original-repo-id> \
+    --new_repo_id <new-repo-id>
+```
+
+If you own the original repo and wish to upload safetensors to it, then `<original-repo-id>` and `<new-repo-id>` can be the same value.
+
+This will need to be run on an instance with sufficient memory; for `lmsys/vicuna-7b-v1.5`, a SageMaker Studio notebook running on a `ml.g4dn.2xlarge` instance was sufficient.
+
