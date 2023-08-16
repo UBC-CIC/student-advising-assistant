@@ -131,6 +131,11 @@ export class HostingStack extends cdk.Stack {
         },
         {
           namespace: "aws:autoscaling:launchconfiguration",
+          optionName: "DisableIMDSv1",
+          value: "true"
+        },
+        {
+          namespace: "aws:autoscaling:launchconfiguration",
           optionName: "IamInstanceProfile",
           // Here you could reference an instance profile by ARN (e.g. myIamInstanceProfile.attrArn)
           // For the default setup, leave this as is (it is assumed this role exists)
@@ -148,6 +153,16 @@ export class HostingStack extends cdk.Stack {
           value: "30",
         },
         {
+          namespace: "aws:elasticbeanstalk:command",
+          optionName: "DeploymentPolicy",
+          value: "Rolling"
+        },
+        {
+          namespace: "aws:elasticbeanstalk:environment",
+          optionName: "LoadBalancerType",
+          value: "application"
+        },
+        {
           namespace: "aws:ec2:vpc",
           optionName: "VPCId",
           value: vpcStack.vpc.vpcId,
@@ -156,8 +171,20 @@ export class HostingStack extends cdk.Stack {
           namespace: "aws:ec2:vpc",
           optionName: "Subnets",
           value: vpcStack.vpc
+            .selectSubnets({ subnetType: ec2.SubnetType.PRIVATE_ISOLATED })
+            .subnetIds.join(","),
+        },
+        {
+          namespace: "aws:ec2:vpc",
+          optionName: "ELBSubnets",
+          value: vpcStack.vpc
             .selectSubnets({ subnetType: ec2.SubnetType.PUBLIC })
             .subnetIds.join(","),
+        },
+        {
+          namespace: "aws:ec2:vpc",
+          optionName: "AssociatePublicIpAddress",
+          value: "false"
         },
         {
           namespace: "aws:elasticbeanstalk:application:environment",
@@ -183,6 +210,26 @@ export class HostingStack extends cdk.Stack {
           namespace: "aws:elasticbeanstalk:cloudwatch:logs",
           optionName: "RetentionInDays",
           value: "365",
+        },
+        {
+          namespace: "aws:elasticbeanstalk:managedactions",
+          optionName: "ManagedActionsEnabled",
+          value: "true"
+        },
+        {
+          namespace: "aws:elasticbeanstalk:managedactions",
+          optionName: "PreferredStartTime",
+          value: "Sun:01:00"
+        },
+        {
+          namespace: "aws:elasticbeanstalk:managedactions",
+          optionName: "ServiceRoleForManagedUpdates",
+          value: "AWSServiceRoleForElasticBeanstalkManagedUpdates"
+        },
+        {
+          namespace: "aws:elasticbeanstalk:managedactions:platformupdate",
+          optionName: "UpdateLevel",
+          value: "minor"
         },
       ],
       // This line is critical - reference the label created in this same stack
