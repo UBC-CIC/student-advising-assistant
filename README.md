@@ -47,15 +47,16 @@ For instructions on how to develop the application, refer to the [Developer Guid
 │       └───test
 ├───document_scraping
 ├───embeddings
-└───flask_app
-    ├───documents
-    ├───embeddings
-    ├───filters
-    ├───llms
-    ├───prompts
-    ├───retrievers
-    ├───static
-    └───templates
+├───flask_app
+│   ├───documents
+│   ├───embeddings
+│   ├───filters
+│   ├───llms
+│   ├───prompts
+│   ├───retrievers
+│   ├───static
+│   └───templates
+└───misc
 ```
 
 1. `/aws_helpers`: Contains utilities classes / functions for connecting to AWS Services, used across the other portions of the app
@@ -73,6 +74,7 @@ For instructions on how to develop the application, refer to the [Developer Guid
     - `/retrievers`: Retriever classes for PGVector and Pinecone
     - `/static`: Static web content as .md or .json
     - `/templates`: HTML files with Jinja2 templates for the web app's pages
+6. `/misc`: Contains various other useful scripts, contents described in the [Developer Guide](./docs/DeveloperGuide.md)
 
 ## Changelog
 N/A
