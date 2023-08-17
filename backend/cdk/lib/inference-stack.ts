@@ -23,10 +23,13 @@ import * as s3 from "aws-cdk-lib/aws-s3";
 import * as s3n from "aws-cdk-lib/aws-s3-notifications";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
+import {readFileSync} from 'fs';
+
 export class InferenceStack extends Stack {
   public readonly psycopg2_layer: lambda.LayerVersion;
   public readonly lambda_rds_role: iam.Role;
-  public readonly SM_ENDPOINT_NAME: string;
+  public readonly ENDPOINT_TYPE: string;
+  public readonly ENDPOINT_NAME: string;
 
   constructor(
     scope: Construct,
@@ -47,9 +50,9 @@ export class InferenceStack extends Stack {
     }).valueAsString; // get the value of the parameter as string
 
     const llmMode = new CfnParameter(this, "llmMode", {
-      description: "If true, enables the LLM. If false, disables all LLM features and does not deploy LLM.",
-      default: "true",
-      allowedValues: ["true", "false"], // allowed values of the parameter
+      description: "LLM mode chooses the hosting service for the LLM, or none for no LLM",
+      default: "ec2",
+      allowedValues: ["ec2", "sagemaker", "none"], // allowed values of the parameter
     }).valueAsString; // get the value of the parameter as string
 
     // Bucket for files related to inference
@@ -325,22 +328,23 @@ export class InferenceStack extends Stack {
     );
 
     // LLM configuration
-    const HUGGINGFACE_MODEL_ID = "lmsys/vicuna-7b-v1.5";
+    const HUGGINGFACE_MODEL_ID = "arya/vicuna-7b-v1.5-hf";
     const MODEL_NAME = "vicuna";
-    const INSTANCE_TYPE = "ml.g5.2xlarge";
-    const NUM_GPUS = "1";
-    this.SM_ENDPOINT_NAME = MODEL_NAME + "-inference";
 
-    // Create the SM Inference Endpoint only if LLM mode is enabled
-
-    new CfnCondition(this, "llm-mode-boolean", {
-      expression: Fn.conditionEquals(llmMode, "true")
+    // Setup the LLM Inference Hosting only if LLM mode is enabled
+    new CfnCondition(this, "llm-mode-sagemaker-boolean", {
+      expression: Fn.conditionEquals(llmMode, "sagemaker")
     });
-
-    const llmFlag = Fn.conditionIf("llm-mode-boolean", true , false);
-    console.log(llmFlag)
+    new CfnCondition(this, "llm-mode-ec2-boolean", {
+      expression: Fn.conditionEquals(llmMode, "ec2")
+    });
     
-    if (llmFlag) {
+    if (Fn.conditionIf("llm-mode-sagemaker-boolean", true, false)) {
+      this.ENDPOINT_NAME = MODEL_NAME + "-inference";
+      this.ENDPOINT_TYPE = "sagemaker";
+      const INSTANCE_TYPE = "ml.g5.xlarge";
+      const NUM_GPUS = "1";
+
       // Role for Sagemaker
       // this role will be used for both task role and task execution role
       const smRole = new iam.Role(this, "sagemaker-role", {
@@ -361,7 +365,7 @@ export class InferenceStack extends Stack {
           timeout: Duration.seconds(300),
           memorySize: 512,
           environment: {
-            SM_ENDPOINT_NAME: this.SM_ENDPOINT_NAME,
+            SM_ENDPOINT_NAME: this.ENDPOINT_NAME,
             SM_REGION: this.region || "us-west-2",
             SM_ROLE_ARN: smRole.roleArn,
             HF_MODEL_ID: HUGGINGFACE_MODEL_ID,
@@ -401,12 +405,65 @@ export class InferenceStack extends Stack {
           resources: ["*"],
         })
       );
+    } else if (Fn.conditionIf("llm-mode-ec2-boolean", true, false)) {
+      this.ENDPOINT_TYPE = "huggingface_tgi";
+
+      const vpc = vpcStack.vpc
+
+      // Security group for the EC2 instance
+      const ec2SG = new ec2.SecurityGroup(this, 'student-advising-ec2-tgi-sg', {
+        vpc,
+        description: 'Allow ssh access to ec2 instance and traffic to tgi inference endpoint',
+        allowAllOutbound: true,
+        disableInlineRules: true
+      });
+
+      ec2SG.addIngressRule(
+        ec2.Peer.ipv4(vpcStack.cidr),
+        ec2.Port.tcp(22),
+        'Allow ssh traffic to ec2',
+      );
+
+      ec2SG.addIngressRule(
+        ec2.Peer.ipv4(vpcStack.cidr),
+        ec2.Port.tcp(8080),
+        'Allow traffic to inference endpoint',
+      );
+      
+      // Find the Deep Learning Base GPU AMI (Ubuntu 20.04)
+      const dlami = ec2.MachineImage.lookup({
+        name: 'Deep Learning Base GPU AMI (Ubuntu 20.04)*',
+        owners: ['amazon'],
+      });
+
+      // Create the instance
+      const ec2Instance = new ec2.Instance(this, 'student-advising-tgi-inference', {
+        vpc: vpc,
+        vpcSubnets: {
+          subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
+        },
+        securityGroup: ec2SG,
+        instanceType: ec2.InstanceType.of(ec2.InstanceClass.g4dn, ec2.InstanceSize.xlarge),
+        machineImage: dlami,
+        blockDevices: [
+          {
+            deviceName: '/dev/sda1',
+            volume: ec2.BlockDeviceVolume.ebs(100),
+          }
+        ]
+      });
+
+      // Load the startup script
+      const startupScript = readFileSync('./ec2-tgi-startup.sh', 'utf8');
+      ec2Instance.addUserData(startupScript);
+
+      this.ENDPOINT_NAME = ec2Instance.privateIpAddress + ':8080'
     }
 
     // Create the SSM parameter with the string value of the sagemaker inference endpoint name
-    new ssm.StringParameter(this, "SmEndpointNameParameter", {
+    new ssm.StringParameter(this, "EndpointNameParameter", {
       parameterName: "/student-advising/generator/ENDPOINT_NAME",
-      stringValue: this.SM_ENDPOINT_NAME,
+      stringValue: this.ENDPOINT_NAME,
     });
 
     // Create the SSM parameter with the name of the generator model
@@ -418,7 +475,7 @@ export class InferenceStack extends Stack {
     // Create the SSM parameter with the type of the generator model
     new ssm.StringParameter(this, "GeneratorModelTypeParameter", {
       parameterName: "/student-advising/generator/ENDPOINT_TYPE",
-      stringValue: "sagemaker",
+      stringValue: this.ENDPOINT_TYPE,
     });
 
     // Create the SSM parameter with the type of the retriever
