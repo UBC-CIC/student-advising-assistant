@@ -206,10 +206,11 @@ You can find the XML file for the [Draw.io](https://app.diagrams.net/) Architect
 The `/misc` folder contains some additional scripts that may be useful for development. They are described below.
 
 **Convert to Safetensors**
-The `./misc/convert_to_safetensors` folder contains the pip `requirements.txt` and a script `to_safetensors.py` which will clone any public Huggingface Hub model without safetensors, convert the model weights to safetensors, and upload the result to a new Huggingface Hub repo.
+The `./misc/convert_to_safetensors` folder contains the pip `requirements.txt` and a script `to_safetensors.py` which will clone any public Huggingface Hub text generation model without [safetensors](https://huggingface.co/docs/safetensors/index), convert the model weights to safetensors, and upload the result to a new Huggingface Hub repo.
 
-This allows a model without safetensors, like `lmsys/vicuna-7b-v1.5`, to be run on a smaller instance, thus saving cost. This is because the conversion from PyTorch weights to safetensors is performed when the model is loaded onto an instance, requires twice as much memory as running the model normally. By precomputing the safetensors, we can run `lmsys/vicuna-7b-v1.5` on AWS EC2 with a `g5.xlarge` instance rather than a `g5.2xlarge` instance.
+This allows a model without safetensors, like `lmsys/vicuna-7b-v1.5`, to be run on a smaller instance, thus saving cost. This is because the conversion from PyTorch weights to safetensors is performed when the model is loaded onto an instance, and requires twice as much memory as running the model normally. By precomputing the safetensors, we can run `lmsys/vicuna-7b-v1.5` on AWS EC2 with a `g5.xlarge` instance rather than a `g5.2xlarge` instance.
 
+The script requires an environment variable `HF_API_KEY` to be set, containing a [Huggingface Access Token](https://huggingface.co/docs/hub/security-tokens) with write access to the repo you want to upload to (the `<new-repo-id>` below).
 The `requirements.txt` assumes a CUDA-enabled system, and installs PyTorch for CUDA 11.7 - you may need to modify this for your system.
 The script can be called by command line as follows, replacing `<original-repo-id>` and `<new-repo-id>` with the appropriate values.
 ```
