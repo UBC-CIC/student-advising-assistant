@@ -8,6 +8,7 @@ This guide contains some additional instructions for developing the system.
 - [Local App Development](#local-app-development)
 - [Development of `document_scraping` and `embeddings`](#development-of-document_scraping-and-embeddings)
 - [CDK](#cdk)
+- [Reinitialize Web App After Deployment](#reinitialize-web-app-after-deployment)
 - [Architecture Diagram and Database Schema](#architecture-diagram-and-database-schema)
 - [Miscellaneous Scripts](#miscellaneous-scripts)
 
@@ -35,9 +36,36 @@ By default, during the document retrieval step, the system performs a ‘zoom-ou
 If a University or faculty has a different policy hierarchy, they will need to change this behaviour.
 
 **Faculty & Program Titles**
-By default, the data processing script identifies the faculty, program, and specialization titles using a regular expression matching on the titles of scraped webpages. You may need to modify the regex in `./document_scraping/processing_functions.py` to better suit 
+By default, the data processing script identifies the faculty, program, and specialization titles using a regular expression matching on the titles of scraped webpages. You may need to modify the regex in `./document_scraping/processing_functions.py` to better suit your institution.
 This step may have some false positives (eg. identifies ‘Major Programs’ as the name of a major), and these positives need to be pruned from the list of programs (see the [User Guide](./UserGuide.md#pruning-the-faculties-and-programs-list)).
 This step could be improved if the University has an index of all faculties, programs, and specializations which can be used instead. However, you will have to ensure that the names of faculties and programs aligns with the names of faculties and programs in the extract metadata, in order for the metadata filtering to work during document retrieval.
+
+**Changing the LLM**
+As progress unfolds in the LLM field, you will likely want to change the language model used. The system will work relatively plug-and-play with any Huggingface Hub text generation model that is supported by the [Text Generation Inference](https://github.com/huggingface/text-generation-inference#optimized-architectures) container. However, you may need to update the prompts (defined in `/flask_app/prompts/prompt_templates.py`) to suit the format expected by a new model.
+
+The Flask App is configured to work with several types of hosted models, and the settings can be changed through the system's SSM Parameters.
+Below is a table of the supported hosting types, and the corresponding setting for the `/student-advising/generator/ENDPOINT_TYPE` SSM Parameter and the `/student-advising/generator/ENDPOINT_NAME` SSM Parameter. 
+
+| **Hosting Type**                      | **ENDPOINT_TYPE**  | **ENDPOINT_NAME**                   |
+|---------------------------------------|--------------------|-------------------------------------|
+| HuggingFace Hub Text Generation       | huggingface_hub    | Model's Hub repo ID                 |
+| HuggingFace Hub Question Answering    | huggingface_hub_qa | Model's Hub repo ID                 |
+| SageMaker Inference Endpoint          | sagemaker          | SageMaker endpoint name             |
+| HuggingFace Text Generation Inference | huggingface_tgi    | URL for the server running TGI      |
+
+You can change the values of these SSM Parameters in the CDK before deployment, or change them in the AWS SSM Console after deployment. If changed after deployment, you will have to reinitialize the Flask app on Elastic Beanstalk - see [Reinitialize Web App After Deployment](#reinitialize-web-app-after-deployment).
+
+Note that when using HuggingFace Hub, you will need to set the Secrets Manager secret for the HuggingFace API Token. 
+You can use the following command, replacing `<profile-name>` with your AWS profile name and `<api-key>` with a [HuggingFace User Token](https://huggingface.co/docs/hub/security-tokens).
+```bash
+aws secretsmanager create-secret \
+    --name student-advising/generator/HUGGINGFACE_API' \
+    --description "API key for HuggingFace Hub" \
+    --secret-string "{\"API_TOKEN\":\"<api key>\"}" \
+    --profile <profile-name>
+```
+
+'generator/HUGGINGFACE_API'
 
 ## Local App Development
 To develop the Flask app locally, some additional steps are required.
@@ -163,6 +191,10 @@ docker push <aws-account-number>.dkr.ecr.<aws-region>.amazonaws.com/scraping-con
 ```
 
 Repeat those step for the embedding script. Remember to use the `embedding.Dockerfile` instead.
+
+## Reinitialize Web App After Deployment
+
+If you need to change any AWS SSM Parameter after deploying the CDK, you will need to prompt the Elastic Beanstalk web app to fetch the new SSM Parameter values and re-initialize. This can be done by sending a GET request to the `/initialize` endpoint of the web app, and upon successful initialization, it will display the message "Successfully initialized the system". 
 
 ## CDK
 
