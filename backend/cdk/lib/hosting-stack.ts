@@ -9,7 +9,10 @@ import { DatabaseStack } from "./database-stack";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import { InferenceStack } from "./inference-stack";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
+import * as s3 from "aws-cdk-lib/aws-s3";
+import * as s3Deploy from "aws-cdk-lib/aws-s3-deployment";
 
+// https://github.com/aws-samples/aws-elastic-beanstalk-hardened-security-cdk-sample/blob/main/lib/elastic_beanstalk_cdk_project-stack.ts
 export class HostingStack extends cdk.Stack {
   private readonly zipFileName: string = "demo-app.zip";
   private readonly zipFilePath: string = path.join(
@@ -48,11 +51,35 @@ export class HostingStack extends cdk.Stack {
         role: inferenceStack.lambda_rds_role,
       }
     );
+    
+    const beanstalkBucketName = `elasticbeanstalk-${this.region}-${this.account}`;
+    let deploymentBucket = s3.Bucket.fromBucketName(
+      this,
+      "student-advising-EBBucket",
+      beanstalkBucketName
+    );
+
+    // Check if the bucket exists
+    if (!deploymentBucket.bucketName) {
+      // If the bucket doesn't exist, create it
+      // Create an encrypted bucket for beanstalk deployments and log storage
+      // S3 Bucket needs a specific format for deployment: https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/AWSHowTo.S3.html
+      // elasticbeanstalk-region-accountId
+      deploymentBucket = new s3.Bucket(this, "student-advising-EBBucket", {
+        bucketName: beanstalkBucketName,
+        encryption: s3.BucketEncryption.S3_MANAGED,
+        blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+        publicReadAccess: false,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+      });
+    }
 
     console.log("path is:" + this.zipFilePath);
-    // Construct an S3 asset from the ZIP located from directory up.
-    const elbZipArchive = new s3assets.Asset(this, "student-advising-elb-zip", {
-      path: this.zipFilePath,
+    // Upload the deployment beanstalk app ZIP file to the bucket 
+    const appDeploymentZip = new s3Deploy.BucketDeployment(this, "student-advising-elb-zip", {
+      sources: [s3Deploy.Source.asset(this.zipFilePath)],
+      destinationBucket: deploymentBucket,
+      extract: false // we want to upload the whole zip to s3, not extract the zip on s3
     });
 
     // EC2 Instance Profile role for Beanstalk App
@@ -85,10 +112,18 @@ export class HostingStack extends cdk.Stack {
       iam.ManagedPolicy.fromAwsManagedPolicyName("SecretsManagerReadWrite")
     );
 
-    const instanceProfile = new iam.CfnInstanceProfile(this, "beanstalk-ec2-instance-profile", {
-      roles: [ec2IamRole.roleName],
-      instanceProfileName: "beanstalk-ec2-instance-profile",
-    });
+    const instanceProfName = "beanstalk-ec2-instance-profile"
+    let instanceProfile = iam.InstanceProfile.fromInstanceProfileName(this, instanceProfName, instanceProfName)
+    if (!instanceProfile.instanceProfileName) {
+      instanceProfile = new iam.InstanceProfile(
+        this,
+        instanceProfName,
+        {
+          role: ec2IamRole,
+          instanceProfileName: instanceProfName,
+        }
+      );
+    }
 
     const appName = "student-advising-demo-app";
     const app = new elasticbeanstalk.CfnApplication(
@@ -108,11 +143,12 @@ export class HostingStack extends cdk.Stack {
       {
         applicationName: appName,
         sourceBundle: {
-          s3Bucket: elbZipArchive.s3BucketName,
-          s3Key: elbZipArchive.s3ObjectKey,
+          s3Bucket: deploymentBucket.bucketName,
+          s3Key: cdk.Fn.select(0, appDeploymentZip.objectKeys),
         },
       }
     );
+    appVersionProps.node.addDependency(appDeploymentZip);  
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const cnamePrefix = "student-advising-demo"; // Prefix for the web app's url
@@ -132,12 +168,11 @@ export class HostingStack extends cdk.Stack {
         {
           namespace: "aws:autoscaling:launchconfiguration",
           optionName: "DisableIMDSv1",
-          value: "true"
+          value: "true",
         },
         {
           namespace: "aws:autoscaling:launchconfiguration",
           optionName: "IamInstanceProfile",
-          // Here you could reference an instance profile by ARN (e.g. myIamInstanceProfile.attrArn)
           // For the default setup, leave this as is (it is assumed this role exists)
           // https://stackoverflow.com/a/55033663/6894670
           value: instanceProfile.instanceProfileName,
@@ -155,12 +190,12 @@ export class HostingStack extends cdk.Stack {
         {
           namespace: "aws:elasticbeanstalk:command",
           optionName: "DeploymentPolicy",
-          value: "Rolling"
+          value: "Rolling",
         },
         {
           namespace: "aws:elasticbeanstalk:environment",
           optionName: "LoadBalancerType",
-          value: "application"
+          value: "application",
         },
         {
           namespace: "aws:ec2:vpc",
@@ -184,7 +219,7 @@ export class HostingStack extends cdk.Stack {
         {
           namespace: "aws:ec2:vpc",
           optionName: "AssociatePublicIpAddress",
-          value: "false"
+          value: "false",
         },
         {
           namespace: "aws:elasticbeanstalk:application:environment",
@@ -214,33 +249,32 @@ export class HostingStack extends cdk.Stack {
         {
           namespace: "aws:elasticbeanstalk:managedactions",
           optionName: "ManagedActionsEnabled",
-          value: "true"
+          value: "true",
         },
         {
           namespace: "aws:elasticbeanstalk:managedactions",
           optionName: "PreferredStartTime",
-          value: "Sun:01:00"
+          value: "Sun:01:00",
         },
         {
           namespace: "aws:elasticbeanstalk:managedactions",
           optionName: "ServiceRoleForManagedUpdates",
-          value: "AWSServiceRoleForElasticBeanstalkManagedUpdates"
+          value: "AWSServiceRoleForElasticBeanstalkManagedUpdates",
         },
         {
           namespace: "aws:elasticbeanstalk:managedactions:platformupdate",
           optionName: "UpdateLevel",
-          value: "minor"
+          value: "minor",
         },
       ],
       // This line is critical - reference the label created in this same stack
       versionLabel: appVersionProps.ref,
     });
-    elbEnv.addDependency(instanceProfile);
     // Also very important - make sure that `app` exists before creating an app version
     appVersionProps.addDependency(app);
 
     // Create the SSM parameter with the url of the elastic beanstalk web app
-    new ssm.StringParameter(this, "S3BucketNameParameter", {
+    new ssm.StringParameter(this, "BeanstalkAppUrlParameter", {
       parameterName: "/student-advising/BEANSTALK_URL",
       stringValue: cnamePrefix + "." + this.region + ".elasticbeanstalk.com",
     });
