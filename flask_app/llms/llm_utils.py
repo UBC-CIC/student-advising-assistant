@@ -4,11 +4,10 @@ Utility functions for loading LLMs and associated prompts
 """
 
 from langchain import HuggingFaceHub, Prompt, LLMChain
-from langchain.llms import BaseLLM
+from langchain.llms import BaseLLM, HuggingFaceTextGenInference
 from langchain.llms.sagemaker_endpoint import LLMContentHandler
-from langchain.retrievers.document_compressors import LLMChainFilter
 import json
-from typing import Tuple, Dict, Callable
+from typing import Tuple, Dict
 import os 
 import prompts
 from filters import VerboseFilter, FilterWithContext
@@ -35,7 +34,12 @@ class ContentHandler(LLMContentHandler):
         return response_json[0]["generated_text"]
     
 ### MODEL LOADING FUNCTIONS
-    
+
+hyperparams = {
+    "temperature": 0.1,
+    "max_new_tokens": 200,
+}
+
 def load_model_and_prompt(endpoint_type: str, endpoint_name: str, model_name: str) -> Tuple[BaseLLM,Prompt]:
     """
     Utility function loads a LLM of the given endpoint type and model name, and the QA Prompt
@@ -50,13 +54,17 @@ def load_model_and_prompt(endpoint_type: str, endpoint_name: str, model_name: st
     llm = None
     if endpoint_type == 'sagemaker':
         llm = load_sagemaker_endpoint(endpoint_name)
-    elif endpoint_type == 'huggingface':
+    elif endpoint_type == 'huggingface_hub':
         os.environ["HUGGINGFACEHUB_API_TOKEN"] = get_param_manager().get_secret('generator/HUGGINGFACE_API')['API_TOKEN']
         llm = load_huggingface_endpoint(endpoint_name)
-    elif endpoint_type == 'huggingface_qa':
+    elif endpoint_type == 'huggingface_hub_qa':
         param_manager = get_param_manager()
         os.environ["HUGGINGFACEHUB_API_TOKEN"] = param_manager.get_secret('generator/HUGGINGFACE_API')['API_TOKEN']
         llm = load_huggingface_qa_endpoint(endpoint_name)
+    elif endpoint_type == 'huggingface_tgi':
+        llm = load_huggingface_tgi_endpoint(endpoint_name)
+    else:
+        raise Exception(f"Endpoint type {endpoint_type} is not supported.")
         
     return llm, load_prompt(endpoint_type, model_name)
     
@@ -84,7 +92,7 @@ def load_sagemaker_endpoint(endpoint_name: str) -> BaseLLM:
         endpoint_name=endpoint_name,
         credentials_profile_name=credentials_profile,
         region_name="us-west-2", 
-        model_kwargs={"do_sample": False, "temperature": 0.1, "max_new_tokens":200},
+        model_kwargs={"do_sample": False, **hyperparams},
         content_handler=content_handler
     )
 
@@ -95,7 +103,7 @@ def load_huggingface_endpoint(name: str) -> BaseLLM:
     Loads the LLM for a huggingface text generation inference endpoint
     Requires that the HUGGINGFACEHUB_API_TOKEN environment variable is set
     """
-    llm = HuggingFaceHub(repo_id=name, model_kwargs={"temperature":0.1, "max_new_tokens":200})
+    llm = HuggingFaceHub(repo_id=name, model_kwargs=hyperparams)
     return llm
 
 def load_huggingface_qa_endpoint(name: str) -> BaseLLM:
@@ -104,6 +112,10 @@ def load_huggingface_qa_endpoint(name: str) -> BaseLLM:
     eg. name = deepset/deberta-v3-large-squad2
     """
     llm = HuggingFaceQAEndpoint(repo_id=name)
+    return llm
+
+def load_huggingface_tgi_endpoint(name: str) -> BaseLLM:
+    llm = HuggingFaceTextGenInference(inference_server_url=name, **hyperparams)
     return llm
 
 def load_chain_filter(base_llm: BaseLLM, model_name: str, verbose: bool = False) -> FilterWithContext:

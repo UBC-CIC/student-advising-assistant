@@ -144,7 +144,7 @@ def initialize():
         reload(feedback_module)
     
     # Upon loading, load the available settings for the form
-    global app_title, faculties, last_updated_time
+    global faculties, last_updated_time
     faculties = read_text(FACULTIES_PATH,as_json=True)
     last_updated_time = get_last_updated_time()
     

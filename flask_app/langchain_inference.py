@@ -27,7 +27,7 @@ param_manager = get_param_manager()
 
 use_llm = None
 try:
-    use_llm = param_manager.get_parameter('USE_LLM') == 'true'
+    use_llm = param_manager.get_parameter('LLM_MODE') == 'true'
 except:
     use_llm = True
     
