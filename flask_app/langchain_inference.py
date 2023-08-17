@@ -44,8 +44,6 @@ def read_text(filename: str, as_json = False):
         if as_json: result = json.load(f)
         else: result = f.read()
     return result
-    
-graph = load_graph(GRAPH_FILEPATH)
 
 def download_all_dirs(retriever: str):
     """
@@ -65,6 +63,8 @@ def download_all_dirs(retriever: str):
         download_s3_directory(dir, output_prefix='data')
         
 download_all_dirs(retriever_config['RETRIEVER_NAME'])
+
+graph = load_graph(GRAPH_FILEPATH)
 
 data_source_annotations = read_text(os.path.join('static','data_source_annotations.json'), as_json=True)
 
