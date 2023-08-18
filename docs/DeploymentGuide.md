@@ -151,12 +151,12 @@ You may  run the following command to deploy the stacks all at once. Please repl
 
 If using pgvector retriever, replace <retriever-type> with pgvector, or omit the retrieverType parameter. If using pinecone retriever, replace <retriever-type> with pinecone.
 
-If you would prefer not to deploy the LLM (eg. for cost reasons), replace `llmMode=true` with `llmMode=false`. The system will not deploy a LLM endpoint, and it will return references from the information sources only, without generated responses.
+If you would prefer not to deploy the LLM (eg. for cost reasons), replace `llmMode=ec2` with `llmMode=none`. The system will not deploy a LLM endpoint, and it will return references from the information sources only, without generated responses.
 
 ```bash
 cdk deploy --all \
     --parameters InferenceStack:retrieverType=<retriever-type> \
-    --parameters InferenceStack:llmMode=true \
+    --parameters InferenceStack:llmMode=ec2 \
     --profile <profile-name>
 ```
 
