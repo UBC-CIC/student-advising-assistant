@@ -24,6 +24,7 @@ import * as s3n from "aws-cdk-lib/aws-s3-notifications";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
 import {readFileSync} from 'fs';
+import config from '../config.json';
 
 export class InferenceStack extends Stack {
   public readonly psycopg2_layer: lambda.LayerVersion;
@@ -41,19 +42,6 @@ export class InferenceStack extends Stack {
     super(scope, id, props);
 
     const vpc = vpcStack.vpc;
-
-    // CDK params
-    const retrieverType = new CfnParameter(this, "retrieverType", {
-      description: "Parameter for the type of retriever to use",
-      default: "pgvector",
-      allowedValues: ["pgvector", "pinecone"], // allowed values of the parameter
-    }).valueAsString; // get the value of the parameter as string
-
-    const llmMode = new CfnParameter(this, "llmMode", {
-      description: "LLM mode chooses the hosting service for the LLM, or none for no LLM",
-      default: "ec2",
-      allowedValues: ["ec2", "sagemaker", "none"], // allowed values of the parameter
-    }).valueAsString; // get the value of the parameter as string
 
     // Bucket for files related to inference
     const inferenceBucket = new s3.Bucket(this, "student-advising-s3bucket", {
@@ -331,15 +319,7 @@ export class InferenceStack extends Stack {
     const HUGGINGFACE_MODEL_ID = "arya/vicuna-7b-v1.5-hf";
     const MODEL_NAME = "vicuna";
 
-    // Setup the LLM Inference Hosting only if LLM mode is enabled
-    new CfnCondition(this, "llm-mode-sagemaker-boolean", {
-      expression: Fn.conditionEquals(llmMode, "sagemaker")
-    });
-    new CfnCondition(this, "llm-mode-ec2-boolean", {
-      expression: Fn.conditionEquals(llmMode, "ec2")
-    });
-    
-    if (Fn.conditionIf("llm-mode-sagemaker-boolean", true, false)) {
+    if (config.llm_mode == "sagemaker") {
       this.ENDPOINT_NAME = MODEL_NAME + "-inference";
       this.ENDPOINT_TYPE = "sagemaker";
       const INSTANCE_TYPE = "ml.g5.xlarge";
@@ -405,7 +385,7 @@ export class InferenceStack extends Stack {
           resources: ["*"],
         })
       );
-    } else if (Fn.conditionIf("llm-mode-ec2-boolean", true, false)) {
+    } else if (config.llm_mode == "ec2") {
       this.ENDPOINT_TYPE = "huggingface_tgi";
 
       const vpc = vpcStack.vpc
@@ -456,7 +436,7 @@ export class InferenceStack extends Stack {
       });
 
       // Load the startup script
-      const startupScript = readFileSync('./ec2-tgi-startup.sh', 'utf8');
+      const startupScript = readFileSync('./lib/ec2-tgi-startup.sh', 'utf8');
       ec2Instance.addUserData(startupScript);
 
       this.ENDPOINT_NAME = ec2Instance.instancePrivateIp + ':8080'
@@ -486,13 +466,13 @@ export class InferenceStack extends Stack {
     // Create the SSM parameter with the type of the retriever
     new ssm.StringParameter(this, "RetrieverNameParameter", {
       parameterName: "/student-advising/retriever/RETRIEVER_NAME",
-      stringValue: retrieverType,
+      stringValue: config.retriever_type,
     });
 
     // Create the SSM parameter with the llm mode
     new ssm.StringParameter(this, "LlmMode", {
       parameterName: "/student-advising/LLM_MODE",
-      stringValue: llmMode,
+      stringValue: ((config.llm_mode == "none") ? 'false' : 'true'),
     });
   }
 }
