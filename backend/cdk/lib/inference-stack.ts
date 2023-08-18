@@ -416,6 +416,11 @@ export class InferenceStack extends Stack {
         owners: ['amazon'],
       });
 
+      // Create a keypair for the instance 
+      const ec2KeyPair = new ec2.CfnKeyPair(this, 'student-advising-tgi-keypair', {
+        keyName: 'student-advising-ec2-tgi-key',
+      });
+
       // Create the instance
       const ec2Instance = new ec2.Instance(this, 'student-advising-tgi-inference', {
         vpc: vpc,
@@ -432,7 +437,8 @@ export class InferenceStack extends Stack {
           }
         ],
         requireImdsv2: true,
-        associatePublicIpAddress: false
+        associatePublicIpAddress: false,
+        keyName: ec2KeyPair.keyName
       });
 
       // Load the startup script
