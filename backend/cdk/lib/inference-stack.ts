@@ -460,6 +460,9 @@ export class InferenceStack extends Stack {
       ec2Instance.addUserData(startupScript);
 
       this.ENDPOINT_NAME = ec2Instance.instancePrivateIp + ':8080'
+    } else {
+      this.ENDPOINT_NAME = "none";
+      this.ENDPOINT_TYPE = "none";
     }
 
     // Create the SSM parameter with the string value of the sagemaker inference endpoint name
