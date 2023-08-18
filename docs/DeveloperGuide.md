@@ -138,12 +138,6 @@ Windows:
 2. In WSL, install the zip tool: `sudo apt install zip`
 3. In WSL, navigate to the `student_advising_assistant`
 
-To simply create a zip file to inspect, make sure you under `student-advising-assistant` folder and run:
-
-``` bash
-zip -r <file-name>.zip aws_helpers/ flask_app/ Dockerfile -x "*/.*" -x ".*" -x "*.env" -x "__pycache__*"
-```
-
 From the `student_advising_assistant` folder, call the script:
 ```
 ./deploy_beanstalk.sh \
@@ -159,6 +153,12 @@ From the `student_advising_assistant` folder, call the script:
 - When prompted to deploy the app, enter `1` to upload and deploy to Elastic Beanstalk
 
 For future deployments of the app, make sure to update the BUNDLE_VER argument. The new version name must be unique.
+
+If you simply want to create the app zip file, without uploading to beanstalk, make sure you are under `student-advising-assistant` folder and run:
+
+``` bash
+zip -r <file-name>.zip aws_helpers/ flask_app/ Dockerfile -x "*/.*" -x ".*" -x "*.env" -x "__pycache__*"
+```
 
 ## Development of `document_scraping` and `embeddings`
 
