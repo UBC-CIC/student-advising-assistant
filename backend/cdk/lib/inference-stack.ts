@@ -443,21 +443,23 @@ export class InferenceStack extends Stack {
           subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
         },
         securityGroup: ec2SG,
-        instanceType: ec2.InstanceType.of(ec2.InstanceClass.g4dn, ec2.InstanceSize.xlarge),
+        instanceType: ec2.InstanceType.of(ec2.InstanceClass.G4DN, ec2.InstanceSize.XLARGE),
         machineImage: dlami,
         blockDevices: [
           {
             deviceName: '/dev/sda1',
             volume: ec2.BlockDeviceVolume.ebs(100),
           }
-        ]
+        ],
+        requireImdsv2: true,
+        associatePublicIpAddress: false
       });
 
       // Load the startup script
       const startupScript = readFileSync('./ec2-tgi-startup.sh', 'utf8');
       ec2Instance.addUserData(startupScript);
 
-      this.ENDPOINT_NAME = ec2Instance.privateIpAddress + ':8080'
+      this.ENDPOINT_NAME = ec2Instance.instancePrivateIp + ':8080'
     }
 
     // Create the SSM parameter with the string value of the sagemaker inference endpoint name
