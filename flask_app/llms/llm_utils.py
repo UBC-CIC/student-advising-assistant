@@ -14,6 +14,7 @@ from filters import VerboseFilter, FilterWithContext
 from .huggingface_qa import HuggingFaceQAEndpoint
 from .sagemaker_endpoint import MySagemakerEndpoint
 from aws_helpers.param_manager import get_param_manager
+from aws_helpers.ssh_forwarder import start_ssh_forwarder
 
 ### HELPER CLASSES
 class ContentHandler(LLMContentHandler):
@@ -40,16 +41,18 @@ hyperparams = {
     "max_new_tokens": 200,
 }
 
-def load_model_and_prompt(endpoint_type: str, endpoint_name: str, model_name: str) -> Tuple[BaseLLM,Prompt]:
+def load_model_and_prompt(endpoint_type: str, endpoint_name: str, model_name: str, dev_mode: bool = False) -> Tuple[BaseLLM,Prompt]:
     """
     Utility function loads a LLM of the given endpoint type and model name, and the QA Prompt
-    - endpoint_type: 'sagemaker', 'huggingface', or 'huggingface_qa'
+    - endpoint_type: 'sagemaker', 'huggingface_hub', 'huggingface_hub_qa', or 'huggingface_tgi'
         - sagemaker: an AWS sagemaker endpoint
-        - huggingface: a huggingface api endpoint for the 'text generation' task
-        - huggingface_qa: a huggingface api endpoint for the 'question answering' task
+        - huggingface_hub: a huggingface hub api endpoint for the 'text generation' task
+        - huggingface_hub_qa: a huggingface hub api endpoint for the 'question answering' task
                           (eg. a BERT-type model)
+        - huggingface_tgi: a huggingface text generation server
     - endpoint_name: huggingface model id, or sagemaker endpoint name
     - model_name: display name of the model
+    - dev_mode: if true, loads a model for local connection if applicable
     """
     llm = None
     if endpoint_type == 'sagemaker':
@@ -62,7 +65,7 @@ def load_model_and_prompt(endpoint_type: str, endpoint_name: str, model_name: st
         os.environ["HUGGINGFACEHUB_API_TOKEN"] = param_manager.get_secret('generator/HUGGINGFACE_API')['API_TOKEN']
         llm = load_huggingface_qa_endpoint(endpoint_name)
     elif endpoint_type == 'huggingface_tgi':
-        llm = load_huggingface_tgi_endpoint(endpoint_name)
+        llm = load_huggingface_tgi_endpoint(endpoint_name, dev_mode)
     else:
         raise Exception(f"Endpoint type {endpoint_type} is not supported.")
         
@@ -114,8 +117,14 @@ def load_huggingface_qa_endpoint(name: str) -> BaseLLM:
     llm = HuggingFaceQAEndpoint(repo_id=name)
     return llm
 
-def load_huggingface_tgi_endpoint(name: str) -> BaseLLM:
-    llm = HuggingFaceTextGenInference(inference_server_url=name, **hyperparams)
+def load_huggingface_tgi_endpoint(name: str, dev_mode: bool = False) -> BaseLLM:
+    if dev_mode:
+        # Start SSH forwarder through bastion host for local development
+        remote_host, remote_port = name.split(':')
+        server = start_ssh_forwarder(remote_host, int(remote_port))
+        name = f"localhost:{server.local_bind_port}"
+        
+    llm = HuggingFaceTextGenInference(inference_server_url=f'http://{name}', **hyperparams)
     return llm
 
 def load_chain_filter(base_llm: BaseLLM, model_name: str, verbose: bool = False) -> FilterWithContext:

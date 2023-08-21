@@ -85,10 +85,16 @@ To develop the Flask app locally, some additional steps are required.
 4. Ensure your AWS profile is logged in via `aws sso login --profile <profile name>` using the same profile name as specified in the `.env` file
 5. Run `flask --app application --debug run` to run the app in debug mode (Optionally, specify the port with `-p <port num>`)
 
-### Using PGVector locally
+### Using Private AWS resources locally
 
-If using the RDS PGVector to store documents, some setup will be required to access the it while developing locally since the DB is within a VPC. Follow this [guide](https://reflectoring.io/connect-rds-byjumphost/) here to create the bastion host only. At the step where you create the keypair, name your key-pair `bastion-host` so that a file called `bastion-host.pem` can be downloaded to your local machine. Make sure you create the ec2 bastion host in a public subnet, with public ipv4 address enabled. In the bastion host's security group, only allow inbound connection from your local device's public ipv4 address. To do that, type "What's my ip" in google search and you will see the ip address. Then in the security group, specify `<your-ip>/32` as Source. If you change your location, or your ip address is not static, you would have to update that value with the correct value.
+If using the RDS PGVector to store documents, or the EC2 LLM hosting, some setup will be required to access the these while developing locally since the DB and/or EC2 instance are within a VPC. 
 
+Setup the Bastion Host
+- Follow this [guide](https://reflectoring.io/connect-rds-byjumphost/) here to create the bastion host only. - At the step where you create the keypair, name your key-pair `bastion-host` so that a file called `bastion-host.pem` can be downloaded to your local machine. 
+- Make sure you create the ec2 bastion host in a public subnet, with public ipv4 address enabled. 
+- In the bastion host's security group, only allow inbound connection from your local device's public ipv4 address. To do that, type "What's my ip" in google search and you will see the ip address. Then in the security group, specify `<your-ip>/32` as Source. If you change your location, or your ip address is not static, you would have to update that value with the correct value.
+
+Setup the local environment
 - Modify the `.env` file in the root of `/flask_app`
     - Add these variables:
         ```
@@ -98,7 +104,7 @@ If using the RDS PGVector to store documents, some setup will be required to acc
         ```
     - Also ensure that `MODE=dev` is in the `.env`
 - Add the `bastion-host.pem` file in the root of `/flask_app`
-- Restart the flask app, it should now be able to use the `pgvector` retriever with connection to RDS
+- Restart the flask app, it should now be able to use the `pgvector` retriever with connection to RDS, and/or connect to the EC2 model-hosting instance.
 
 ### Docker Container
 
