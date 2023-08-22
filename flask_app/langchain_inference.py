@@ -27,7 +27,7 @@ param_manager = get_param_manager()
 
 use_llm = None
 try:
-    use_llm = param_manager.get_parameter('USE_LLM') == 'true'
+    use_llm = param_manager.get_parameter('LLM_MODE') == 'true'
 except:
     use_llm = True
     
@@ -74,7 +74,7 @@ spell_correct_chain = combine_documents_chain = filter = compressor = None
 if use_llm:
     # LLMs
     base_llm, qa_prompt = llms.load_model_and_prompt(generator_config['ENDPOINT_TYPE'], generator_config['ENDPOINT_NAME'], 
-                                                     generator_config['MODEL_NAME'])
+                                                     generator_config['MODEL_NAME'], dev_mode=DEV_MODE)
 
     # Chains
     spell_correct_chain = llms.load_spell_chain(base_llm, generator_config['MODEL_NAME'], verbose=VERBOSE_LLMS)

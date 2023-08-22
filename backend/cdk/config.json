@@ -1,0 +1,4 @@
+{
+    "retriever_type": "pgvector",
+    "llm_mode": "ec2"
+}

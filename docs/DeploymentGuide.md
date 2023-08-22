@@ -137,6 +137,23 @@ Note: `zip` command requires that you use Linux or WSL. If `zip` is not installe
 Install requirements with npm:
 ```npm install```
 
+**Configure the CDK deployment**
+The configuration options are in the `/backend/cdk/config.json` file. By default, the contents are:
+```
+{
+    "retriever_type": "pgvector",
+    "llm_mode": "ec2"
+}
+```
+- `retriever_type` allowed values: "pgvector", "pinecone"
+- `llm_mode` allowed values: "ec2", "sagemaker", "none"
+
+If you chose to use Pinecone.io retriever, replace the `"pgvector"` value with `"pinecone"`.
+
+If you would prefer not to deploy the LLM, replace the `"ec2"` value with `"none"`. The system will not deploy a LLM endpoint, and it will return references from the information sources only, without generated responses. 
+
+The `"sagemaker"` options for `llm_mode` will host the model with an SageMaker inference endpoint instead of an EC2 instance. This may incur a higher cost.
+
 **Initialize the CDK stacks**
 (required only if you have not deployed any resources with CDK in this region before)
 
@@ -149,15 +166,8 @@ cdk bootstrap aws://YOUR_AWS_ACCOUNT_ID/YOUR_ACCOUNT_REGION --profile your-profi
 
 You may  run the following command to deploy the stacks all at once. Please replace `<profile-name>` with the appropriate AWS profile used earlier. 
 
-If using pgvector retriever, replace <retriever-type> with pgvector, or omit the retrieverType parameter. If using pinecone retriever, replace <retriever-type> with pinecone.
-
-If you would prefer not to deploy the LLM (eg. for cost reasons), replace `llmMode=true` with `llmMode=false`. The system will not deploy a LLM endpoint, and it will return references from the information sources only, without generated responses.
-
 ```bash
-cdk deploy --all \
-    --parameters InferenceStack:retrieverType=<retriever-type> \
-    --parameters InferenceStack:llmMode=true \
-    --profile <profile-name>
+cdk deploy --all --profile <profile-name>
 ```
 
 #### **Extra: Taking down the deployed stacks**
