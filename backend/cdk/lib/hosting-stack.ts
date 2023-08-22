@@ -51,6 +51,26 @@ export class HostingStack extends cdk.Stack {
         role: inferenceStack.lambda_rds_role,
       }
     );
+
+    const fetchFeedbackLambda = new lambda.Function(
+      this,
+      "student-advising-fetch-feedback",
+      {
+        functionName: "student-advising-fetch-feedback-logs",
+        runtime: lambda.Runtime.PYTHON_3_9,
+        handler: "fetch_feedback.lambda_handler",
+        timeout: cdk.Duration.seconds(300),
+        memorySize: 512,
+        environment: {
+          DB_SECRET_NAME: databaseStack.secretPath,
+          BUCKET_PARAM_NAME: 	inferenceStack.S3_SSM_PARAM_NAME
+        },
+        vpc: vpcStack.vpc,
+        code: lambda.Code.fromAsset("./lambda/fetch_feedback"),
+        layers: [inferenceStack.psycopg2_layer],
+        role: inferenceStack.lambda_rds_role,
+      }
+    );
     
     const beanstalkBucketName = `elasticbeanstalk-${this.region}-${this.account}`;
     let deploymentBucket = s3.Bucket.fromBucketName(

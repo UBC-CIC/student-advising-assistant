@@ -6,11 +6,12 @@
 
 Once you have deployed the solution, the following user guide will help you navigate the functions available.
 
-| Index                                                                               | Description                                           |
-| :---------------------------------------------------------------------------------  | :---------------------------------------------------- |
-| [Web User Interface](#web-user-interface)    | A walkthrough of the User Interface  |
-| [Data Pipeline](#data-pipeline)                                                     | Rerun the pipeline to update information sources      |
-| [Pruning the Faculties and Programs List](#pruning-the-faculties-and-programs-list) | Clean the list of faculties and programs              |
+| Index                                                                               | Description                                            |
+| :---------------------------------------------------------------------------------  | :----------------------------------------------------  |
+| [Web User Interface](#web-user-interface)                                           | A walkthrough of the User Interface                    |
+| [Data Pipeline](#data-pipeline)                                                     | Rerun the pipeline to update information sources       |
+| [Pruning the Faculties and Programs List](#pruning-the-faculties-and-programs-list) | Clean the list of faculties and programs               |
+| [Downloading Logs and Feedback](#downloading-logs-and-feedback)                     | Download the logs and feedback for submitted questions |
 
 ## Web User Interface
 
@@ -99,7 +100,7 @@ If the data pipeline needs to be rerun outside of the scheduled times, it can be
 ```bash
 aws lambda invoke \
     --function-name student-advising-start-ecs-task \
-    --profile <profile-name> 
+    --profile <profile-name> \
     student-advising-start-ecs-task-log.txt
 ```
 2. The rerun will take several hours to complete. Once it is complete, the web app will display the time that the pipeline finished.
@@ -139,3 +140,15 @@ The list may need manual pruning after the data processing is first run, to remo
 6. Save the `faculties.json` file and in the AWS Console, click 'upload' and drag and drop the updated file.
 
 Future runs of the data processing pipeline will reapply any changes that you made to this file. If the data sources are updated, you may need to manually check the `faculties.json` file again through the same process.
+
+## Downloading Logs and Feedback
+1. To prepare spreadsheets of all submitted questions and feedback received, run the following lambda function:
+```bash
+aws lambda invoke \
+    --function-name student-advising-fetch-feedback-logs \
+    --profile <profile-name> \
+    student-advising-fetch-feedback-task-log.txt
+```
+2. In the [S3 Console](https://s3.console.aws.amazon.com/s3), navigate to the bucket named `inferencestack-studentadvisings3bucket...`, then to the `logs` folder
+3. Download the latest `feedback-log-[...].csv` and `question-log-[...].csv` files. They can be viewed in a spreadsheet viewer such as Excel.
+![S3 Download Logs](./images/s3_download_logs.png)
