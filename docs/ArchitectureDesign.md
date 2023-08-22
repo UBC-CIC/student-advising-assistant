@@ -3,13 +3,18 @@
 This document provides a more in-depth explanation of the system's architecture and operation.
 
 ## Table of Contents
-1. [Introduction](#introduction)
-2. [System Overview](#system-overview)
-    1. [Data Processing](#data-processing)
-    2. [Question Answering System](#question-answering-system)
-        1. [Document Retrieval](#document-retrieval)
-        2. [Answer Generation](#answer-generation)
-3. [AWS Infrastructure](#aws-infrastructure)
+- [Architecture Design](#architecture-design)
+  - [Table of Contents](#table-of-contents)
+- [Introduction](#introduction)
+- [System Overview](#system-overview)
+  - [Data Processing](#data-processing)
+    - [Website Scraping](#website-scraping)
+  - [Question Answering System](#question-answering-system)
+    - [Document Retrieval](#document-retrieval)
+    - [Answer Generation](#answer-generation)
+- [AWS Infrastructure](#aws-infrastructure)
+  - [Architecture Diagram](#architecture-diagram)
+  - [Database Schema](#database-schema)
 
 # Introduction
 
@@ -226,7 +231,7 @@ This section provides an overview of the AWS components used in the system archi
 
 ## Architecture Diagram 
 
-![Architecture Diagram](./images/architecture_diagram.png)
+![Architecture Diagram](./images/ArchiectureDiagram-EC2-tgi-inference.drawio.png)
 
 **Amazon Virtual Private Cloud (VPC)**
 Various components of the infrastructure are placed inside a VPC for a more isolated and secure cloud environment.
@@ -236,7 +241,7 @@ Various components of the infrastructure are placed inside a VPC for a more isol
 1. A user (eg. a student) interacts with the web UI of the application hosted on AWS Elastic Beanstalk, and submits a query. 
 2. Using semantic search over the embedded documents in the Amazon RDS PostgreSQL database, the app fetches documents that are most closely related to the user’s query.
     1. The diagram illustrates the case where documents are stored in Amazon RDS. In the case that the system is using the Pinecone retriever, the app would instead make a request to the Pinecone.io API.
-3. The app invokes an Amazon SageMaker Inference Endpoint hosting a LLM, prompting it to respond to the user’s query using the retrieved documents from step 2 as context. It then displays the response and the reference documents to the user in the web UI.
+3. The app invokes a [HuggingFace Text Generation Inference Endpoint](https://github.com/huggingface/text-generation-inference) hosted on an EC2 Instance, prompting it to respond to the user’s query using the retrieved documents from step 2 as context. It then displays the response and the reference documents to the user in the web UI.
 4. The system logs all questions and answers, storing them in the Amazon RDS PostgreSQL database by making a request to an AWS Lambda Function as a proxy. Users can provide feedback to help improve the solution, which is also stored in the Amazon RDS PostgreSQL database using the AWS Lambda Function.
 
 **Data Processing**
