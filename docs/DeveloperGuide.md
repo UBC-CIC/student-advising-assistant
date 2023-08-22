@@ -3,14 +3,25 @@
 This guide contains some additional instructions for developing the system.
 
 ## Table of Contents
-- [Requirements](#requirements)
-- [Development Considerations](#development-considerations)
-- [Local App Development](#local-app-development)
-- [Development of `document_scraping` and `embeddings`](#development-of-document_scraping-and-embeddings)
-- [CDK](#cdk)
-- [Reinitialize Web App After Deployment](#reinitialize-web-app-after-deployment)
-- [Architecture Diagram and Database Schema](#architecture-diagram-and-database-schema)
-- [Miscellaneous Scripts](#miscellaneous-scripts)
+- [Developer Guide](#developer-guide)
+  - [Table of Contents](#table-of-contents)
+  - [Requirements](#requirements)
+  - [Development Considerations](#development-considerations)
+  - [Local App Development](#local-app-development)
+    - [Local Flask deployment](#local-flask-deployment)
+    - [Using Private AWS resources locally](#using-private-aws-resources-locally)
+    - [Docker Container](#docker-container)
+    - [Uploading the app to Beanstalk](#uploading-the-app-to-beanstalk)
+  - [Development of `document_scraping` and `embeddings`](#development-of-document_scraping-and-embeddings)
+    - [Dockerize the `document_scraping` and `embeddings` for the ECS and ECR](#dockerize-the-document_scraping-and-embeddings-for-the-ecs-and-ecr)
+  - [Reinitialize Web App After Deployment](#reinitialize-web-app-after-deployment)
+  - [CDK](#cdk)
+    - [Bootstrap (only required once per AWS region)](#bootstrap-only-required-once-per-aws-region)
+    - [Synth (run before `cdk deploy`)](#synth-run-before-cdk-deploy)
+    - [Deploy](#deploy)
+      - [**Extra: Taking down the deployed stacks**](#extra-taking-down-the-deployed-stacks)
+  - [Architecture Diagram and Database Schema](#architecture-diagram-and-database-schema)
+  - [Miscellaneous Scripts](#miscellaneous-scripts)
 
 ## Requirements
 
