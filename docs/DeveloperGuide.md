@@ -77,9 +77,11 @@ To develop the Flask app locally, some additional steps are required.
     ```
     AWS_PROFILE_NAME=<insert AWS SSO profile name>
     MODE=dev
+    FEEDBACK_LAMBDA=student-advising-store-feedback-to-db
     ```
     - `MODE=dev` activates verbose LLMs and uses the `/dev` versions of secrets and SSM parameters
     - Using dev mode requires creating the dev versions of secrets and SSM parameters, eg `student-advising/generator/ENDPOINT-TYPE` -> `student-advising/dev/generator/ENDPOINT-TYPE`
+    - The `FEEDBACK_LAMBDA` variable is set by CDK for the deployed version of the app, and needs to be specified for local development. You can choose a different lambda function if you don't want feedback from the development server to be sent to the same DB as the deployed server.
 2. In `/flask_app`, create a conda environment with the command `conda env create -f environment.yml`
 3. Activate the environment with `conda activate flaskenv` (or whichever name you chose for the environment)
 4. Ensure your AWS profile is logged in via `aws sso login --profile <profile name>` using the same profile name as specified in the `.env` file
