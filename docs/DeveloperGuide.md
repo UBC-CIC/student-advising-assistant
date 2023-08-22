@@ -3,13 +3,25 @@
 This guide contains some additional instructions for developing the system.
 
 ## Table of Contents
-- [Requirements](#requirements)
-- [Development Considerations](#development-considerations)
-- [Local App Development](#local-app-development)
-- [Development of `document_scraping` and `embeddings`](#development-of-document_scraping-and-embeddings)
-- [CDK](#cdk)
-- [Architecture Diagram and Database Schema](#architecture-diagram-and-database-schema)
-- [Miscellaneous Scripts](#miscellaneous-scripts)
+- [Developer Guide](#developer-guide)
+  - [Table of Contents](#table-of-contents)
+  - [Requirements](#requirements)
+  - [Development Considerations](#development-considerations)
+  - [Local App Development](#local-app-development)
+    - [Local Flask deployment](#local-flask-deployment)
+    - [Using Private AWS resources locally](#using-private-aws-resources-locally)
+    - [Docker Container](#docker-container)
+    - [Uploading the app to Beanstalk](#uploading-the-app-to-beanstalk)
+  - [Development of `document_scraping` and `embeddings`](#development-of-document_scraping-and-embeddings)
+    - [Dockerize the `document_scraping` and `embeddings` for the ECS and ECR](#dockerize-the-document_scraping-and-embeddings-for-the-ecs-and-ecr)
+  - [Reinitialize Web App After Deployment](#reinitialize-web-app-after-deployment)
+  - [CDK](#cdk)
+    - [Bootstrap (only required once per AWS region)](#bootstrap-only-required-once-per-aws-region)
+    - [Synth (run before `cdk deploy`)](#synth-run-before-cdk-deploy)
+    - [Deploy](#deploy)
+      - [**Extra: Taking down the deployed stacks**](#extra-taking-down-the-deployed-stacks)
+  - [Architecture Diagram and Database Schema](#architecture-diagram-and-database-schema)
+  - [Miscellaneous Scripts](#miscellaneous-scripts)
 
 ## Requirements
 
@@ -35,9 +47,36 @@ By default, during the document retrieval step, the system performs a ‘zoom-ou
 If a University or faculty has a different policy hierarchy, they will need to change this behaviour.
 
 **Faculty & Program Titles**
-By default, the data processing script identifies the faculty, program, and specialization titles using a regular expression matching on the titles of scraped webpages. You may need to modify the regex in `./document_scraping/processing_functions.py` to better suit 
+By default, the data processing script identifies the faculty, program, and specialization titles using a regular expression matching on the titles of scraped webpages. You may need to modify the regex in `./document_scraping/processing_functions.py` to better suit your institution.
 This step may have some false positives (eg. identifies ‘Major Programs’ as the name of a major), and these positives need to be pruned from the list of programs (see the [User Guide](./UserGuide.md#pruning-the-faculties-and-programs-list)).
 This step could be improved if the University has an index of all faculties, programs, and specializations which can be used instead. However, you will have to ensure that the names of faculties and programs aligns with the names of faculties and programs in the extract metadata, in order for the metadata filtering to work during document retrieval.
+
+**Changing the LLM**
+As progress unfolds in the LLM field, you will likely want to change the language model used. The system will work relatively plug-and-play with any Huggingface Hub text generation model that is supported by the [Text Generation Inference](https://github.com/huggingface/text-generation-inference#optimized-architectures) container. However, you may need to update the prompts (defined in `/flask_app/prompts/prompt_templates.py`) to suit the format expected by a new model.
+
+The Flask App is configured to work with several types of hosted models, and the settings can be changed through the system's SSM Parameters.
+Below is a table of the supported hosting types, and the corresponding setting for the `/student-advising/generator/ENDPOINT_TYPE` SSM Parameter and the `/student-advising/generator/ENDPOINT_NAME` SSM Parameter. 
+
+| **Hosting Type**                      | **ENDPOINT_TYPE**  | **ENDPOINT_NAME**                   |
+|---------------------------------------|--------------------|-------------------------------------|
+| HuggingFace Hub Text Generation       | huggingface_hub    | Model's Hub repo ID                 |
+| HuggingFace Hub Question Answering    | huggingface_hub_qa | Model's Hub repo ID                 |
+| SageMaker Inference Endpoint          | sagemaker          | SageMaker endpoint name             |
+| HuggingFace Text Generation Inference | huggingface_tgi    | URL for the server running TGI      |
+
+You can change the values of these SSM Parameters in the CDK before deployment, or change them in the AWS SSM Console after deployment. If changed after deployment, you will have to reinitialize the Flask app on Elastic Beanstalk - see [Reinitialize Web App After Deployment](#reinitialize-web-app-after-deployment).
+
+Note that when using HuggingFace Hub, you will need to set the Secrets Manager secret for the HuggingFace API Token. 
+You can use the following command, replacing `<profile-name>` with your AWS profile name and `<api-key>` with a [HuggingFace User Token](https://huggingface.co/docs/hub/security-tokens).
+```bash
+aws secretsmanager create-secret \
+    --name student-advising/generator/HUGGINGFACE_API' \
+    --description "API key for HuggingFace Hub" \
+    --secret-string "{\"API_TOKEN\":\"<api key>\"}" \
+    --profile <profile-name>
+```
+
+'generator/HUGGINGFACE_API'
 
 ## Local App Development
 To develop the Flask app locally, some additional steps are required.
@@ -49,18 +88,26 @@ To develop the Flask app locally, some additional steps are required.
     ```
     AWS_PROFILE_NAME=<insert AWS SSO profile name>
     MODE=dev
+    FEEDBACK_LAMBDA=student-advising-store-feedback-to-db
     ```
     - `MODE=dev` activates verbose LLMs and uses the `/dev` versions of secrets and SSM parameters
     - Using dev mode requires creating the dev versions of secrets and SSM parameters, eg `student-advising/generator/ENDPOINT-TYPE` -> `student-advising/dev/generator/ENDPOINT-TYPE`
+    - The `FEEDBACK_LAMBDA` variable is set by CDK for the deployed version of the app, and needs to be specified for local development. You can choose a different lambda function if you don't want feedback from the development server to be sent to the same DB as the deployed server.
 2. In `/flask_app`, create a conda environment with the command `conda env create -f environment.yml`
 3. Activate the environment with `conda activate flaskenv` (or whichever name you chose for the environment)
 4. Ensure your AWS profile is logged in via `aws sso login --profile <profile name>` using the same profile name as specified in the `.env` file
 5. Run `flask --app application --debug run` to run the app in debug mode (Optionally, specify the port with `-p <port num>`)
 
-### Using PGVector locally
+### Using Private AWS resources locally
 
-If using the RDS PGVector to store documents, some setup will be required to access the it while developing locally since the DB is within a VPC. Follow this [guide](https://reflectoring.io/connect-rds-byjumphost/) here to create the bastion host only. At the step where you create the keypair, name your key-pair `bastion-host` so that a file called `bastion-host.pem` can be downloaded to your local machine. Make sure you create the ec2 bastion host in a public subnet, with public ipv4 address enabled. In the bastion host's security group, only allow inbound connection from your local device's public ipv4 address. To do that, type "What's my ip" in google search and you will see the ip address. Then in the security group, specify `<your-ip>/32` as Source. If you change your location, or your ip address is not static, you would have to update that value with the correct value.
+If using the RDS PGVector to store documents, or the EC2 LLM hosting, some setup will be required to access the these while developing locally since the DB and/or EC2 instance are within a VPC. 
 
+Setup the Bastion Host
+- Follow this [guide](https://reflectoring.io/connect-rds-byjumphost/) here to create the bastion host only. - At the step where you create the keypair, name your key-pair `bastion-host` so that a file called `bastion-host.pem` can be downloaded to your local machine. 
+- Make sure you create the ec2 bastion host in a public subnet, with public ipv4 address enabled. 
+- In the bastion host's security group, only allow inbound connection from your local device's public ipv4 address. To do that, type "What's my ip" in google search and you will see the ip address. Then in the security group, specify `<your-ip>/32` as Source. If you change your location, or your ip address is not static, you would have to update that value with the correct value.
+
+Setup the local environment
 - Modify the `.env` file in the root of `/flask_app`
     - Add these variables:
         ```
@@ -70,7 +117,7 @@ If using the RDS PGVector to store documents, some setup will be required to acc
         ```
     - Also ensure that `MODE=dev` is in the `.env`
 - Add the `bastion-host.pem` file in the root of `/flask_app`
-- Restart the flask app, it should now be able to use the `pgvector` retriever with connection to RDS
+- Restart the flask app, it should now be able to use the `pgvector` retriever with connection to RDS, and/or connect to the EC2 model-hosting instance.
 
 ### Docker Container
 
@@ -110,12 +157,6 @@ Windows:
 2. In WSL, install the zip tool: `sudo apt install zip`
 3. In WSL, navigate to the `student_advising_assistant`
 
-To simply create a zip file to inspect, make sure you under `student-advising-assistant` folder and run:
-
-``` bash
-zip -r <file-name>.zip aws_helpers/ flask_app/ Dockerfile -x "*/.*" -x ".*" -x "*.env" -x "__pycache__*"
-```
-
 From the `student_advising_assistant` folder, call the script:
 ```
 ./deploy_beanstalk.sh \
@@ -131,6 +172,12 @@ From the `student_advising_assistant` folder, call the script:
 - When prompted to deploy the app, enter `1` to upload and deploy to Elastic Beanstalk
 
 For future deployments of the app, make sure to update the BUNDLE_VER argument. The new version name must be unique.
+
+If you simply want to create the app zip file, without uploading to beanstalk, make sure you are under `student-advising-assistant` folder and run:
+
+``` bash
+zip -r <file-name>.zip aws_helpers/ flask_app/ Dockerfile -x "*/.*" -x ".*" -x "*.env" -x "__pycache__*"
+```
 
 ## Development of `document_scraping` and `embeddings`
 
@@ -163,6 +210,10 @@ docker push <aws-account-number>.dkr.ecr.<aws-region>.amazonaws.com/scraping-con
 ```
 
 Repeat those step for the embedding script. Remember to use the `embedding.Dockerfile` instead.
+
+## Reinitialize Web App After Deployment
+
+If you need to change any AWS SSM Parameter after deploying the CDK, you will need to prompt the Elastic Beanstalk web app to fetch the new SSM Parameter values and re-initialize. This can be done by sending a GET request to the `/initialize` endpoint of the web app, and upon successful initialization, it will display the message "Successfully initialized the system". 
 
 ## CDK
 

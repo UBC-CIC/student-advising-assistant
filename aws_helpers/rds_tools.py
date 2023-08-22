@@ -1,6 +1,5 @@
 import psycopg2
-import os
-from sshtunnel import SSHTunnelForwarder
+from .ssh_forwarder import start_ssh_forwarder
 from .param_manager import get_param_manager
 
 param_manager = get_param_manager()
@@ -30,27 +29,6 @@ def execute_and_fetch(sql: str, dev_mode = False):
         
     connect_and_callback(callback, dev_mode)
     return result
-
-def start_ssh_forwarder(host: str, port: int):
-    """
-    Starts an SSH forwarder for local connection to RDS
-    Requires that the environment variables are set
-    - host: the rds host name
-    - port: the rds port
-    Returns: the server's local bind port
-    """
-    EC2_PUBLIC_IP = os.environ["EC2_PUBLIC_IP"] # public ipv4 addr of the ec2 bastion host, need this in a .env
-    EC2_USERNAME = os.environ["EC2_USERNAME"] # ec2 username, need this in a .env
-    SSH_PRIV_KEY = os.environ["SSH_PRIV_KEY"] # path to the .pem file, need this in a .env
-
-    server = SSHTunnelForwarder(
-        (EC2_PUBLIC_IP, 22),
-        ssh_pkey=SSH_PRIV_KEY,
-        ssh_username=EC2_USERNAME,
-        remote_bind_address=(host, port),
-    )
-    server.start()
-    return server
 
 def connect_and_callback(callback, dev_mode = False):
     """

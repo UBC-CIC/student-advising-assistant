@@ -23,10 +23,15 @@ import * as s3 from "aws-cdk-lib/aws-s3";
 import * as s3n from "aws-cdk-lib/aws-s3-notifications";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
+import {readFileSync} from 'fs';
+import config from '../config.json';
+
 export class InferenceStack extends Stack {
   public readonly psycopg2_layer: lambda.LayerVersion;
   public readonly lambda_rds_role: iam.Role;
-  public readonly SM_ENDPOINT_NAME: string;
+  public readonly S3_SSM_PARAM_NAME: string;
+  public readonly ENDPOINT_TYPE: string;
+  public readonly ENDPOINT_NAME: string;
 
   constructor(
     scope: Construct,
@@ -37,20 +42,8 @@ export class InferenceStack extends Stack {
   ) {
     super(scope, id, props);
 
+    this.S3_SSM_PARAM_NAME = "/student-advising/documents/S3_BUCKET_NAME"
     const vpc = vpcStack.vpc;
-
-    // CDK params
-    const retrieverType = new CfnParameter(this, "retrieverType", {
-      description: "Parameter for the type of retriever to use",
-      default: "pgvector",
-      allowedValues: ["pgvector", "pinecone"], // allowed values of the parameter
-    }).valueAsString; // get the value of the parameter as string
-
-    const llmMode = new CfnParameter(this, "llmMode", {
-      description: "If true, enables the LLM. If false, disables all LLM features and does not deploy LLM.",
-      default: "true",
-      allowedValues: ["true", "false"], // allowed values of the parameter
-    }).valueAsString; // get the value of the parameter as string
 
     // Bucket for files related to inference
     const inferenceBucket = new s3.Bucket(this, "student-advising-s3bucket", {
@@ -64,7 +57,7 @@ export class InferenceStack extends Stack {
 
     // Create the SSM parameter with the string value representing the S3 bucket name
     new ssm.StringParameter(this, "S3BucketNameParameter", {
-      parameterName: "/student-advising/documents/S3_BUCKET_NAME",
+      parameterName: this.S3_SSM_PARAM_NAME,
       stringValue: inferenceBucket.bucketName, // Replace 'your-s3-bucket-name' with the actual S3 bucket name
     });
 
@@ -294,6 +287,9 @@ export class InferenceStack extends Stack {
     lambdaRole.addManagedPolicy(
       iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonSSMReadOnlyAccess")
     );
+    lambdaRole.addManagedPolicy(
+      iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonS3FullAccess")
+    );
     this.lambda_rds_role = lambdaRole;
 
     // The layer containing the psycopg2 library
@@ -325,22 +321,15 @@ export class InferenceStack extends Stack {
     );
 
     // LLM configuration
-    const HUGGINGFACE_MODEL_ID = "lmsys/vicuna-7b-v1.5";
+    const HUGGINGFACE_MODEL_ID = "arya/vicuna-7b-v1.5-hf";
     const MODEL_NAME = "vicuna";
-    const INSTANCE_TYPE = "ml.g5.2xlarge";
-    const NUM_GPUS = "1";
-    this.SM_ENDPOINT_NAME = MODEL_NAME + "-inference";
 
-    // Create the SM Inference Endpoint only if LLM mode is enabled
+    if (config.llm_mode == "sagemaker") {
+      this.ENDPOINT_NAME = MODEL_NAME + "-inference";
+      this.ENDPOINT_TYPE = "sagemaker";
+      const INSTANCE_TYPE = "ml.g5.xlarge";
+      const NUM_GPUS = "1";
 
-    new CfnCondition(this, "llm-mode-boolean", {
-      expression: Fn.conditionEquals(llmMode, "true")
-    });
-
-    const llmFlag = Fn.conditionIf("llm-mode-boolean", true , false);
-    console.log(llmFlag)
-    
-    if (llmFlag) {
       // Role for Sagemaker
       // this role will be used for both task role and task execution role
       const smRole = new iam.Role(this, "sagemaker-role", {
@@ -361,7 +350,7 @@ export class InferenceStack extends Stack {
           timeout: Duration.seconds(300),
           memorySize: 512,
           environment: {
-            SM_ENDPOINT_NAME: this.SM_ENDPOINT_NAME,
+            SM_ENDPOINT_NAME: this.ENDPOINT_NAME,
             SM_REGION: this.region || "us-west-2",
             SM_ROLE_ARN: smRole.roleArn,
             HF_MODEL_ID: HUGGINGFACE_MODEL_ID,
@@ -401,12 +390,76 @@ export class InferenceStack extends Stack {
           resources: ["*"],
         })
       );
+    } else if (config.llm_mode == "ec2") {
+      this.ENDPOINT_TYPE = "huggingface_tgi";
+
+      const vpc = vpcStack.vpc
+
+      // Security group for the EC2 instance
+      const ec2SG = new ec2.SecurityGroup(this, 'student-advising-ec2-tgi-sg', {
+        vpc,
+        description: 'Allow ssh access to ec2 instance and traffic to tgi inference endpoint',
+        allowAllOutbound: true,
+        disableInlineRules: true
+      });
+
+      ec2SG.addIngressRule(
+        ec2.Peer.ipv4(vpcStack.cidr),
+        ec2.Port.tcp(22),
+        'Allow ssh traffic to ec2',
+      );
+
+      ec2SG.addIngressRule(
+        ec2.Peer.ipv4(vpcStack.cidr),
+        ec2.Port.tcp(8080),
+        'Allow traffic to inference endpoint',
+      );
+      
+      // Find the Deep Learning Base GPU AMI (Ubuntu 20.04)
+      const dlami = ec2.MachineImage.lookup({
+        name: 'Deep Learning Base GPU AMI (Ubuntu 20.04)*',
+        owners: ['amazon'],
+      });
+
+      // Create a keypair for the instance 
+      const ec2KeyPair = new ec2.CfnKeyPair(this, 'student-advising-tgi-keypair', {
+        keyName: 'student-advising-ec2-tgi-key',
+      });
+
+      // Create the instance
+      const ec2Instance = new ec2.Instance(this, 'student-advising-tgi-inference', {
+        vpc: vpc,
+        vpcSubnets: {
+          subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
+        },
+        securityGroup: ec2SG,
+        instanceType: ec2.InstanceType.of(ec2.InstanceClass.G4DN, ec2.InstanceSize.XLARGE),
+        machineImage: dlami,
+        blockDevices: [
+          {
+            deviceName: '/dev/sda1',
+            volume: ec2.BlockDeviceVolume.ebs(100),
+          }
+        ],
+        requireImdsv2: true,
+        associatePublicIpAddress: false,
+        keyName: ec2KeyPair.keyName
+      });
+
+      // Load the startup script
+      const startupScript = readFileSync('./lib/ec2-tgi-startup.sh', 'utf8');
+      ec2Instance.addUserData(startupScript);
+
+      this.ENDPOINT_NAME = ec2Instance.instancePrivateIp + ':8080';
+    } else {
+      this.ENDPOINT_NAME = "none";
+      this.ENDPOINT_TYPE = "none";
     }
 
     // Create the SSM parameter with the string value of the sagemaker inference endpoint name
-    new ssm.StringParameter(this, "SmEndpointNameParameter", {
+    new ssm.StringParameter(this, "EndpointNameParameter", {
       parameterName: "/student-advising/generator/ENDPOINT_NAME",
-      stringValue: this.SM_ENDPOINT_NAME,
+      stringValue: this.ENDPOINT_NAME,
     });
 
     // Create the SSM parameter with the name of the generator model
@@ -418,19 +471,19 @@ export class InferenceStack extends Stack {
     // Create the SSM parameter with the type of the generator model
     new ssm.StringParameter(this, "GeneratorModelTypeParameter", {
       parameterName: "/student-advising/generator/ENDPOINT_TYPE",
-      stringValue: "sagemaker",
+      stringValue: this.ENDPOINT_TYPE,
     });
 
     // Create the SSM parameter with the type of the retriever
     new ssm.StringParameter(this, "RetrieverNameParameter", {
       parameterName: "/student-advising/retriever/RETRIEVER_NAME",
-      stringValue: retrieverType,
+      stringValue: config.retriever_type,
     });
 
     // Create the SSM parameter with the llm mode
     new ssm.StringParameter(this, "LlmMode", {
       parameterName: "/student-advising/LLM_MODE",
-      stringValue: llmMode,
+      stringValue: ((config.llm_mode == "none") ? 'false' : 'true'),
     });
   }
 }
