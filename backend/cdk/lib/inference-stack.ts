@@ -29,6 +29,7 @@ import config from '../config.json';
 export class InferenceStack extends Stack {
   public readonly psycopg2_layer: lambda.LayerVersion;
   public readonly lambda_rds_role: iam.Role;
+  public readonly S3_SSM_PARAM_NAME: string;
   public readonly ENDPOINT_TYPE: string;
   public readonly ENDPOINT_NAME: string;
 
@@ -41,6 +42,7 @@ export class InferenceStack extends Stack {
   ) {
     super(scope, id, props);
 
+    this.S3_SSM_PARAM_NAME = "/student-advising/documents/S3_BUCKET_NAME"
     const vpc = vpcStack.vpc;
 
     // Bucket for files related to inference
@@ -55,7 +57,7 @@ export class InferenceStack extends Stack {
 
     // Create the SSM parameter with the string value representing the S3 bucket name
     new ssm.StringParameter(this, "S3BucketNameParameter", {
-      parameterName: "/student-advising/documents/S3_BUCKET_NAME",
+      parameterName: this.S3_SSM_PARAM_NAME,
       stringValue: inferenceBucket.bucketName, // Replace 'your-s3-bucket-name' with the actual S3 bucket name
     });
 
@@ -285,6 +287,9 @@ export class InferenceStack extends Stack {
     lambdaRole.addManagedPolicy(
       iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonSSMReadOnlyAccess")
     );
+    lambdaRole.addManagedPolicy(
+      iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonS3FullAccess")
+    );
     this.lambda_rds_role = lambdaRole;
 
     // The layer containing the psycopg2 library
@@ -445,7 +450,7 @@ export class InferenceStack extends Stack {
       const startupScript = readFileSync('./lib/ec2-tgi-startup.sh', 'utf8');
       ec2Instance.addUserData(startupScript);
 
-      this.ENDPOINT_NAME = ec2Instance.instancePrivateIp + ':8080'
+      this.ENDPOINT_NAME = ec2Instance.instancePrivateIp + ':8080';
     } else {
       this.ENDPOINT_NAME = "none";
       this.ENDPOINT_TYPE = "none";
