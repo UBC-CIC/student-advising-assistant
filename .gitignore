@@ -17,6 +17,7 @@ document_scraping/processed
 **/log.txt
 **/*.zip
 /document_scraping/documents/
+test.Dockerfile
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
