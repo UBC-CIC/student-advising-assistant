@@ -33,11 +33,13 @@ class VerboseFilter(LLMChainFilter):
         """Filter down documents based on their relevance to the query."""
         filtered_docs = []
         removed_docs = []
-        for doc in documents:
-            _input = self.get_input(query, doc)
-            include_doc, reason = self.llm_chain.predict_and_parse(
-                **_input, callbacks=callbacks
-            )
+        
+        inputs = [self.get_input(query, doc) for doc in documents]
+        results = self.llm_chain.apply_and_parse(inputs)
+        
+        for result,doc in zip(results,documents):
+            include_doc = result[0]
+            reason = result[1]
             doc.metadata[self.reason_metadata_key] = reason
             if include_doc:
                 filtered_docs.append(doc)
