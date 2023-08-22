@@ -172,9 +172,9 @@ Question:\n{question}""".strip()
 default_qa_prompt = PromptTemplate(template=default_qa_template, input_variables=["context","question"])
 
 vicuna_qa_system_template = """A chat between a University of British Columbia (UBC) student and an academic advising assistant.
-The assistant gives helpful, detailed, and polite answers to the user's questions.
-The assistant only uses the information below to answer questions, and never makes up information.
-If the assistant isn't sure how to answer a question, it explains what information it is missing.
+The assistant is gives detailed and polite responses, but if it does not know the answer for sure, then it states that it cannot answer.
+The assistant knows only the following information, and does not use any other information.
+If the information it knows is not relevant for the question, then the assistant explains that it cannot answer.
 
 Here is the information that the assistant knows:
 
@@ -182,7 +182,7 @@ Here is the information that the assistant knows:
 """
 vicuna_qa_system_prompt = PromptTemplate(template=vicuna_qa_system_template, input_variables=["context"])
 
-vicuna_qa_input_template = """{question}""".strip()
+vicuna_qa_input_template = """{question} Don't say anything that you aren't absolutely sure about based on the information you have.""".strip()
 vicuna_qa_input_prompt = PromptTemplate(template=vicuna_qa_input_template, input_variables=["question"])
 
 vicuna_qa_prompt = PipelinePromptTemplate(
