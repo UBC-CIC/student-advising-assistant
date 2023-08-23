@@ -5,5 +5,5 @@ input_length=1024
 total_tokens=2048
 volume=/opt/dlami/nvme/data
 mkdir -p $volume
-docker run --name vicuna --gpus all --shm-size 1g -p 8080:80 --mount type=bind,source=$volume,target=/data $container --model-id $model --revision main --max-input-length $input_length --max-total-tokens $total_tokens --max-batch-prefill-tokens $total_tokens
+docker run --detach --name vicuna --gpus all --shm-size 1g -p 8080:80 --mount type=bind,source=$volume,target=/data $container --model-id $model --revision main --max-input-length $input_length --max-total-tokens $total_tokens --max-batch-prefill-tokens $total_tokens
 --//--
