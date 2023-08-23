@@ -41,7 +41,7 @@ hyperparams = {
     "max_new_tokens": 200,
 }
 
-def load_model_and_prompt(endpoint_type: str, endpoint_name: str, model_name: str, dev_mode: bool = False) -> Tuple[BaseLLM,Prompt]:
+def load_model_and_prompt(endpoint_type: str, endpoint_name: str, endpoint_region: str, model_name: str, dev_mode: bool = False) -> Tuple[BaseLLM,Prompt]:
     """
     Utility function loads a LLM of the given endpoint type and model name, and the QA Prompt
     - endpoint_type: 'sagemaker', 'huggingface_hub', 'huggingface_hub_qa', or 'huggingface_tgi'
@@ -56,7 +56,7 @@ def load_model_and_prompt(endpoint_type: str, endpoint_name: str, model_name: st
     """
     llm = None
     if endpoint_type == 'sagemaker':
-        llm = load_sagemaker_endpoint(endpoint_name)
+        llm = load_sagemaker_endpoint(endpoint_name, endpoint_region)
     elif endpoint_type == 'huggingface_hub':
         os.environ["HUGGINGFACEHUB_API_TOKEN"] = get_param_manager().get_secret('generator/HUGGINGFACE_API')['API_TOKEN']
         llm = load_huggingface_endpoint(endpoint_name)
@@ -85,7 +85,7 @@ def load_prompt(endpoint_type: str, model_name: str):
     else:
         return prompts.default_qa_prompt
     
-def load_sagemaker_endpoint(endpoint_name: str) -> BaseLLM:
+def load_sagemaker_endpoint(endpoint_name: str, endpoint_region: str) -> BaseLLM:
     """
     Loads the LLM for a sagemaker inference endpoint
     """
@@ -94,7 +94,7 @@ def load_sagemaker_endpoint(endpoint_name: str) -> BaseLLM:
     llm = MySagemakerEndpoint(
         endpoint_name=endpoint_name,
         credentials_profile_name=credentials_profile,
-        region_name="us-west-2", 
+        region_name=endpoint_region, 
         model_kwargs={"do_sample": False, **hyperparams},
         content_handler=content_handler
     )

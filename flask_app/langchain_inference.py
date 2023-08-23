@@ -74,7 +74,7 @@ spell_correct_chain = combine_documents_chain = filter = compressor = None
 if use_llm:
     # LLMs
     base_llm, qa_prompt = llms.load_model_and_prompt(generator_config['ENDPOINT_TYPE'], generator_config['ENDPOINT_NAME'], 
-                                                     generator_config['MODEL_NAME'], dev_mode=DEV_MODE)
+                                                     param_manager.region, generator_config['MODEL_NAME'], dev_mode=DEV_MODE)
 
     # Chains
     spell_correct_chain = llms.load_spell_chain(base_llm, generator_config['MODEL_NAME'], verbose=VERBOSE_LLMS)
