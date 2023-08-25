@@ -101,7 +101,7 @@ async def answer():
     docs, main_response, alerts, removed_docs = await langchain_inference_module.run_chain(program_info,topic,question,config)
     
     # Log the question
-    context_str = ' : '.join(list(program_info.values()) + [topic])
+    context_str = ' : '.join([value for value in list(program_info.values()) + [topic] if len(value) > 0])
     log_question(question, context_str, main_response, [doc.metadata['doc_id'] for doc in docs])
     
     # Render the results
