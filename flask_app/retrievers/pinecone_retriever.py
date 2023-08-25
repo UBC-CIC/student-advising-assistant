@@ -172,7 +172,7 @@ class PineconeRetriever(Retriever):
         for key,val in filter.items():
             retriever_filter[key] = {"$eq": val}
 
-        query_str = ' : '.join(list(program_info.values()) + [topic,query])
+        query_str = ' : '.join([value for value in list(program_info.values()) + [topic,query] if len(value) > 0])
         return self._retriever_combined_query(query_str), {'filter': retriever_filter}
     
     def _response_converter(self, response: List[Document]) -> List[Document]:

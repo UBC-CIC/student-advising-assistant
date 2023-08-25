@@ -32,7 +32,13 @@ def llm_query(program_info: Dict, topic: str, query: str):
     """
     if topic and len(topic) > 0:
         query = f'On the topic of {topic}: {query}'
-    return llm_query_prompt.format(program_info=llm_program_str(program_info), query=query)
+    query = llm_query_prompt.format(program_info=llm_program_str(program_info), query=query)
+    
+    context_str = filter_context_str(program_info,topic)
+    if context_str and len(context_str) > 0:
+        query += f" If none of the references are about {context_str}, say \"I do not have the information to answer\"."
+        
+    return query
 
 ### GENERAL PROMPT TEMPLATES
 # Some models prefer to receive inputs in a particular format
@@ -171,15 +177,17 @@ Context:\n{context}\n
 Question:\n{question}""".strip()
 default_qa_prompt = PromptTemplate(template=default_qa_template, input_variables=["context","question"])
 
-vicuna_qa_system_template = """A chat between a University of British Columbia (UBC) student and an academic advising assistant.
-The assistant gives helpful, detailed, and polite answers to the user's questions.
-The assistant only uses the information below to answer questions, and never makes up information.
-If the assistant isn't sure how to answer a question, it explains what information it is missing.
+vicuna_qa_system_template = """
+A chat between a University of British Columbia (UBC) student and an academic advising assistant.
+The assistant gives detailed and polite responses.
+The assistant knows only the following information, and never uses any other knowledge.
+If the assistant does not know the necessary information to answer, then the assistant says "I do not have the information to answer".
+If none of the references that the assistant has are relevant, then the assistant says "I do not have the information to answer".
 
 Here is the information that the assistant knows:
 
 {context}
-"""
+""".strip()
 vicuna_qa_system_prompt = PromptTemplate(template=vicuna_qa_system_template, input_variables=["context"])
 
 vicuna_qa_input_template = """{question}""".strip()
@@ -199,10 +207,21 @@ huggingface_qa_prompt = PromptTemplate(template=huggingface_qa_template, input_v
 ### OTHER PROMPTS
 
 default_spelling_correction_template = """
-Please correct the grammar and spelling errors in the following text. 
+Please correct the grammar and spelling errors in the user's text. 
 Return only the corrected version of the text, do not respond to the question and do not include any annotation.
->>> Input:
+USER:
+>>> begin input
+ths is a sentince i wrote
+>>> end input
+ASSISTANT:
+>>> begin correction
+This is a sentence I have written.
+>>> end correction
+USER:
+>>> begin input
 {text}
->>> Corrected:
+>>> end input
+ASSISTANT:
+>>> begin correction
 """
 default_spelling_correction_prompt = PromptTemplate(template=default_spelling_correction_template, input_variables=["text"])

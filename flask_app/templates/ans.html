@@ -18,11 +18,11 @@
 
 <body>
   <main>
-    <header>
+    <header class="text-center">
       <div class="mt-auto p-3 bg-light text-center">
         <span class="text-muted">Information last updated on {{last_updated}}</span>
       </div>
-      <h1 id="ask" class="m-5 text-center">{{title}}</h1>
+      <h1 class="m-5 mb-3 text-center">{{title}}</h1>
     </header>
     <div class="container mb-5">
       <div id="content" style="justify-content: center; display: flex;">
@@ -34,7 +34,7 @@
           {% for alert in alerts %}
           <div class="alert alert-warning alert-dismissible fade show" role="alert">{{alert}}</div>
           {% endfor %}
-          <div class="card border-primary mb-3">
+          <div class="card border-primary mb-3 border-2 bg-opacity-10">
             <div class="card-body">
               {% if main_response %}
               <zero-md>
@@ -56,6 +56,10 @@
                 <label for="feedback-no" class="btn btn-outline-danger" type="button" aria-expanded="true" aria-controls="backup-response">No</label>
                 {% endif %}
               </div>
+              <small id="feedback-help-block" class="form-text text-muted ms-3">
+                After selecting 'yes' or 'no', you can submit the feedback form <a href="#feedback-form">below</a>
+              </small>
+              <button class="btn btn-primary float-end" id="ask" type="button">Ask another question</button>
             </div>
           </div>
 
@@ -80,14 +84,14 @@
             </div>
           </div>
 
-          <div id="feedback-form" class="card mb-3">
+          <div id="feedback-form" class="card mb-3 border-warning border-2">
             <div class="card-header">
               Feedback Form
             </div>
             <div class="card-body">
-              <div class="alert alert-light" role="alert">
+              <div class="alert alert-warning" role="alert">
                 Submitting feedback is optional, but will help improve the system. 
-                If you submit feedback, your question and the system response will be anonymously recorded.
+                If you submit feedback, comments will be anonymously recorded.
               </div>
               <form action="/feedback" method="post">
                 <input type="hidden" id="feedback-hidden-helpful" name="feedback-hidden-helpful">
