@@ -20,7 +20,7 @@ GRAPH_FILEPATH = os.path.join('data','documents','website_graph.txt')
 
 ### CONSTANTS
 MIN_DOC_LENGTH = 100 # Remove documents below a certain character length - helps with some LLM hallucinations
-MAX_TOKENS = 900 # Max input tokens
+MAX_TOKENS = 750 # Max input tokens
 
 ### LOAD AWS CONFIG
 param_manager = get_param_manager()
@@ -172,13 +172,15 @@ def docs_for_llms(docs: List[Document]):
     - Adds the sequence of page titles to the contents
     - Adds the context sentence if provided
     """
+    index = 1
     for doc in docs:
-        content = doc_display_title(doc)
-        if 'context' in doc.metadata and type(doc.metadata['context']) == str and doc.metadata['context'] != '': 
-            content += '\n\n' + doc.metadata['context']
-        content += '\n\n' + doc.page_content
+        content = f'The following reference is about {doc_display_title(doc)}'
+        content += '\n\n' + doc.page_content.strip()
+        #if 'context' in doc.metadata and type(doc.metadata['context']) == str and doc.metadata['context'] != '': 
+        #    content += '\n\n' + doc.metadata['context']
         doc.metadata['original_page_content'] = doc.page_content
         doc.page_content = content
+        index += 1
 
 def format_docs_for_display(docs: List[Document]):
     """
@@ -216,6 +218,38 @@ def llm_filter_docs(docs: List[Document], program_info: Dict, topic: str, query:
         return filtered, removed
     else:
         return filtered
+
+def llm_combined_answer(input_docs: List[Document], removed_docs: List[Document], llm_query:str) -> str:
+    """
+    Generate an LLM response for the combined set of documents.
+    If the documents are too long, removes documents and adds them to the removed_docs list
+    """
+    while len(input_docs) > 0:
+        cutoff_docs = []
+        
+        while combine_documents_chain.prompt_length(input_docs, question=llm_query) > MAX_TOKENS:
+            # Remove documents if the resulting input would be too long
+            print(combine_documents_chain.prompt_length(input_docs, question=llm_query))
+            last_doc = input_docs[-1]
+            cutoff_docs.append(last_doc)
+            input_docs.remove(last_doc)
+        
+        combined_answer = combine_documents_chain.run(input_documents=input_docs, question=llm_query)
+        if not is_empty_answer(combined_answer):
+            removed_docs.extend(cutoff_docs)
+            return combined_answer
+        else:
+            # Answer was empty, try using the cut off docs to answer
+            removed_docs.extend(input_docs)
+            input_docs = cutoff_docs
+    
+    return None
+
+def is_empty_answer(answer: str) -> bool:
+    """
+    Return true if a generated answer empty or is saying that the system cannot answer.
+    """            
+    return answer is None or len(answer) == 0 or "I do not have the information to answer" in answer 
     
 def backoff_retrieval(retriever: Retriever, program_info: Dict, topic: str, query:str, k:int = 5, threshold = 0, 
                       do_filter: bool = False) -> List[Document]:
@@ -230,20 +264,21 @@ def backoff_retrieval(retriever: Retriever, program_info: Dict, topic: str, quer
                  the threshold range depends on the scoring function of the chosen retriever
     - do_filter: If true, performs an LLM filter step on returned documents
     """ 
-    backoff_order = [['specialization','year'],['program'],['faculty']] 
+    backoff_order = [['specialization','year'],['program','faculty']] 
     # ^ order of context elements to remove
     metadata_filter_keys = ['program','faculty']
     # ^ these keys will be included in the metadata filter when the value is not empty
     metadata_filter_when_empty = ['specialization','program','faculty'] 
     # ^ these keys will be included in the metadata filter when the value is empty
     
+    answer = ""
     program_info_copy = copy.copy(program_info) # copy the dict since elements will be popped
     docs = []
     removed_docs = []
     
     backoff_index = 0
     removed_keys = []
-    while len(docs) == 0 and backoff_index < len(backoff_order):
+    while is_empty_answer(answer):
         # Prepare the metadata filter
         filter = {}
         nonfiltered_program_info = copy.copy(program_info_copy)
@@ -254,21 +289,29 @@ def backoff_retrieval(retriever: Retriever, program_info: Dict, topic: str, quer
                 nonfiltered_program_info.pop(key)
         
         # Perform search
-        docs = retriever.semantic_search(filter, nonfiltered_program_info, topic, query, k=k)
+        docs = retriever.semantic_search(filter, nonfiltered_program_info, topic, query, k=k, threshold=threshold)
         
         # Prefilter documents that are too short
         # Some LLMs will hallucinate if the document content is empty
         docs = [doc for doc in docs if len(doc.page_content) >= MIN_DOC_LENGTH]
         
-        # Filter docs
+        # Generate an intermediate answer
         docs_for_llms(docs)
         if do_filter: 
             docs, removed = llm_filter_docs(docs, nonfiltered_program_info, topic, query, return_removed=True)
             removed_docs += removed
-    
-        if len(docs) > 0: 
-            # Enough documents already retrieved, break loop
-            break
+        
+        if len(docs) > 0:   
+            llm_query = prompts.llm_query(program_info_copy, topic, query)
+            answer = llm_combined_answer(docs, removed_docs, llm_query)
+        
+            if is_empty_answer(answer): 
+                print("Didn't find answer")
+                removed_docs.extend(docs)
+                docs = []
+            else:
+                # Generated an answer, break loop
+                break
         
         has_key = False
         # Find the next key(s) that can be removed from the program info
@@ -296,13 +339,15 @@ def backoff_retrieval(retriever: Retriever, program_info: Dict, topic: str, quer
     # don't include them in removed_docs
     doc_ids = [doc.metadata['doc_id'] for doc in docs]
     removed_docs = [doc for doc in removed_docs if doc.metadata['doc_id'] not in doc_ids]
-    return docs, removed_keys, removed_docs
+    if is_empty_answer(answer): answer = None
+    
+    return docs, removed_keys, removed_docs, answer
 
 default_config = {
     'start_doc': None,
     'combine_with_sibs': False, 
     'spell_correct': use_llm, 
-    'do_filter': use_llm,
+    'do_filter': False,
     'compress': False, 
     'generate_by_document': False,
     'generate_combined': use_llm, 
@@ -344,7 +389,7 @@ async def run_chain(program_info: Dict, topic: str, query: str, config: Dict):
     
     # Spell correct the query if the option is turned on
     if config['spell_correct']:
-        corrected_query = spell_correct_chain.run(query)
+        corrected_query = spell_correct_chain.run(text=query,stop=[">>> end correction"])
         if query.lower() != corrected_query.lower(): alerts.append(f'Used spell/grammar corrected query: {corrected_query}')
         query = corrected_query
         
@@ -357,7 +402,8 @@ async def run_chain(program_info: Dict, topic: str, query: str, config: Dict):
         docs += retriever.docs_from_ids([config['start_doc']])
     else:
         # Peform retrieval
-        result, ignored_keys, removed_docs = backoff_retrieval(retriever, program_info, topic, query, k=config['k'], do_filter=config['do_filter'])
+        result, ignored_keys, removed_docs, main_response = backoff_retrieval(retriever, program_info, topic, query, 
+                                                                              k=config['k'], do_filter=config['do_filter'], threshold=0.1)
         docs += result
 
     if config['combine_with_sibs']: combine_sib_docs(retriever, docs)
@@ -369,18 +415,8 @@ async def run_chain(program_info: Dict, topic: str, query: str, config: Dict):
         get_related_links_from_compressed(docs, compressed_docs)
 
     # Perform a combined generation if the option is turned on
-    if config['generate_combined']:
-        input_docs = compressed_docs if compressed_docs else docs
-        if len(input_docs) > 0:
-            while combine_documents_chain.prompt_length(input_docs, question=llm_query) > MAX_TOKENS:
-                # Remove documents if the resulting input would be too long
-                print(combine_documents_chain.prompt_length(input_docs, question=llm_query))
-                last_doc = input_docs[-1]
-                removed_docs.insert(0,last_doc)
-                input_docs.remove(last_doc)
-                
-            combined_answer = combine_documents_chain.run(input_documents=input_docs, question=llm_query)
-            main_response = combined_answer
+    #if config['generate_combined']:
+    #    main_response = llm_combined_answer(compressed_docs if compressed_docs else docs, removed_docs, llm_query)
     
     for doc in docs:    
         # Generate a response from this document onlys, if the option is turned on
