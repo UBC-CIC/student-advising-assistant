@@ -1,0 +1,153 @@
+
+// This file is used to specify the general parameters and websites to 
+// download and process for the Science Advising Assistant.
+// Each website specified here will be downloaded recursively by
+// following links to child pages within the same domain, and then
+// all pages will be processed into extracts.
+//
+// See the example entry under dump_configs below for details on parameters
+// 
+// ** Note on attributes: **
+//    Attribute groups specify a list of named attributes and values to compare
+//    against html tags. For more information on which attributes and values can be used,
+//    see https://www.crummy.com/software/BeautifulSoup/bs4/doc/#the-keyword-arguments
+//
+// ** Note on functions: **
+//    To specify functions, include the name of any function in the 
+//    process_site_dumps.py file
+// 
+{
+    // General config options applied to all sites
+    general_config: {
+        // Maximum number of characters in an extract
+        // This value should depend on the language models used downstream
+        // Some models perform better with larger or smaller context
+        // OPTIONAL, default is 1000
+        max_extract_len: 1000,
+        // Encoding to use when reading input html files and when
+        // writing output .csv
+        // OPTIONAL, default is 'utf-8-sig'
+        encoding: 'utf-8-sig',
+        // Regex to match links that should be ignored when processing websites
+        // OPTIONAL, default is 'mailto:.*'
+        link_ignore_regex: 'mailto:.*'
+    },
+    // Configuration per website
+    dump_configs: {
+        // Below is an example configuration item as a reference
+        // this example configuration will be ignored
+        example_config: {
+            // base_url is the root url to begin the recursive site scraping from
+            // no sites 'above' the url will be downloaded, ie. only child pages within
+            // the same domain will be downloaded
+            // REQUIRED
+            base_url: "base url",
+            // main_content_attrs is an attribute group describing the html tag that contains
+            // the main content of any page. It should be used to exclude elements such as
+            // footers, navigation panes, headers, etc.
+            // REQUIRED
+            main_content_attrs: {
+                attribute_name_1: "<attribute value 1>",
+                attribute_name_2: "<attribute value 2>",
+                //...
+            },
+            // title_attrs is an attribute group describing the html tag that contains
+            // the title of any page.
+            // OPTIONAL, default is {name: 'h1'}
+            title_attrs: {
+                attribute_name_1: "<attribute value 1>",
+                attribute_name_2: "<attribute value 2>",
+                //...
+            },
+            // remove_tag_attrs is a list of groups of html attributes
+            // if any html tag within a site matches all attributes in a group,
+            // it will be removed before performing any further processing
+            // OPTIONAL
+            remove_tag_attrs: [
+                {
+                    attribute_name_1: "<attribute value 1>",
+                    attribute_name_2: "<attribute value 2>",
+                    //...
+                },
+                //...
+            ],
+            // replacements is a list of attribute groups and functions
+            // such that any tag matching the given attributes group will be 
+            // passed to the function and replaced with the function output
+            // OPTIONAL
+            replacements: [
+                {
+                    attrs: {
+                        attribute_name_1: "attribute value 1",
+                        attribute_name_2: "attribute value 2",
+                        //...
+                    },
+                    function: 'function name'
+                },
+                //...
+            ],
+            // split_attrs is a list of attribute groups that are used to hierarchically
+            // split a webpage into extracts. A webpage is split into extracts by tags 
+            // matching the first attribute group, then those extracts are further split
+            // by the second attribute group, etc.
+            //
+            // Optionally: specify the attribute 'function' for any attribute group
+            // in order to split on tags matching the function
+            // function type: Callable[[BeautifulSoup],boolean]
+            // inputs: beautiful soup tag object
+            // outputs: boolean, true if the tag should be split on, false otherwise
+            //
+            // OPTIONAL, default is the title tags h1 to h4 in order, followed by tags having the 
+            // split class applied (see website_dump_doc_extractor.DEFAULT_SPLIT_CLASS)
+            split_attrs: [
+                {
+                    attribute_name_1: "<attribute value 1>",
+                    attribute_name_2: "<attribute value 2>",
+                    //...
+                },
+                //...
+            ],
+            // mandatory_splits indicates the index (zero-indexed) of the last element in 
+            // split_attrs on which to always split the document, regardless of extract length.
+            // Any entries beyond this index will only be used to split if the document is longer 
+            // than the maximum length.
+            // OPTIONAL, default is 3, so all h1 to h4 tags are mandatory to split on
+            mandatory_splits: 3,
+            // ignore_empty_split_tags is a boolean value
+            // if true: will not split a page on a tag matching split attributes if the tag 
+            //          contains no text
+            // if false: will always split on a tag matching split atributes, even if it
+            //          contains no text. This can result in empty titles.
+            // OPTIONAL, default is true
+            ignore_empty_split_tags: true,
+            // ignore_empty_split_tags is a boolean value
+            // if true: allows splitting on a tag that contains a link tag
+            // if false: if a tag contains a link, it won't be used to split a page
+            //           even if it matches split attributes
+            // Setting this to false could be useful for, for example,
+            // a newsfeed or blog that links to articles
+            // OPTIONAL, default is false
+            allow_link_splits: false,
+            // ignore_empty_split_tags a list of indexes of split_attrs where the text of the 
+            // tag should not be used as a new title. An integer index will be used instead
+            // OPTIONAL, default is an empty list
+            no_title_splits: [],
+            // metadata_extractor is the name of a function that will return any additional 
+            // metadata to be added to a document
+            // function type: Callable[[str,List[str],List[str],str],dict]
+            // inputs: page url, page titles. titles of parent pages, text content for the document
+            // outputs: dict of metadata values
+            // OPTIONAL
+            metadata_extractor: 'function name',
+            // metadata_extractor is the name of a function that, given the contents of a 'parent' document extract, returns any context that 
+            // will be included in the 'context' column for child extracts
+            // Eg. if the parent extract describes the purpose of a table, that purpose should be
+            //     considered for child pages containing the actual table
+            // function type: Callable[[str,List[str],List[str],str],str]
+            // inputs: page url, page titles. titles of parent pages, text content for the document
+            // outputs: context string
+            // OPTIONAL
+            parent_context_extractor: 'function name',
+        }
+    }
+}
