@@ -94,19 +94,16 @@ Licenses of libraries and tools used by the system are listed below:
 - "a liberal Open Source license, similar to the BSD or MIT licenses."
 
 [BSD 3-clause](https://opensource.org/license/bsd-3-clause/)
-- For Networkx, Flask, and Pytorch
+- For networkx, Flask, pytorch, lxml, pandas, python-dotenv, dateparser, and scrapy
 
 [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0)
-- For Transformers, Sentence-transformers, and Fschat
-
-[GNU General Public License](https://www.gnu.org/licenses/gpl-3.0.en.html)
-- For wget
+- For transformers, sentence-transformers, fschat, and pyjson5
 	
 [GNU Lesser General Public License](https://www.gnu.org/licenses/lgpl-3.0.en.html)
-- For Psycopg2-binary
+- For psycopg2-binary
 
 [MIT License](LICENSE)
-- For Spacy and Dictdiffer
+- For Spacy and dictdiffer
 
 [HFOIL 1.0](https://github.com/huggingface/text-generation-inference/blob/bde25e62b33b05113519e5dbf75abda06a03328e/LICENSE)
 - For Huggingface text-generation-inference, used by the DLC container for the sagemaker inference endpoint

@@ -4,9 +4,11 @@ import sys
 import regex as re
 import pyjson5 as json5
 import json
-from subprocess import check_call, STDOUT, CalledProcessError
 import logging
 from typing import Dict, List, Tuple, Any
+from scrapy.crawler import CrawlerProcess
+from scrapy.utils.project import get_project_settings
+from site_pull_spider import SitePullSpider
 from tools import write_file
 import processing_functions
 from website_dump_doc_extractor import DumpConfig, DocExtractor
@@ -25,8 +27,6 @@ downstream tasks.
 ### CONSTANTS
 # Input files
 CONFIG_FILEPATH = 'dump_config.json5' # Filepath to the dump config file in current working dir
-WGET_EXE_PATH = "wget.exe" # Wget executable used on non-unix systems
-WGET_CONFIG_PATH = 'wget_config.txt' # Config file for wget calls
 
 # Output files
 BASE_DUMP_PATH = 'site_dumps' # Directory where site dump files are saved
@@ -132,114 +132,24 @@ def load_config(config_filepath: str) -> Tuple[DocExtractor, List[DumpConfig]]:
         dump_configs.append(dump_config)
     
     return doc_extractor, dump_configs
-
-def site_regex_rule(base_url: str) -> str:
-    """
-    Generates a regex string to match only sub urls of the given
-    base url. Used in wget calls to fetch child pages of sites.
-    """
-    url_segments = [segment for segment in base_url.split('/') 
-                        if len(segment) > 0 and not segment.startswith('http')]
-    return f".*{re.escape('/'.join(url_segments))}.*"
     
 ### Main function to pull websites and process
-def pull_sites(dump_configs: List[DumpConfig], system_os, output_folder = './', wget_exe_path = './wget.exe', wget_config_path = './wget_config.txt'):
+def pull_sites(dump_configs: List[DumpConfig], output_folder = './'):
     """
     Uses wget to pull the indicated websites, and processes
     the files into one combined csv of documents for use in the UBC Science 
     Advising question answering system.
     - dump_configs: Config objects for the sites to pull
-    - system_os: 
     - output_folder: directory for the output site dumps
-    - wget_exe_path: path to the wget.exe file
-    - wget_config_path: path to the wget config file (aka .wgetrc)
     """
-    # create the output dir if not exists, otherwise do nothing
-    os.makedirs(output_folder, exist_ok=True)
-    redirects = {}
-    total_num = 0
-    for dump_config in dump_configs:
-        logging.info(dump_config)
-        log_file = os.path.join(output_folder,f'wget_log_{dump_config.name}.txt')
-        regex_rule_arg = f'--accept-regex=({site_regex_rule(dump_config.base_url)})'
-            
-        try:
-            logging.info(f'- Beginning pull from {dump_config.base_url}, making call to wget')
-            logging.info(f'    - ** This may take a long time')
-            logging.info(f'    - Check the log file {log_file} for updates')
-            if system_os == "Windows":
-                check_call([wget_exe_path, f'--config={wget_config_path}', f'--output-file={log_file}', '--recursive', 
-                            f'--directory-prefix={output_folder}', regex_rule_arg, dump_config.base_url], stderr=STDOUT)
-            elif system_os in ["Darwin", "Linux"]:
-                check_call(['wget', f'--config={wget_config_path}', f'--output-file={log_file}', '--recursive', 
-                            f'--directory-prefix={output_folder}', regex_rule_arg, dump_config.base_url], stderr=STDOUT)
-            else:
-                logging.error(f"OS {system_os} is not currently supported. Currently supported OS are Windows, Darwin and Linux")
-                raise OSError(f"OS {system_os} is not currently supported")
-            logging.info(f'- Successfully pulled from {dump_config.base_url}')
-        except CalledProcessError as exc:
-            if exc.returncode == 8:
-                # Server error return code
-                logging.warning('- wget returned code 8, indicating server error:' 
-                                + 'this will occur if it comes across any 404 error, so it is expected for the Academic Calendar.' 
-                                + 'Please check that files were downloaded correctly.')
-            else: 
-                logging.error('- Call to wget failed')
-                logging.error(f'- Error message: {exc.output}' if exc.output else 'No error message given')
-        
-        total_num += get_redirects_from_log(log_file, redirects)
+    start_urls = [dump_config.base_url for dump_config in dump_configs]
     
-    # Cleanup copied files
-    logging.info("Cleanup any duplicated files from wget")
-    cleanup_copy_files(output_folder)
+    logging.info(f'Beginning pull from sites, this may take a long time')
+    process = CrawlerProcess(get_project_settings())
+    process.crawl(SitePullSpider, start_urls=start_urls, out_dir=output_folder)
+    process.start()
     
-    def writer(): 
-        os.makedirs(output_folder, exist_ok=True)
-        with open(REDIRECT_FILEPATH,'w') as f: json.dump(redirects,f)
-    
-    write_file(writer)
-    print(f'Completed pulling sites, downloaded {total_num} pages')
-
-def cleanup_copy_files(filepath):
-    """
-    wget will sometimes name the new version of a file as <name>.1.html,
-    we want to rename it to <name>.html and delete the previous version
-    """
-    for root, _, files in os.walk(filepath):
-        for name in files:
-            splitname = name.split('.')
-            if len(splitname) == 3 and splitname[1] == '1':
-                # this is a new version of a file
-                orig_name = f'{splitname[0]}.{splitname[2]}'
-                copy_filepath = os.path.join(root, name)
-                orig_filepath = os.path.join(root, orig_name)
-                try: os.remove(orig_filepath) # remove the old version of the file
-                except OSError: pass
-                os.rename(copy_filepath,orig_filepath) # rename copy file to original file
-
-def get_redirects_from_log(log_file, redirects):
-    """
-    Given a wget log file (on verbose mode), adds any redirected urls to the redirects dict
-    Also returns the total number of URLs processed from the log
-    """
-    logging.info('- Getting redirects from the log file')
-    total_num = 0
-    with open(log_file,'r') as f: 
-        initial_url = None
-        redirected = False
-        for line in f: # read line by line since the log file could be large
-            if re.match(r'Saving to: \'[^\n\s]*\'',line):
-                total_num += 1
-            elif match := re.search('(?<=--\s\s)[^\n\s]*',line):
-                initial_url = match.captures()[0]
-                redirected = False
-            elif '301 Moved Permanently' in line:
-                redirected = True
-            elif redirected and (match := re.search('(?<=Location: )[^\n\s]*',line)):
-                final_url = match.captures()[0]
-                redirects[initial_url] = final_url
-    logging.info('- Completed processing redirects')
-    return total_num
+    print(f'Completed pulling sites')
 
 ### Main
     
@@ -263,19 +173,15 @@ def process_site_dumps(doc_extractor: DocExtractor, dump_configs: list[DumpConfi
     doc_extractor.parse_folder(dump_configs,out_path)
 
 def main():
-    logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+    logging.basicConfig(stream=sys.stdout, level=logging.INFO)
     set_boto_log_levels(logging.INFO) # Quiet boto logs, debug clogs up stdout
     
     # Download the config file from s3
     download_single_file(f"document_scraping/{CONFIG_FILEPATH}", CONFIG_FILEPATH)
-    
-    # Check the system OS since Windows Machine requires wget.exe
-    # darwin (OS X) and Linux probably already have wget
-    system_os = platform.system()
-    logging.info(f"System OS: {system_os}")
 
+    # Pull and process sites
     doc_extractor, dump_configs = load_config(CONFIG_FILEPATH)
-    pull_sites(dump_configs, system_os=system_os, output_folder = BASE_DUMP_PATH, wget_exe_path=WGET_EXE_PATH, wget_config_path=WGET_CONFIG_PATH)
+    pull_sites(dump_configs, output_folder = BASE_DUMP_PATH)
     process_site_dumps(doc_extractor, dump_configs, redirect_map_path=REDIRECT_FILEPATH, out_path=DOCUMENTS_DIR)
 
     # Upload the website_extracts.csv and website_graph.txt

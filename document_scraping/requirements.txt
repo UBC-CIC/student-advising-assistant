@@ -9,3 +9,5 @@ boto3
 pyjson5
 python-dotenv
 dictdiffer
+dateparser
+scrapy
