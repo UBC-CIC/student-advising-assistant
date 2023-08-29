@@ -100,14 +100,14 @@
                 <input 
                 type="hidden" 
                 name="feedback-hidden-reference-ids" 
-                value="{% for doc in answers %}{{doc.metadata['doc_id']}},{% endfor %}">
+                value="{% for doc in docs + removed_docs%}{{doc.metadata['doc_id']}},{% endfor %}">
                 <input type="hidden" name="feedback-hidden-response" value="{{main_response}}">
 
                 <div class="mt-3">
                   <div class="input-group mb-3">
                     <span class="input-group-text" id="inputGroup-sizing-default">Which reference is the most relevant?</span>
                     <select class="form-select" name="feedback-reference-select" aria-label="Reference Select">
-                      <option selected>None</option>
+                      <option value="0" selected>None</option>
                       {% for i in range(docs|length + removed_docs|length) %}
                         <option value="{{i+1}}">Reference {{i+1}}</option>
                       {% endfor %}
