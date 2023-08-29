@@ -174,7 +174,15 @@ def docs_for_llms(docs: List[Document]):
     """
     index = 1
     for doc in docs:
-        content = f'The following reference is about {doc_display_title(doc)}'
+        title = doc_display_title(doc)
+        
+        if doc.metadata['program'] not in title:
+            title = f"{doc.metadata['program']} -> {title}"
+            
+        if doc.metadata['faculty'] not in title:
+            title = f"{doc.metadata['faculty']} -> {title}"
+            
+        content = f'The following reference is about {title}'
         content += '\n\n' + doc.page_content.strip()
         #if 'context' in doc.metadata and type(doc.metadata['context']) == str and doc.metadata['context'] != '': 
         #    content += '\n\n' + doc.metadata['context']
@@ -347,7 +355,7 @@ default_config = {
     'start_doc': None,
     'combine_with_sibs': False, 
     'spell_correct': use_llm, 
-    'do_filter': False,
+    'do_filter': True,
     'compress': False, 
     'generate_by_document': False,
     'generate_combined': use_llm, 
@@ -414,10 +422,6 @@ async def run_chain(program_info: Dict, topic: str, query: str, config: Dict):
         compressed_docs = compressor.compress_documents(docs, llm_query)
         get_related_links_from_compressed(docs, compressed_docs)
 
-    # Perform a combined generation if the option is turned on
-    #if config['generate_combined']:
-    #    main_response = llm_combined_answer(compressed_docs if compressed_docs else docs, removed_docs, llm_query)
-    
     for doc in docs:    
         # Generate a response from this document onlys, if the option is turned on
         if config['generate_by_document']:

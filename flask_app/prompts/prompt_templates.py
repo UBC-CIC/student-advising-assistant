@@ -34,7 +34,7 @@ def llm_query(program_info: Dict, topic: str, query: str):
         query = f'On the topic of {topic}: {query}'
     query = llm_query_prompt.format(program_info=llm_program_str(program_info), query=query)
     
-    context_str = filter_context_str(program_info,topic)
+    context_str = filter_context_str(program_info,None)
     if context_str and len(context_str) > 0:
         query += f" If none of the references are about {context_str}, say \"I do not have the information to answer\"."
         
