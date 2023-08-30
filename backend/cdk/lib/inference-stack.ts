@@ -433,7 +433,7 @@ export class InferenceStack extends Stack {
           subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
         },
         securityGroup: ec2SG,
-        instanceType: ec2.InstanceType.of(ec2.InstanceClass.G5, ec2.InstanceSize.XLARGE),
+        instanceType: ec2.InstanceType.of(ec2.InstanceClass.G4DN, ec2.InstanceSize.XLARGE),
         machineImage: dlami,
         blockDevices: [
           {
