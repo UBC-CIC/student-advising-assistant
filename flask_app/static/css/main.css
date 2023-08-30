@@ -1,0 +1,23 @@
+p {
+    font-family: var(--bs-body-font-family);
+}
+
+.card button {
+    font-size: inherit;
+}
+
+/* Makes the 'x' pseudoelement on the search inputs always visible */
+.icon::before {
+    display: inline-block;
+    text-rendering: auto;
+    -webkit-font-smoothing: antialiased;
+}
+
+input[type="search"]::-webkit-search-cancel-button {
+    opacity: 100;
+}
+
+.arrow::before {
+font: var(--fa-font-solid);
+content: "\f13a";
+}

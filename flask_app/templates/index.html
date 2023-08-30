@@ -9,22 +9,24 @@
   <!-- Bootstrap 5 -->
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"
-    integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"
     integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz"
     crossorigin="anonymous"></script>
+  <!-- Custom css -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+  <script src="https://kit.fontawesome.com/603730e44e.js" crossorigin="anonymous"></script>
 </head>
 
-<body>
+<body class="bg-body-secondary">
   <main>
     <header>
       <div class="mt-auto p-3 bg-light text-center">
-        <span class="text-muted">Information last updated on {{last_updated}}</span>
+        <span>Information last updated on {{last_updated}}</span>
       </div>
       <h1 class="m-5 text-center">{{title}}</h1>
     </header>
-    <div class="container mb-5">
+    <div class="container pb-5">
       <div class="accordion mb-3" id="info-accordion">
         <div class="accordion-item">
           <h2 class="accordion-header" id="headingOne">
@@ -56,7 +58,7 @@
         </div>
       </div>
       <div id="content" class="card" style="justify-content: center; display: flex;">
-        <div class="card-header primary">
+        <div class="card-header bg-primary text-white">
           Ask a Question
         </div>
         <div class="card-body">
@@ -65,7 +67,7 @@
               <div class="input-group mb-3">
                 <span class="input-group-text">Faculty</span>
                 <input type="search" id="faculty" class="form-control" name="faculty" list="faculty_list"
-                  placeholder="All Faculties" autocomplete="off">
+                  placeholder="All Faculties" autocomplete="on">
                 <datalist id="faculty_list">
                   {% for faculty in faculties.keys() %}
                   <option value="{{faculty}}">{{faculty}}</option>
