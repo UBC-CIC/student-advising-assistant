@@ -236,6 +236,8 @@ This section provides an overview of the AWS components used in the system archi
 **Amazon Virtual Private Cloud (VPC)**
 Various components of the infrastructure are placed inside a VPC for a more isolated and secure cloud environment.
 
+Information related to VPC networking specifications can be separately found [here](NetworkingSpecifications.md). Please familiarize yourself with the services in the architecture first before going through the Networking document mentioned above.
+
 **Question Answering**
 
 1. A user (eg. a student) interacts with the web UI of the application hosted on AWS Elastic Beanstalk, and submits a query. 
