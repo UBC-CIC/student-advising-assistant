@@ -18,6 +18,9 @@ document_scraping/processed
 **/*.zip
 /document_scraping/documents/
 test.Dockerfile
+id_rsa_MyKeyPair.pub
+kube_command.txt
+*test.txt
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
