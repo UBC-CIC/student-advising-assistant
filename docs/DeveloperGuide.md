@@ -76,8 +76,6 @@ aws secretsmanager create-secret \
     --profile <profile-name>
 ```
 
-'generator/HUGGINGFACE_API'
-
 ## Local App Development
 To develop the Flask app locally, some additional steps are required.
 
@@ -275,3 +273,7 @@ If you own the original repo and wish to upload safetensors to it, then `<origin
 
 This will need to be run on an instance with sufficient memory; for `lmsys/vicuna-7b-v1.5`, a SageMaker Studio notebook running on a `ml.g4dn.2xlarge` instance was sufficient.
 
+**Load Testing**
+To test the response times of the system, there is a locus load testing file under `/misc/load_testing`. In the folder `/misc/load_testing`, pip install the `requirements.txt`, then run `locust`. Navigate to `http://localhost:8089/` in your browser, then configure the number of users and click `start swarming`.
+
+When tested with the `g4dn.xlarge` model hosting ec2 instance, the system takes an average of 12 seconds to answer one user, and 35 seconds to answer when there are 10 concurrent users.
