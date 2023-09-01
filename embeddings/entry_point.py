@@ -26,7 +26,7 @@ retriever_config = param_manager.get_parameter('retriever')
 retriever_name = retriever_config[RETRIEVER_NAME_SSM_KEY]
 
 args = ["--compute_embeddings", "--clear_index"]
-if torch.cuda.is_available():
+if torch.cuda.is_available() or torch.backends.mps.is_available():
     args.append("--gpu_available")
 else:
     args.append("--no-gpu_available")
