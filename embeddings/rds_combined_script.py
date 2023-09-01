@@ -20,6 +20,7 @@ import argparse
 sys.path.append('..')
 from aws_helpers.param_manager import get_param_manager
 from aws_helpers.s3_tools import download_s3_directory, upload_directory_to_s3
+from aws_helpers.ssh_forwarder import start_ssh_forwarder
 
 ### CONFIGURATION
 # AWS Secrets Manager config for the Pinecone secret API key and region
@@ -94,7 +95,14 @@ if not args.compute_embeddings:
             print(f'Loaded embeddings {file.stem}')
 else:
     # Load the base embedding model from huggingface
-    device = 'cuda' if args.gpu_available else 'cpu'
+    if args.gpu_available:
+        if torch.cuda.is_available():
+            device = "cuda"
+        elif torch.backends.mps.is_available():
+            device = "mps"
+    else:
+        device = "cpu"
+    print("Torch device is: ", device)    
     base_embeddings = HuggingFaceEmbeddings(model_name=index_config['base_embedding_model'], model_kwargs={'device': device})
     base_embeddings = HuggingFaceEmbeddings(model_name=index_config['base_embedding_model'], 
                                         model_kwargs={'device': device},
@@ -126,13 +134,22 @@ with open(os.path.join(pgvector_dir,'index_config.json'),'w') as f:
 # Connect to the rds db
 db_secret = param_manager.get_secret(secret_name)
 
+forwarder_port = None
+if "MODE" in os.environ and os.environ["MODE"] == "dev":
+    # Use an SSH forwarder so that we can connect to the pgvector RDS in a private subnet
+    try:
+        server = start_ssh_forwarder(db_secret["host"],db_secret["port"])
+        forwarder_port = server.local_bind_port
+    except Exception as e:
+        print(f'Could not set up ssh forwarder for local connection to rds: {str(e)}')
+    
 CONNECTION_STRING = PGVector.connection_string_from_db_params(
-     driver="psycopg2",
-     host=db_secret["host"],
-     port=db_secret["port"],
-     database=db_secret["dbname"],
-     user=db_secret["username"],
-     password=db_secret["password"],
+    driver="psycopg2",
+    database=db_secret["dbname"],
+    user=db_secret["username"],
+    password=db_secret["password"],
+    host='localhost' if forwarder_port else db_secret["host"],
+    port=forwarder_port if forwarder_port else db_secret["port"],
 )
 
 # Upload the embedded documents
