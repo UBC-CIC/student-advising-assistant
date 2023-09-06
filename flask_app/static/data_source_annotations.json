@@ -1,10 +1,6 @@
 {
-    "vancouver.calendar.ubc.ca": {
-        "name": "UBC Vancouver Academic Calendar",
-        "annotation": "The Calendar serves as the official source for UBC policies."
-    },
-    "science.ubc.ca/students": {
-        "name": "UBC Science Student Site",
-        "annotation": "The Science Student Site serves as a companion to the Calendar, but is not considered law."
+    "example.website.com": {
+        "name": "Example Website",
+        "annotation": "The example website is the official source for..."
     }
 }

@@ -43,15 +43,7 @@ def convert_table(table: Tag, url: str) -> Tag:
     if not table_title: table_title = table.find_previous(['h1','h2','h3','h4'])
     table_title = table_title.text.strip()
 
-    if first_header and (first_header.text.strip() in ["First Year","Lower-level Requirements","Lower-Level Prerequisites","Term 1","Year One"] or 
-        table.find(string=lambda x: x and x.strip().lower() in ["total credits","program total"])):
-        # Table is a degree requirements table
-        new_table = table_conversion_function(table,convert_degree_requirements_row)
-    elif first_header and "Sessional Average & Course Success" in first_header.text.strip():
-        new_table = table_conversion_function(table,convert_continuation_requirements_row)
-    elif 'B.Sc. Specialization-Specific Courses Required for Promotion' in table_title:
-        new_table = table_conversion_function(table,convert_promotion_courses_row)
-    elif first_header and first_header.text.strip() == '':
+    if first_header and first_header.text.strip() == '':
         # Likely a double-indexed table (both the rows and columns have headers)
         new_table = table_conversion_function(table,convert_double_indexed_row)
     else:
@@ -132,59 +124,6 @@ def handle_footnotes_only_table(footnotes):
     for num, note in footnotes.items():
         ul.append(make_tag('li',['[',num,'] ', *note.contents]))
     return ul
-
-def convert_degree_requirements_row(cells: list[Tag], footnotes: list[Tag], *_) -> Tag:
-    """
-    Converts a row from the degree requirements table from the academic calendar to a 
-    more machine-understandable format
-    """
-    notes = find_cell_footnotes(cells[0],footnotes,remove_sup=True)
-    if len(cells) == 2:
-        li = make_tag('li', [f"{cells[1].text.strip()} credits of {cells[0].text.strip()}"])
-        if notes: 
-            note_lis = [make_tag('li',note) for note in notes]
-            li.append(make_tag('ul',note_lis))
-        return li
-    else:
-        return make_tag('li', cells[0].contents)
-
-def convert_continuation_requirements_row(cells: list[Tag], *_) -> Tag:
-    """
-    Converts a row from the continuation requirements table from the academic calendar to a 
-    more machine-understandable format
-
-    Intended table:
-    https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-science/bachelor-science/academic-performance-review-and-continuation#18568
-    """
-    headers = ['', 'Good standing', 'Academic Probation (ACPR)', 'Failed standing, permitted to continue']
-
-    if cells[0] == None or cells[0].string.strip() == '': return None # skip the row of standings upon entering session
-
-    p = make_tag('p',f'Sessional average & course success: {cells[0].text.strip()}')
-    ul = make_tag('ul', [make_tag('li', f'Standing Upon Entering Session: {headers[i]}; New Standing: {cells[i].text.strip()}') 
-                             for i in range(1,4)])
-    
-    return make_tag('li',[p,ul])
-
-def convert_promotion_courses_row(cells: list[Tag], _, headers: List[Tuple[Tag,str]]) -> Tag:
-    """
-    Converts row from a promotion courses table from the academic calendar to a 
-    more machine-understandable format
-
-    Example of the intended table: 
-    https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-science/bachelor-science/bsc-specialization-specific-courses-required-promotion
-    """
-    if not hasattr(convert_promotion_courses_row, 'state'): convert_promotion_courses_row.state = None
-
-    if len(cells) == 1:
-        convert_promotion_courses_row.state = cells[0].text.strip()
-        return None
-    else:
-        p = make_tag('p', convert_promotion_courses_row.state)
-        ul = make_tag('ul',[
-            make_tag('li', f'{headers[1][1]}: {cells[1].text.strip()}'),
-            make_tag('li', f'{headers[2][1]}: {cells[2].text.strip()}')])
-        return make_tag('li',[p,ul])
 
 def convert_cell(cell: Tag, footnotes: Dict) -> List[Tag]:
     """
@@ -398,16 +337,6 @@ def default_extract_metadata(url: str, titles: List[str], parent_titles: List[st
             if 'specialization' not in metadata:
                 metadata['specialization'] = []
             metadata['specialization'].append(subtitle)
-    return metadata
-    
-def calendar_extract_metadata(url: str, titles: List[str], parent_titles: List[str], text: str):
-    metadata = default_extract_metadata(url, titles, parent_titles, text)
-
-    if re.search('\- \d+ credits of ', text):
-        if 'specialization' in metadata:
-            metadata['context'] = f"This is a list of degree requirements for {','.join(metadata['specialization'])}.\n"
-        else: metadata['context'] = f'This is a list of degree requirements.\n'
-                
     return metadata
 
 ### SPLIT TAG PREDICATES 
