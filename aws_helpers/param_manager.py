@@ -1,14 +1,14 @@
-from typing import List 
 from botocore.exceptions import ClientError
 import ast
 import os
+from dotenv import load_dotenv, find_dotenv
 from .ssm_parameter_store import SSMParameterStore
 from .get_session import get_session
     
 class ParamManager():
     # Prefix for this app
     prefix: str = 'student-advising'
-    region: str = os.environ["AWS_DEFAULT_REGION"] if "AWS_DEFAULT_REGION" in os.environ else 'ca-central-1'
+    region: str = ''
     
     """
     Convenience class to access secret keys from AWS Secrets Manager and 
@@ -21,7 +21,9 @@ class ParamManager():
         If the environment variable MODE = 'dev', 
         uses the dev version of the secrets and parameters
         """
+        load_dotenv(find_dotenv())
         dev_mode = 'MODE' in os.environ and os.environ.get('MODE') == 'dev'
+        self.region = os.environ.get("AWS_DEFAULT_REGION")
         if dev_mode:
             self.prefix += '/dev'
         session = get_session()
@@ -67,5 +69,5 @@ def get_param_manager() -> ParamManager:
     global manager
     if not manager:
         manager = ParamManager()
-    print(manager.region)
+    print(f"Got param manager for region: {manager.region}")
     return manager

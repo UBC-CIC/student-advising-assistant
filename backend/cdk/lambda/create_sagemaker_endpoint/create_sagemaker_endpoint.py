@@ -39,7 +39,6 @@ model_name = f'{MODEL_NAME}-huggingface' # just an identifier, not the actual fu
 endpoint_config_name = f'{MODEL_NAME}-endpoint-config' # also just an identifier
 
 def lambda_handler(event, context):
-    
     #Create model
     try:
         print("Creating Model")
@@ -80,8 +79,3 @@ def lambda_handler(event, context):
         ) 
     except ClientError as e:
         print(e.response["Error"]["Message"])
-    
-    # return {
-    #     'statusCode': 200,
-    #     'body': f"Successfully started inference endpoint creation for endpoint: {SM_ENDPOINT_NAME}"
-    # }

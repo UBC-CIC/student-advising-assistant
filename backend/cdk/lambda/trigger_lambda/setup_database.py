@@ -9,9 +9,7 @@ print(psycopg2.__version__)
 
 DB_SECRET_NAME = os.environ["DB_SECRET_NAME"]
 
-
 def getDbSecret():
-    
     # secretsmanager client to get db credentials
     sm_client = boto3.client("secretsmanager")
     response = sm_client.get_secret_value(
@@ -20,7 +18,6 @@ def getDbSecret():
     return secret
 
 def createConnection():
-    
     connection = psycopg2.connect(
         user=dbSecret["username"],
         password=dbSecret["password"],
@@ -34,7 +31,6 @@ dbSecret = getDbSecret()
 connection = createConnection()
 
 def lambda_handler(event, context):
-
     global connection
     print(connection)
     if connection.closed:

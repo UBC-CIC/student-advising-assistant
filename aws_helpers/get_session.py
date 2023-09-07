@@ -10,10 +10,10 @@ def get_session():
     On AWS container, gets the session automatically
     """
 
-    load_dotenv()
+    load_dotenv(find_dotenv())
 
     if "AWS_PROFILE_NAME" in  os.environ:
-        print("Named profile found, running custom session")
+        print(f"Named profile found, running custom session: {os.environ.get('AWS_PROFILE_NAME')}")
         return boto3.Session(profile_name=os.environ.get("AWS_PROFILE_NAME"))
     else:
         print("No named profile found, running default session")

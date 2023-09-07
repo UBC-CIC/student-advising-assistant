@@ -26,12 +26,6 @@ in dump_config.json5
 def convert_table(table: Tag, url: str) -> Tag:
     """
     Converts any table in the page to a more machine readable format
-    Includes special processing functions for the following table types:
-    - Degree requirements table
-    - Continuation requirements table
-      eg. https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-science/bachelor-science/academic-performance-review-and-continuation#18568
-    - Promotion courses table
-      eg. https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-science/bachelor-science/bsc-specialization-specific-courses-required-promotion
     """
     if not table.find():
         # Empty table, ignore it

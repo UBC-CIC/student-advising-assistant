@@ -16,7 +16,6 @@ S3_BUCKET_PARAM_NAME = os.environ["BUCKET_PARAM_NAME"]
 # ^ name of the key in the event that specifies the name of the S3 bucket
 
 def getDbSecret():
-    
     # secretsmanager client to get db credentials
     sm_client = boto3.client("secretsmanager")
     response = sm_client.get_secret_value(
@@ -25,7 +24,6 @@ def getDbSecret():
     return secret
 
 def getBucketName():
-    
     # ssm parameters client to get the default bucket name
     ssm_client = boto3.client('ssm')
     response = ssm_client.get_parameter(Name=S3_BUCKET_PARAM_NAME)
@@ -33,7 +31,6 @@ def getBucketName():
     return secret
 
 def createConnection():
-    
     connection = psycopg2.connect(
         user=dbSecret["username"],
         password=dbSecret["password"],

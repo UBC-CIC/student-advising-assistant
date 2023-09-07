@@ -351,7 +351,7 @@ export class InferenceStack extends Stack {
           memorySize: 512,
           environment: {
             SM_ENDPOINT_NAME: this.ENDPOINT_NAME,
-            SM_REGION: this.region || "us-west-2",
+            SM_REGION: this.region,
             SM_ROLE_ARN: smRole.roleArn,
             HF_MODEL_ID: HUGGINGFACE_MODEL_ID,
             MODEL_NAME: MODEL_NAME,
