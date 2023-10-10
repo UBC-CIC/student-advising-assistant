@@ -127,7 +127,7 @@ It's time to set up everything that goes on behind the scenes! For more informat
 Note this CDK deployment was tested in `us-west-2` region only.
 
 Open a terminal in the `/backend/cdk` directory.
-The file `demo-app.zip` should already exist in the directory. In the case that it does not, run the following command to create it:
+The file `demo-app.zip` should already exist in the directory. In the case that it does not, navigate back to the root directory `student-advising-assitant/` and run the following command to create it:
 ``` bash
 zip -r demo-app.zip aws_helpers/ flask_app/ Dockerfile -x "*/.*" -x ".*" -x "*.env" -x "__pycache__*"
 ```
