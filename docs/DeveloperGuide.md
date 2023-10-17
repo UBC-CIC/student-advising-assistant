@@ -137,12 +137,12 @@ Run the container:
 Here we're mounting the aws credentials directory so that the container have access to the aws cli profiles
 
 ```bash
-docker run -v ${HOME}/.aws/credentials:/root/.aws/credentials:ro --env-file .env -d -p <localhost-port>:5000 <image-name>:latest
+docker run -v ${HOME}/.aws/:/root/.aws/:ro --env-file .env -d -p <localhost-port>:<container-port> <image-name>:latest
 ```
 
 The docker run command mount the directory which contains the aws cli credentials into the container, which is the only way make it run locally. On the cloud, every boto3 called will be called with the service's IAM role.
 
-replace `localhost-port` with any port, usually 5000, but can use 5001 or other if 5000 is already used by other processes.
+replace `localhost-port` with any port, usually 5000, but can use 5001 or other if 5000 is already used by other processes. Replace `<container-port>` with the port that was `EXPOSE` in the Dockerfile that build the image.
 
 ### Uploading the app to Beanstalk
 To deploy the current version of the Flask app on Elastic Beanstalk, use the `deploy_beanstalk.sh` script in the root `student_advising_assistant`.

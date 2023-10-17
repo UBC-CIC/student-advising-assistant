@@ -2,8 +2,8 @@ pandas
 flask
 gunicorn
 langchain>=0.0.239
-faiss-cpu
 sentence-transformers
+faiss-cpu
 networkx
 python-dotenv
 flask[async]
