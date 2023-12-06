@@ -133,9 +133,10 @@ export class HostingStack extends cdk.Stack {
     );
 
     const instanceProfName = "beanstalk-ec2-instance-profile"
-    let instanceProfile = iam.InstanceProfile.fromInstanceProfileName(this, instanceProfName, instanceProfName)
-    if (!instanceProfile.instanceProfileName) {
-      instanceProfile = new iam.InstanceProfile(
+    // let instanceProfile = iam.InstanceProfile.fromInstanceProfileName(this, instanceProfName, instanceProfName)
+    // if (!instanceProfile.instanceProfileName) {
+      console.log("executed")
+      const instanceProfile = new iam.InstanceProfile(
         this,
         instanceProfName,
         {
@@ -143,7 +144,7 @@ export class HostingStack extends cdk.Stack {
           instanceProfileName: instanceProfName,
         }
       );
-    }
+    // }
 
     const appName = "student-advising-demo-app";
     const app = new elasticbeanstalk.CfnApplication(
@@ -171,13 +172,13 @@ export class HostingStack extends cdk.Stack {
     appVersionProps.node.addDependency(appDeploymentZip);  
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const cnamePrefix = "student-advising-demo"; // Prefix for the web app's url
+    const cnamePrefix = "student-advising-voice-assitant-demo"; // Prefix for the web app's url
     const elbEnv = new elasticbeanstalk.CfnEnvironment(this, "Environment", {
       environmentName: "student-advising-demo-app-env",
       cnamePrefix: cnamePrefix,
       description: "Docker environment for Python Flask application",
       applicationName: app.applicationName || appName,
-      solutionStackName: "64bit Amazon Linux 2 v3.6.0 running Docker",
+      solutionStackName: "64bit Amazon Linux 2 v3.6.2 running Docker",
       optionSettings: [
         // https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/command-options-general.html
         {
