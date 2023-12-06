@@ -12,7 +12,7 @@ import sys
 sys.path.append('..')
 
 # Imports
-from flask import Flask, request, render_template, Response
+from flask import Flask, request, render_template, Response, jsonify
 import json
 import os 
 from typing import List
@@ -76,6 +76,65 @@ def home():
     
     # Render the form template
     return render_template('index.html',title=app_title,faculties=faculties,last_updated=last_updated_time,defaults=defaults)
+
+@application.route('/test', methods=['GET'])
+def test():
+    return "Hello from flask!!"
+
+@application.route('/faculties', methods=['GET'])
+def faculty_list():
+    results = []
+    for faculty in faculties.keys():
+        results.append(faculty)
+
+    return jsonify(results)
+
+@application.route('/programs', methods=['GET'])
+def program_list():
+    programs = faculties[request.args.get('faculty')]['programs']
+    results = []
+    for program in programs.keys():
+        results.append(program)
+    
+    return jsonify(results)
+
+@application.route('/specializations', methods=['GET'])
+def specialization_list():
+    faculty =  request.args.get("faculty")
+    program = request.args.get("program")
+    specializations = faculties[faculty]['programs'][program]['specializations']
+    results = []
+    for specialization in specializations.keys():
+        results.append(specialization)
+    
+    return jsonify(results)
+
+@application.route('/question', methods=['GET'])
+async def question():
+
+    topic = request.args.get('topic')
+    question = request.args.get('question')
+    filter_elems = ['faculty','program','specialization','year']
+    program_info = {filter_elem: request.args.get(filter_elem) for filter_elem in filter_elems}
+
+    start_doc = request.args.get('doc')
+    if start_doc:
+        start_doc = int(start_doc)
+    config = {
+        'start-doc': start_doc
+    }
+
+    docs, main_response, alerts, removed_docs = await langchain_inference_module.run_chain(program_info,topic,question,config)
+
+    context_str = ' : '.join([value for value in list(program_info.values()) + [topic] if len(value) > 0])
+    log_question(question, context_str, main_response, [doc.metadata['doc_id'] for doc in docs])
+
+    response = {
+        'main_response': main_response,
+    }
+
+    return jsonify(response)
+
 
 @application.route('/answer', methods=['POST'])
 async def answer():
