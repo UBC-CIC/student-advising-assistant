@@ -211,6 +211,10 @@ Add permission. A dropdown will appear. Click on Create inline policy. Select JS
 
 Open a new tab (keep the one you are using to create the inline policy open) and go to Secrets Manager on the AWS Console. Click on student-advising/credentials/RDSCredentials. Replace ```arn:aws:secretsmanager:<region>:<account-ID>:secret:<secret-name>``` above with the Secret ARN of that secret. Click on Next, provide a name for that policy, and click on Create policy. This step allows the IAM role to access the student-advising/credentials/RDSCredentials secret. Rebuild the Elastic Beanstalk environment. If the issue still persists, take down the deployed stacks and try deploying from scratch again.
 
+#### **If facing issue that says you are requesting more vCPU capacity than your current limit**
+If you face this issue when trying to delpy the Inference Stack, then you need to submit a Service 
+quota request. Go to Service Quotas through the AWS Console. Click on AWS service on the menu on the left of the screen. Select Amazon Elastic Compute Cloud (Amazon EC2). Search and select "Running Dedicated g5 Hosts" and then click on Request increase at account level. Fill in the appropriate blanks and under New quota value, enter 8 (this was 14 in the script before I took it on, I requested 14 but they gave me 8, the script is already edited to use 8). Type a proper Use case description mentioning where you work and why you need it. They respond within a couple of hours.
+
 #### **Extra: Taking down the deployed stacks**
 
 To take down the deployed stack for a fresh redeployment in the future, navigate to AWS Cloudformation, click on the stack(s) and hit Delete. Please wait for the stacks in each step to be properly deleted before deleting the stack downstream. The deletion order is as followed:
