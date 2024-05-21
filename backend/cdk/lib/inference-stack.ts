@@ -149,7 +149,7 @@ export class InferenceStack extends Stack {
           logRetention: RetentionDays.ONE_YEAR,
         }),
         essential: true,
-        cpu: 14336, // 14 vCPU
+        cpu: 8192, // 8 vCPU
         environment: {
           // ECS_ENABLE_GPU_SUPPORT: "true",
           AWS_DEFAULT_REGION: this.region

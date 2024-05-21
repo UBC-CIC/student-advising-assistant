@@ -1,6 +1,6 @@
 {
-    "example.website.com": {
-        "name": "Example Website",
-        "annotation": "The example website is the official source for..."
+    "https://ece.ubc.ca/undergraduates/programs/computer-engineering-program/": {
+        "name": "UBC CPEN",
+        "annotation": "please work"
     }
 }
