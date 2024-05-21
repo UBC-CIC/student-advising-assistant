@@ -170,6 +170,47 @@ You may  run the following command to deploy the stacks all at once. Please repl
 cdk deploy --all --profile <profile-name>
 ```
 
+#### **If facing issue where Docker image fails to build**
+A potential reason this error might be occuring might be due to a missing IAM Role. The Hosting Stack script ```hosting-stack.ts``` assumes you already have this role. In the future, the script will be modified where in the case it is missing, the script will automatically generate it.
+
+Go to the AWS Console, then IAM, and click on Roles. Here, select Create role.
+Select "AWS service" as the Trusted entity type and "EC2" as the Use case. Click on Next and add the following permission policies:
+
+1. AWSElasticBeanstalkMulticontainerDocker
+2. AWSElasticBeanstalkWebTier
+3. AWSElasticBeanstalkWorkerTier
+
+Click on Next, name the role "beanstalk-ec2-instance-profile",  and then click on Creat role.
+Go back to IAM and click on Roles again. Select ```beanstalk-ec2-instance-profile``` and click on
+Add permission. A dropdown will appear. Click on Create inline policy. Select JSON and paste the following:
+
+```
+{
+	"Version": "2012-10-17",
+	"Statement": [
+		{
+			"Effect": "Allow",
+			"Action": [
+				"secretsmanager:GetResourcePolicy",
+				"secretsmanager:GetSecretValue",
+				"secretsmanager:DescribeSecret",
+				"secretsmanager:ListSecretVersionIds"
+			],
+			"Resource": [
+				"arn:aws:secretsmanager:<region>:<account-ID>:secret:<secret-name>"
+			]
+		},
+		{
+			"Effect": "Allow",
+			"Action": "secretsmanager:ListSecrets",
+			"Resource": "*"
+		}
+	]
+}
+```
+
+Open a new tab (keep the one you are using to create the inline policy open) and go to Secrets Manager on the AWS Console. Click on student-advising/credentials/RDSCredentials. Replace ```arn:aws:secretsmanager:<region>:<account-ID>:secret:<secret-name>``` above with the Secret ARN of that secret. Click on Next, provide a name for that policy, and click on Create policy. This step allows the IAM role to access the student-advising/credentials/RDSCredentials secret. Rebuild the Elastic Beanstalk environment. If the issue still persists, take down the deployed stacks and try deploying from scratch again.
+
 #### **Extra: Taking down the deployed stacks**
 
 To take down the deployed stack for a fresh redeployment in the future, navigate to AWS Cloudformation, click on the stack(s) and hit Delete. Please wait for the stacks in each step to be properly deleted before deleting the stack downstream. The deletion order is as followed:
