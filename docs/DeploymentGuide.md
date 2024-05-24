@@ -170,7 +170,7 @@ You may  run the following command to deploy the stacks all at once. Please repl
 cdk deploy --all --profile <profile-name>
 ```
 
-#### **If facing issue where Docker image fails to build**
+#### **If facing issue where Docker image fails to build or initialization does not work**
 A potential reason this error might be occuring might be due to a missing IAM Role. The Hosting Stack script ```hosting-stack.ts``` assumes you already have this role. In the future, the script will be modified where in the case it is missing, the script will automatically generate it.
 
 Go to the AWS Console, then IAM, and click on Roles. Here, select Create role.
@@ -180,7 +180,7 @@ Select "AWS service" as the Trusted entity type and "EC2" as the Use case. Click
 2. AWSElasticBeanstalkWebTier
 3. AWSElasticBeanstalkWorkerTier
 
-Click on Next, name the role "beanstalk-ec2-instance-profile",  and then click on Creat role.
+Click on Next, name the role "beanstalk-ec2-instance-profile",  and then click on Create role.
 Go back to IAM and click on Roles again. Select ```beanstalk-ec2-instance-profile``` and click on
 Add permission. A dropdown will appear. Click on Create inline policy. Select JSON and paste the following:
 
@@ -194,22 +194,42 @@ Add permission. A dropdown will appear. Click on Create inline policy. Select JS
 				"secretsmanager:GetResourcePolicy",
 				"secretsmanager:GetSecretValue",
 				"secretsmanager:DescribeSecret",
-				"secretsmanager:ListSecretVersionIds"
+				"secretsmanager:ListSecretVersionIds",
+				"ssm:GetParameter",
+				"ssm:GetParametersByPath",
+				"ssm:DescribeParameters",
+				"s3:ListBucket",
+				"s3:GetObject"
 			],
 			"Resource": [
-				"arn:aws:secretsmanager:<region>:<account-ID>:secret:<secret-name>"
+				"arn:aws:secretsmanager:<region>:<account-ID>:secret:<secret-name>",
+				"arn:aws:ssm:<region>:<account_number>:parameter/*",
+				"arn:aws:s3:::<bucket_for_inferencestack>",
+				"arn:aws:s3:::<bucket_for_inferencestack>/*"
 			]
 		},
 		{
 			"Effect": "Allow",
-			"Action": "secretsmanager:ListSecrets",
+			"Action": [
+				"secretsmanager:ListSecrets",
+				"ssm:DescribeParameters"
+			],
 			"Resource": "*"
 		}
 	]
 }
 ```
 
-Open a new tab (keep the one you are using to create the inline policy open) and go to Secrets Manager on the AWS Console. Click on student-advising/credentials/RDSCredentials. Replace ```arn:aws:secretsmanager:<region>:<account-ID>:secret:<secret-name>``` above with the Secret ARN of that secret. Click on Next, provide a name for that policy, and click on Create policy. This step allows the IAM role to access the student-advising/credentials/RDSCredentials secret. Rebuild the Elastic Beanstalk environment. If the issue still persists, take down the deployed stacks and try deploying from scratch again.
+1. Open a new tab (keep the one you are using to create the inline policy open).
+2. Go to Secrets Manager on the AWS Console.
+3. Click on student-advising/credentials/RDSCredentials.
+4. Replace ```arn:aws:secretsmanager:<region>:<account-ID>:secret:<secret-name>``` in the tab to create the inline policy with the ARN of that secret.
+5. On the other tab, navigate to S3 on the AWS Console.
+6. Click on the ```inferencestack-studentadvisings3bucket...``` bucket.
+7. Replace ```arn:aws:s3:::<bucket_for_inferencestack>``` in the tab to create the inline policy with the ARN of that bucket.
+8. On the tab to create the inline policy, click on Next, provide a name for that policy, and click on Create policy.
+
+This role grants the necessary permissions for our Elastic Beanstalk application to access AWS resources such as Secrets Manager, SSM Parameter Store, and S3 buckets. Without it, we run into issues where the Docker container unexpectedly stops running or the /initialize endpoint leads to an internal server error.
 
 #### **If facing issue that says you are requesting more vCPU capacity than your current limit**
 If you face this issue when trying to delpy the Inference Stack, then you need to submit a Service 

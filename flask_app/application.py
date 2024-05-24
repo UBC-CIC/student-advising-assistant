@@ -14,10 +14,12 @@ sys.path.append('..')
 # Imports
 from flask import Flask, request, render_template, Response
 import json
-import os 
+import os
+import logging
 from typing import List
 from importlib import reload 
 from aws_helpers.rds_tools import execute_and_fetch
+from aws_helpers.logging import set_boto_log_levels
 
 ### Constants
 FACULTIES_PATH = os.path.join('data','documents','faculties.json')
@@ -32,6 +34,11 @@ faculties = {}
 last_updated_time = None
 langchain_inference_module = None
 store_feedback_module = None
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+set_boto_log_levels(logging.WARNING)
 
 # Helper functions
 def read_text(filename: str, as_json = False):
@@ -50,9 +57,11 @@ def log_question(question: str, context: str, answer: str, reference_ids: List[i
     
     try:
         response = feedback_module.store_feedback(json_payload=payload, logging_only=True)
+        logger.info(f"SUCCESS: feedback stored when logging question: {response}")
         print(response)
     except Exception as e:
         # Handle any exceptions that occur during the Lambda invocation
+        logger.error(f"ERROR: submitting feedback to the database when logging question did not work: {e}")
         print(f"ERROR occurs when submitting the feedback to the database: {e}")
 
 def get_last_updated_time():
@@ -120,9 +129,11 @@ async def feedback():
 
     try:
         response = feedback_module.store_feedback(json_payload=payload)
+        logger.info(f"SUCCESS: feedback stored successfully: {response}")
         print(response)
     except Exception as e:
         # Handle any exceptions that occur during the Lambda invocation
+        logger.error(f"ERROR: submitting feedback to the database did not work: {e}")
         print(f"ERROR occurs when submitting the feedback to the database: {e}")
             
     # Render the results
@@ -134,21 +145,29 @@ def initialize():
     Imports files and runs all initial setup of the app
     Exists as an endpoint so that configuration can be reloaded on demand
     """
+    logger.info("Initializing...")
     global langchain_inference_module, feedback_module
     
-    if not langchain_inference_module:
-        import langchain_inference as langchain_inference_module
-        import feedback as feedback_module
-    else:
-        reload(langchain_inference_module)
-        reload(feedback_module)
-    
-    # Upon loading, load the available settings for the form
-    global faculties, last_updated_time
-    faculties = read_text(FACULTIES_PATH,as_json=True)
-    last_updated_time = get_last_updated_time()
-    
-    return "Successfully initialized the system"
+    try:
+        if not langchain_inference_module:
+            import langchain_inference as langchain_inference_module
+            import feedback as feedback_module
+            logger.info("SUCCESS: modules imported")
+        else:
+            reload(langchain_inference_module)
+            reload(feedback_module)
+            logger.info("SUCCESS: modules reloaded")
+        
+        # Upon loading, load the available settings for the form
+        global faculties, last_updated_time
+        faculties = read_text(FACULTIES_PATH,as_json=True)
+        last_updated_time = get_last_updated_time()
+        logger.info("SUCCESS: system initialized with updates")
+        
+        return "Successfully initialized the system"
+    except Exception as e:
+        logger.error(f"ERROR: initialization failed: {str(e)}")
+        return Response("Initialization failed", status=500)
 
 @application.route('/health')
 def health():

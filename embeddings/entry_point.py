@@ -51,7 +51,9 @@ execute_and_commit(sql)
 
 # Ping the Flask app to initialize
 app_url = param_manager.get_parameter('BEANSTALK_URL')
-initialize_url = app_url + '/initialize'
+initialize_url = 'http://' + app_url + '/initialize'
+
+print(f"Formatted URL: {initialize_url}")
 
 try:
     response = requests.get(url = initialize_url, timeout = 300)
