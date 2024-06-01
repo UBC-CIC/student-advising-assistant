@@ -156,7 +156,7 @@ export class InferenceStack extends Stack {
         }
       }
     );
-    // only start the embedding container when the scraping container successfully exit without error
+    // only start the embedding container when the scraping container successfully exits without error
     embedding_container.addContainerDependencies({
       container: scraping_container,
       condition: ecs.ContainerDependencyCondition.SUCCESS,
@@ -247,13 +247,13 @@ export class InferenceStack extends Stack {
 
     const lambdaRole = new iam.Role(this, "lambda-vpc-role", {
       assumedBy: new iam.ServicePrincipal("lambda.amazonaws.com"),
-      description: "Role for all Lambda function inside vpc",
+      description: "Role for all Lambda function inside VPC",
     });
     lambdaRole.addToPolicy(
       new iam.PolicyStatement({
         effect: iam.Effect.ALLOW,
         actions: [
-          //Secrets Manager
+          // Secrets Manager
           "secretsmanager:GetSecretValue",
         ],
         resources: [
@@ -321,8 +321,7 @@ export class InferenceStack extends Stack {
     );
 
     // LLM configuration
-    const HUGGINGFACE_MODEL_ID = "arya/vicuna-7b-v1.5-hf";
-    const MODEL_NAME = "vicuna";
+    const MODEL_NAME = "meta.llama3-8b-instruct-v1:0";
 
     if (config.llm_mode == "sagemaker") {
       this.ENDPOINT_NAME = MODEL_NAME + "-inference";
@@ -353,7 +352,6 @@ export class InferenceStack extends Stack {
             SM_ENDPOINT_NAME: this.ENDPOINT_NAME,
             SM_REGION: this.region,
             SM_ROLE_ARN: smRole.roleArn,
-            HF_MODEL_ID: HUGGINGFACE_MODEL_ID,
             MODEL_NAME: MODEL_NAME,
             INSTANCE_TYPE: INSTANCE_TYPE,
             NUM_GPUS: NUM_GPUS,
@@ -414,14 +412,14 @@ export class InferenceStack extends Stack {
         ec2.Port.tcp(8080),
         'Allow traffic to inference endpoint',
       );
-      
+
       // Find the Deep Learning Base GPU AMI (Ubuntu 20.04)
       const dlami = ec2.MachineImage.lookup({
         name: 'Deep Learning Base GPU AMI (Ubuntu 20.04)*',
         owners: ['amazon'],
       });
 
-      // Create a keypair for the instance 
+      // Create a keypair for the instance
       const ec2KeyPair = new ec2.CfnKeyPair(this, 'student-advising-tgi-keypair', {
         keyName: 'student-advising-ec2-tgi-key',
       });
@@ -450,13 +448,16 @@ export class InferenceStack extends Stack {
       const startupScript = readFileSync('./lib/ec2-tgi-startup.sh', 'utf8');
       ec2Instance.addUserData(startupScript);
 
-      this.ENDPOINT_NAME = ec2Instance.instancePrivateIp + ':8080';
+      this.ENDPOINT_NAME = ec2Instance.instancePrivateIp + ":8080";
+    } else if (config.llm_mode == "bedrock") {
+      this.ENDPOINT_TYPE = "bedrock";
+      this.ENDPOINT_NAME = MODEL_NAME;
     } else {
       this.ENDPOINT_NAME = "none";
       this.ENDPOINT_TYPE = "none";
     }
 
-    // Create the SSM parameter with the string value of the sagemaker inference endpoint name
+    // Create the SSM parameter with the string value of the inference endpoint name
     new ssm.StringParameter(this, "EndpointNameParameter", {
       parameterName: "/student-advising/generator/ENDPOINT_NAME",
       stringValue: this.ENDPOINT_NAME,

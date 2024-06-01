@@ -12,7 +12,7 @@ import sys
 sys.path.append('..')
 
 # Imports
-from flask import Flask, request, render_template, Response
+from flask import Flask, request, render_template, Response, jsonify
 import json
 import os
 import logging
@@ -20,6 +20,12 @@ from typing import List
 from importlib import reload 
 from aws_helpers.rds_tools import execute_and_fetch
 from aws_helpers.logging import set_boto_log_levels
+import boto3
+
+# Initialize Amazon Bedrock client if mode is bedrock
+bedrock_runtime = None
+if os.environ.get('LLM_MODE') == 'bedrock':
+    bedrock_runtime = boto3.client('bedrock-runtime', region_name='us-west-2')
 
 ### Constants
 FACULTIES_PATH = os.path.join('data','documents','faculties.json')
@@ -108,14 +114,31 @@ async def answer():
         'start_doc': start_doc
     }
     docs, main_response, alerts, removed_docs = await langchain_inference_module.run_chain(program_info,topic,question,config)
-    
+
     # Log the question
     context_str = ' : '.join([value for value in list(program_info.values()) + [topic] if len(value) > 0])
     log_question(question, context_str, main_response, [doc.metadata['doc_id'] for doc in docs])
     
-    # Render the results
-    return render_template('ans.html',title=app_title,question=question,context=context_str,docs=docs,
-                           form=request.form.to_dict(), main_response=main_response, alerts=alerts,
+    if os.environ.get('LLM_MODE') == 'bedrock':
+        kwargs = {
+            "modelId": "meta.llama3-8b-instruct-v1:0",
+            "contentType": "application/json",
+            "accept": "application/json",
+            "body": json.dumps({
+                "prompt": f"{context_str}\n\n{question}",
+                "max_gen_len": 512,
+                "temperature": 0.5,
+                "top_p": 0.9
+            })
+        }
+        response = bedrock_runtime.invoke_model(**kwargs)
+        bedrock_response = json.loads(response['body'].read())
+        generated_text = bedrock_response['generated_text']
+    else:
+        generated_text = main_response
+
+    return render_template('ans.html', title=app_title, question=question, context=context_str, docs=docs,
+                           form=request.form.to_dict(), main_response=generated_text, alerts=alerts,
                            removed_docs=removed_docs, last_updated=last_updated_time)
 
 @application.route('/feedback', methods=['POST'])

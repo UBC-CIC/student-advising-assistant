@@ -12,6 +12,8 @@ from documents import load_graph, get_split_sib_ids
 import prompts
 from aws_helpers.param_manager import get_param_manager
 from aws_helpers.s3_tools import download_s3_directory
+import boto3
+from llms.bedrock import BedrockLLM
 
 # If process is running locally, activate dev mode
 DEV_MODE = 'MODE' in os.environ and os.environ.get('MODE') == 'dev'
@@ -72,17 +74,20 @@ data_source_annotations = read_text(os.path.join('static','data_source_annotatio
 spell_correct_chain = combine_documents_chain = filter = compressor = None
 
 if use_llm:
-    # LLMs
-    base_llm, qa_prompt = llms.load_model_and_prompt(generator_config['ENDPOINT_TYPE'], generator_config['ENDPOINT_NAME'], 
-                                                     param_manager.region, generator_config['MODEL_NAME'], dev_mode=DEV_MODE)
-
-    # Chains
-    spell_correct_chain = llms.load_spell_chain(base_llm, generator_config['MODEL_NAME'], verbose=VERBOSE_LLMS)
-    combine_documents_chain = load_qa_chain(llm=base_llm, chain_type="stuff", prompt=qa_prompt, verbose=VERBOSE_LLMS)
-
-    # Document compressors
-    filter = llms.load_chain_filter(base_llm, generator_config['MODEL_NAME'], verbose=VERBOSE_LLMS)
-    compressor = LLMChainExtractor.from_llm(base_llm)
+    try:
+        endpoint_type = generator_config.get('ENDPOINT_TYPE')
+        if endpoint_type.lower() == 'bedrock':
+            bedrock_runtime = boto3.client('bedrock-runtime', region_name='us-west-2')
+            base_llm = BedrockLLM(bedrock_runtime, generator_config['MODEL_NAME'])
+            qa_prompt = llms.bedrock.load_bedrock_prompt(generator_config['MODEL_NAME'])
+        combine_documents_chain = load_qa_chain(llm=base_llm, chain_type="stuff", prompt=qa_prompt, verbose=VERBOSE_LLMS)
+        compressor = LLMChainExtractor.from_llm(base_llm)
+        print("Successfully initialized LLM components")
+    except Exception as e:
+        print(f"Error initializing LLM components: {e}")
+        raise
+else:
+    print("LLM mode is disabled")
 
 # Retriever
 retriever: Retriever = load_retriever(retriever_config['RETRIEVER_NAME'], dev_mode=DEV_MODE, 
@@ -305,9 +310,9 @@ def backoff_retrieval(retriever: Retriever, program_info: Dict, topic: str, quer
         
         # Generate an intermediate answer
         docs_for_llms(docs)
-        if do_filter: 
-            docs, removed = llm_filter_docs(docs, nonfiltered_program_info, topic, query, return_removed=True)
-            removed_docs += removed
+        # if do_filter: 
+        #     docs, removed = llm_filter_docs(docs, nonfiltered_program_info, topic, query, return_removed=True)
+        #     removed_docs += removed
         
         if len(docs) > 0:   
             llm_query = prompts.llm_query(program_info_copy, topic, query)
@@ -396,10 +401,10 @@ async def run_chain(program_info: Dict, topic: str, query: str, config: Dict):
     removed_docs: List[Document] = []
     
     # Spell correct the query if the option is turned on
-    if config['spell_correct']:
-        corrected_query = spell_correct_chain.run(text=query,stop=[">>> end correction"])
-        if query.lower() != corrected_query.lower(): alerts.append(f'Used spell/grammar corrected query: {corrected_query}')
-        query = corrected_query
+    # if config['spell_correct']:
+    #     corrected_query = spell_correct_chain.run(text=query,stop=[">>> end correction"])
+    #     if query.lower() != corrected_query.lower(): alerts.append(f'Used spell/grammar corrected query: {corrected_query}')
+    #     query = corrected_query
         
     llm_query = prompts.llm_query(program_info, topic, query)
     

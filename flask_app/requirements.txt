@@ -1,7 +1,7 @@
 pandas
 flask
 gunicorn
-langchain>=0.0.239
+langchain
 sentence-transformers
 faiss-cpu
 networkx

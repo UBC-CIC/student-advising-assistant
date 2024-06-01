@@ -49,8 +49,8 @@ export class DatabaseStack extends Stack {
         version: rds.PostgresEngineVersion.VER_16, // earliest support for pgvector
       }),
       instanceType: ec2.InstanceType.of(
-        ec2.InstanceClass.BURSTABLE3,
-        ec2.InstanceSize.MICRO
+        ec2.InstanceClass.M7G,
+        ec2.InstanceSize.XLARGE2
       ),
       credentials: rds.Credentials.fromUsername(
         dbUsername.secretValueFromJson("username").unsafeUnwrap(),
