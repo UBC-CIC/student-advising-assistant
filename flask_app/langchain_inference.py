@@ -3,23 +3,21 @@ from langchain.retrievers.document_compressors import LLMChainExtractor
 import regex as re
 from typing import List, Dict, Tuple
 from retrievers import Retriever, load_retriever
-import copy 
+import copy
 import json
 import os
 from langchain.chains.question_answering import load_qa_chain
-import llms
 from documents import load_graph, get_split_sib_ids
 import prompts
 from aws_helpers.param_manager import get_param_manager
 from aws_helpers.s3_tools import download_s3_directory
 import boto3
 from llms.bedrock import BedrockLLM
-from langchain_core.prompts import PromptTemplate
 
 # If process is running locally, activate dev mode
 DEV_MODE = 'MODE' in os.environ and os.environ.get('MODE') == 'dev'
 VERBOSE_LLMS = DEV_MODE
-GRAPH_FILEPATH = os.path.join('data','documents','website_graph.txt')
+GRAPH_FILEPATH = os.path.join('data', 'documents', 'website_graph.txt')
 
 ### CONSTANTS
 MIN_DOC_LENGTH = 100 # Remove documents below a certain character length - helps with some LLM hallucinations
@@ -41,11 +39,13 @@ retriever_config = param_manager.get_parameter('retriever')
 generator_config = param_manager.get_parameter('generator')
 
 ### LOAD FILES
-def read_text(filename: str, as_json = False):
+def read_text(filename: str, as_json=False):
     result = ''
     with open(filename) as f:
-        if as_json: result = json.load(f)
-        else: result = f.read()
+        if as_json:
+            result = json.load(f)
+        else:
+            result = f.read()
     return result
 
 def download_all_dirs(retriever: str):
@@ -69,14 +69,14 @@ download_all_dirs(retriever_config['RETRIEVER_NAME'])
 
 graph = load_graph(GRAPH_FILEPATH)
 
-data_source_annotations = read_text(os.path.join('static','data_source_annotations.json'), as_json=True)
+data_source_annotations = read_text(os.path.join('static', 'data_source_annotations.json'), as_json=True)
 
 ### LOAD MODELS
 spell_correct_chain = combine_documents_chain = filter = compressor = None
 
 if use_llm:
     try:
-        endpoint_type = generator_config.get('ENDPOINT_TYPE')
+        endpoint_type = generator_config['ENDPOINT_TYPE']
         if endpoint_type.lower() == 'bedrock':
             bedrock_runtime = boto3.client('bedrock-runtime', region_name='us-west-2')
             base_llm = BedrockLLM(bedrock_runtime, generator_config['MODEL_NAME'])
@@ -94,7 +94,8 @@ else:
     print("LLM mode is disabled")
 
 # Retriever
-retriever: Retriever = load_retriever(retriever_config['RETRIEVER_NAME'], dev_mode=DEV_MODE, verbose=VERBOSE_LLMS)
+retriever: Retriever = load_retriever(retriever_config['RETRIEVER_NAME'], dev_mode=DEV_MODE, 
+                                      verbose=VERBOSE_LLMS)
 
 ### UTILITY FUNCTIONS
 
