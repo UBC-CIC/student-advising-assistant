@@ -20,12 +20,7 @@ class BedrockLLM:
         }
         response = self.bedrock_runtime.invoke_model(**kwargs)
         bedrock_response = json.loads(response['body'].read())
-        return bedrock_response['generation']
+        return bedrock_response['generated_text']
 
     def run(self, text, stop):
         return self.invoke_model(prompt=text)
-
-def load_bedrock_prompt(model_name):
-    # Customize this function based on how you manage prompts
-    # For simplicity, returning a basic prompt
-    return f"Answer the following question using the context provided: {{context}} \n\n Question: {{question}} \n Answer:"

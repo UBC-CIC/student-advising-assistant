@@ -3,18 +3,20 @@
 Utility functions for loading LLMs and associated prompts
 """
 
-from langchain import Prompt, LLMChain
+from langchain_core.prompts import PromptTemplate
+from langchain.chains import LLMChain
 from langchain.llms import BaseLLM
 from langchain.llms.sagemaker_endpoint import LLMContentHandler
 import json
 from typing import Tuple, Dict
-import os 
+import os
 import prompts
 from filters import VerboseFilter, FilterWithContext
 from .sagemaker_endpoint import MySagemakerEndpoint
 from aws_helpers.param_manager import get_param_manager
 from aws_helpers.ssh_forwarder import start_ssh_forwarder
 from .bedrock import BedrockLLM
+import boto3
 
 ### HELPER CLASSES
 class ContentHandler(LLMContentHandler):
@@ -33,7 +35,7 @@ class ContentHandler(LLMContentHandler):
         response_json = json.loads(output.read().decode("utf-8"))
         print(response_json)
         return response_json[0]["generated_text"]
-    
+
 ### MODEL LOADING FUNCTIONS
 
 hyperparams = {
@@ -41,13 +43,14 @@ hyperparams = {
     "max_new_tokens": 200,
 }
 
-def load_model_and_prompt(endpoint_type: str, endpoint_name: str, endpoint_region: str, model_name: str, dev_mode: bool = False) -> Tuple[BaseLLM,Prompt]:
+def load_model_and_prompt(endpoint_type: str, endpoint_name: str, endpoint_region: str, model_name: str, dev_mode: bool = False) -> Tuple[BaseLLM, PromptTemplate]:
     """
     Utility function loads a LLM of the given endpoint type and model name, and the QA Prompt
-    - endpoint_type: 'sagemaker' or 'huggingface_tgi'
+    - endpoint_type: 'sagemaker', 'huggingface_tgi', or 'bedrock'
         - sagemaker: an AWS sagemaker endpoint
         - huggingface_tgi: a huggingface text generation server
-    - endpoint_name: sagemaker endpoint name
+        - bedrock: an AWS bedrock endpoint
+    - endpoint_name: sagemaker or bedrock endpoint name
     - model_name: display name of the model
     - dev_mode: if true, loads a model for local connection if applicable
     """
@@ -56,19 +59,21 @@ def load_model_and_prompt(endpoint_type: str, endpoint_name: str, endpoint_regio
         llm = load_sagemaker_endpoint(endpoint_name, endpoint_region)
     elif endpoint_type == 'huggingface_tgi':
         llm = load_huggingface_tgi_endpoint(endpoint_name, dev_mode)
+    elif endpoint_type == 'bedrock':
+        llm = load_bedrock_llm(endpoint_region, model_name)
     else:
         raise Exception(f"Endpoint type {endpoint_type} is not supported.")
         
     return llm, load_prompt(endpoint_type, model_name)
-    
-def load_prompt(endpoint_type: str, model_name: str):
+
+def load_prompt(endpoint_type: str, model_name: str) -> PromptTemplate:
     """
     Utility function loads a prompt for the given endpoint type and model name
-    - endpoint_type: 'sagemaker' or 'huggingface_tgi'
+    - endpoint_type: 'sagemaker', 'huggingface_tgi', or 'bedrock'
     - model_name: requires that the name is defined for the appropriate endpoint
                   in the dicts above
     """
-    return prompts.default_qa_prompt
+    return PromptTemplate.from_template(prompts.default_qa_prompt)
 
 def load_sagemaker_endpoint(endpoint_name: str, endpoint_region: str) -> BaseLLM:
     """
@@ -86,6 +91,12 @@ def load_sagemaker_endpoint(endpoint_name: str, endpoint_region: str) -> BaseLLM
 
     return llm
 
+def load_bedrock_llm(endpoint_region: str, model_name: str) -> BaseLLM:
+    """
+    Loads the LLM for a Bedrock inference endpoint
+    """
+    bedrock_runtime = boto3.client('bedrock-runtime', region_name=endpoint_region)
+    return BedrockLLM(bedrock_runtime, model_name)
 
 def load_huggingface_tgi_endpoint(name: str, dev_mode: bool = False) -> BaseLLM:
     if dev_mode:
@@ -93,6 +104,7 @@ def load_huggingface_tgi_endpoint(name: str, dev_mode: bool = False) -> BaseLLM:
         remote_host, remote_port = name.split(':')
         server = start_ssh_forwarder(remote_host, int(remote_port))
         name = f"localhost:{server.local_bind_port}"
+
 def load_chain_filter(base_llm: BaseLLM, model_name: str, verbose: bool = False) -> FilterWithContext:
     """
     Loads a chain filter using the given base llm for the given model name
@@ -100,15 +112,12 @@ def load_chain_filter(base_llm: BaseLLM, model_name: str, verbose: bool = False)
              Expects the following inputs to the compress_documents function: docs, query, program_info, topic
     """
     return FilterWithContext(VerboseFilter.from_llm(base_llm,prompt=prompts.default_filter_prompt,verbose=verbose), prompts.filter_context_str)
-    
+
 def load_spell_chain(base_llm: BaseLLM, model_name: str, verbose: bool = False) -> LLMChain:
     """
     Loads a spelling correction chain using the given base llm
     Chooses a prompts based on the model name
     Returns: A LLMChain for spelling correction
     """
-    prompt = prompts.default_spelling_correction_prompt
-    return LLMChain(llm=base_llm,prompt=prompt,verbose=verbose)
-
-def load_bedrock_llm(region_name: str, api_key: str) -> BedrockLLM:
-    return BedrockLLM(region_name=region_name, api_key=api_key)
+    prompt = PromptTemplate.from_template(prompts.default_spelling_correction_prompt)
+    return LLMChain(llm=base_llm, prompt=prompt, verbose=verbose)
