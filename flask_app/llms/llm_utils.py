@@ -119,5 +119,5 @@ def load_spell_chain(base_llm: BaseLLM, model_name: str, verbose: bool = False) 
     Chooses a prompts based on the model name
     Returns: A LLMChain for spelling correction
     """
-    prompt = PromptTemplate.from_template(prompts.default_spelling_correction_prompt)
+    prompt = prompts.default_spelling_correction_prompt
     return LLMChain(llm=base_llm, prompt=prompt, verbose=verbose)

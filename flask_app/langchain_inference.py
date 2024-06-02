@@ -12,7 +12,8 @@ import prompts
 from aws_helpers.param_manager import get_param_manager
 from aws_helpers.s3_tools import download_s3_directory
 import boto3
-from llms.bedrock import BedrockLLM
+from langchain.llms import Bedrock
+import llms
 
 # If process is running locally, activate dev mode
 DEV_MODE = 'MODE' in os.environ and os.environ.get('MODE') == 'dev'
@@ -77,16 +78,16 @@ spell_correct_chain = combine_documents_chain = filter = compressor = None
 if use_llm:
     try:
         endpoint_type = generator_config['ENDPOINT_TYPE']
-        if endpoint_type.lower() == 'bedrock':
-            bedrock_runtime = boto3.client('bedrock-runtime', region_name='us-west-2')
-            base_llm = BedrockLLM(bedrock_runtime, generator_config['MODEL_NAME'])
+        if endpoint_type.lower() == 'bedrock':            
+            bedrock=boto3.client(service_name="bedrock-runtime")
+            base_llm = Bedrock(model_id="meta.llama3-8b-instruct-v1:0",client=bedrock,
+                model_kwargs={'max_gen_len':512})
+            spell_correct_chain = llms.load_spell_chain(base_llm, generator_config['MODEL_NAME'], verbose=VERBOSE_LLMS)
+            filter = llms.load_chain_filter(base_llm, generator_config['MODEL_NAME'], verbose=VERBOSE_LLMS)
             qa_prompt = prompts.default_qa_prompt
-        else:
-            raise ValueError(f"Unsupported endpoint type: {endpoint_type}")
-        
-        combine_documents_chain = load_qa_chain(llm=base_llm, chain_type="stuff", prompt=qa_prompt, verbose=VERBOSE_LLMS)
-        compressor = LLMChainExtractor.from_llm(base_llm)
-        print("Successfully initialized LLM components")
+            combine_documents_chain = load_qa_chain(llm=base_llm, chain_type="stuff", prompt=qa_prompt, verbose=VERBOSE_LLMS)
+            compressor = LLMChainExtractor.from_llm(base_llm)
+            print("Successfully initialized LLM components")
     except Exception as e:
         print(f"Error initializing LLM components: {e}")
         raise
