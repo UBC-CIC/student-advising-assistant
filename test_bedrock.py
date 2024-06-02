@@ -18,5 +18,6 @@ kwargs = {
 }
 
 response = bedrock_runtime.invoke_model(**kwargs)
-body = json.loads(response['body'].read())
-print(body)
+# body = json.loads(response['body'].read())
+# generated_text = body['generation']
+print(json.loads(response['body'].read())['generation'])

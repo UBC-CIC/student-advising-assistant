@@ -133,7 +133,7 @@ async def answer():
         }
         response = bedrock_runtime.invoke_model(**kwargs)
         bedrock_response = json.loads(response['body'].read())
-        generated_text = bedrock_response['generated_text']
+        generated_text = bedrock_response['generation']
     else:
         generated_text = main_response
 
