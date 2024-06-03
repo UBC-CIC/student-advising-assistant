@@ -199,13 +199,16 @@ Add permission. A dropdown will appear. Click on Create inline policy. Select JS
 				"ssm:GetParametersByPath",
 				"ssm:DescribeParameters",
 				"s3:ListBucket",
-				"s3:GetObject"
+				"s3:GetObject",
+				"bedrock:InvokeModel"
 			],
 			"Resource": [
 				"arn:aws:secretsmanager:<region>:<account-ID>:secret:<secret-name>",
 				"arn:aws:ssm:<region>:<account_number>:parameter/*",
 				"arn:aws:s3:::<bucket_for_inferencestack>",
-				"arn:aws:s3:::<bucket_for_inferencestack>/*"
+				"arn:aws:s3:::<bucket_for_inferencestack>/*",
+				"arn:aws:bedrock:us-west-2::foundation-model/meta.llama3-70b-instruct-v1:0",
+				"arn:aws:bedrock:us-west-2::foundation-model/meta.llama3-8b-instruct-v1:0"
 			]
 		},
 		{
