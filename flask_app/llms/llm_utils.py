@@ -16,6 +16,7 @@ from .sagemaker_endpoint import MySagemakerEndpoint
 from aws_helpers.param_manager import get_param_manager
 from aws_helpers.ssh_forwarder import start_ssh_forwarder
 import boto3
+from langchain.llms import Bedrock
 
 ### HELPER CLASSES
 class ContentHandler(LLMContentHandler):
@@ -42,38 +43,39 @@ hyperparams = {
     "max_new_tokens": 200,
 }
 
-# not used anymore at least for now - Aman
-# def load_model_and_prompt(endpoint_type: str, endpoint_name: str, endpoint_region: str, model_name: str, dev_mode: bool = False) -> Tuple[BaseLLM, PromptTemplate]:
-#     """
-#     Utility function loads a LLM of the given endpoint type and model name, and the QA Prompt
-#     - endpoint_type: 'sagemaker', 'huggingface_tgi', or 'bedrock'
-#         - sagemaker: an AWS sagemaker endpoint
-#         - huggingface_tgi: a huggingface text generation server
-#         - bedrock: an AWS bedrock endpoint
-#     - endpoint_name: sagemaker or bedrock endpoint name
-#     - model_name: display name of the model
-#     - dev_mode: if true, loads a model for local connection if applicable
-#     """
-#     llm = None
-#     if endpoint_type == 'sagemaker':
-#         llm = load_sagemaker_endpoint(endpoint_name, endpoint_region)
-#     elif endpoint_type == 'huggingface_tgi':
-#         llm = load_huggingface_tgi_endpoint(endpoint_name, dev_mode)
-#     elif endpoint_type == 'bedrock':
-#         llm = load_bedrock_llm(endpoint_region, model_name)
-#     else:
-#         raise Exception(f"Endpoint type {endpoint_type} is not supported.")
+def load_model_and_prompt(endpoint_type: str, endpoint_name: str, endpoint_region: str, model_name: str, dev_mode: bool = False) -> Tuple[BaseLLM, PromptTemplate]:
+    """
+    Utility function loads a LLM of the given endpoint type and model name, and the QA Prompt
+    - endpoint_type: 'sagemaker', 'huggingface_tgi', or 'bedrock'
+        - sagemaker: an AWS sagemaker endpoint
+        - huggingface_tgi: a huggingface text generation server
+        - bedrock: an AWS bedrock endpoint
+    - endpoint_name: sagemaker or bedrock endpoint name
+    - model_name: display name of the model
+    - dev_mode: if true, loads a model for local connection if applicable
+    """
+    llm = None
+    if endpoint_type == 'sagemaker':
+        llm = load_sagemaker_endpoint(endpoint_name, endpoint_region)
+    elif endpoint_type == 'huggingface_tgi':
+        llm = load_huggingface_tgi_endpoint(endpoint_name, dev_mode)
+    elif endpoint_type == 'bedrock':
+        bedrock=boto3.client(service_name="bedrock-runtime")
+        llm = Bedrock(model_id="meta.llama3-8b-instruct-v1:0",client=bedrock,
+                model_kwargs={'max_gen_len':512})
+    else:
+        raise Exception(f"Endpoint type {endpoint_type} is not supported.")
         
-#     return llm, load_prompt(endpoint_type, model_name)
+    return llm, load_prompt(endpoint_type, model_name)
 
-def load_prompt(endpoint_type: str, model_name: str) -> PromptTemplate:
+def load_prompt(endpoint_type: str, model_name: str):
     """
     Utility function loads a prompt for the given endpoint type and model name
     - endpoint_type: 'sagemaker', 'huggingface_tgi', or 'bedrock'
     - model_name: requires that the name is defined for the appropriate endpoint
                   in the dicts above
     """
-    return PromptTemplate.from_template(prompts.default_qa_prompt)
+    return prompts.default_qa_prompt
 
 def load_sagemaker_endpoint(endpoint_name: str, endpoint_region: str) -> BaseLLM:
     """

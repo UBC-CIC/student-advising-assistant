@@ -22,10 +22,8 @@ from aws_helpers.rds_tools import execute_and_fetch
 from aws_helpers.logging import set_boto_log_levels
 import boto3
 
-# Initialize Amazon Bedrock client if mode is bedrock
-bedrock_runtime = None
-if os.environ.get('LLM_MODE') == 'bedrock':
-    bedrock_runtime = boto3.client('bedrock-runtime', region_name='us-west-2')
+# Initialize Amazon Bedrock client
+# bedrock_runtime = boto3.client('bedrock-runtime', region_name='us-west-2')
 
 ### Constants
 FACULTIES_PATH = os.path.join('data','documents','faculties.json')
@@ -82,6 +80,17 @@ def get_last_updated_time():
         LIMIT 1"""
     result = execute_and_fetch(sql, dev_mode=DEV_MODE)
     return result[0][0].strftime("%m/%d/%Y, %H:%M:%S (UTC)")
+
+# For debugging to see the content inside a doc
+def document_to_dict(doc):
+    return {
+        'page_content': doc.page_content,
+        'metadata': doc.metadata
+    }
+
+# For debugging to see all the doc items in docs
+def convert_docs_to_json(docs):
+    return [document_to_dict(doc) for doc in docs]
         
 @application.route('/', methods=['GET'])
 def home():
@@ -114,32 +123,53 @@ async def answer():
         'start_doc': start_doc
     }
     docs, main_response, alerts, removed_docs = await langchain_inference_module.run_chain(program_info,topic,question,config)
+    context = "\n".join([doc.page_content for doc in docs])
 
     # Log the question
     context_str = ' : '.join([value for value in list(program_info.values()) + [topic] if len(value) > 0])
     log_question(question, context_str, main_response, [doc.metadata['doc_id'] for doc in docs])
     
-    if os.environ.get('LLM_MODE') == 'bedrock':
-        kwargs = {
-            "modelId": "meta.llama3-8b-instruct-v1:0",
-            "contentType": "application/json",
-            "accept": "application/json",
-            "body": json.dumps({
-                "prompt": f"{context_str}\n\n{question}",
-                "max_gen_len": 512,
-                "temperature": 0.5,
-                "top_p": 0.9
-            })
-        }
-        response = bedrock_runtime.invoke_model(**kwargs)
-        bedrock_response = json.loads(response['body'].read())
-        generated_text = bedrock_response['generation']
-    else:
-        generated_text = main_response
+    # For debugging to print what is passed to render_template
+    docs_json = convert_docs_to_json(docs)
+    logger.info(f"docs_json from application.py: {docs_json}")
+    logger.info(f"context_str from application.py: {context_str}")
+    logger.info(f"main_response from application.py: {main_response}")
+    logger.info(f"question from application.py: {question}")
+    logger.info(f"context from application.py: {context}")
 
-    return render_template('ans.html', title=app_title, question=question, context=context_str, docs=docs,
-                           form=request.form.to_dict(), main_response=generated_text, alerts=alerts,
+    # Render the results
+    return render_template('ans.html',title=app_title,question=question,context=context_str,docs=docs,
+                           form=request.form.to_dict(), main_response=main_response, alerts=alerts,
                            removed_docs=removed_docs, last_updated=last_updated_time)
+    # return jsonify({
+    #     "docs": docs_json,
+    #     "context_str": context_str,
+    #     "main_response": main_response,
+    #     "question": question
+    # })
+    
+    # kwargs = {
+    #     "modelId": "meta.llama3-8b-instruct-v1:0",
+    #     "contentType": "application/json",
+    #     "accept": "application/json",
+    #     "body": json.dumps({
+    #         "prompt": f"{question}",
+    #         "max_gen_len": 512,
+    #         "temperature": 0.5,
+    #         "top_p": 0.9
+    #     })
+    # }
+    # response = bedrock_runtime.invoke_model(**kwargs)
+    # bedrock_response = json.loads(response['body'].read())
+    # generated_text = bedrock_response['generation']
+
+    # # return render_template('ans.html', title=app_title, question=question, context=context_str, docs=docs,
+    # #                        form=request.form.to_dict(), main_response=generated_text, alerts=alerts,
+    # #                        removed_docs=removed_docs, last_updated=last_updated_time)
+    # return jsonify({"generated_response": generated_text,
+    #                 "context_str": context_str,
+    #                 "main_response": main_response,
+    #                 "question": question})
 
 @application.route('/feedback', methods=['POST'])
 async def feedback():

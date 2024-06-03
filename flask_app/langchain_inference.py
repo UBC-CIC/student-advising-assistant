@@ -11,9 +11,14 @@ from documents import load_graph, get_split_sib_ids
 import prompts
 from aws_helpers.param_manager import get_param_manager
 from aws_helpers.s3_tools import download_s3_directory
-import boto3
-from langchain.llms import Bedrock
 import llms
+import logging
+from aws_helpers.logging import set_boto_log_levels
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+set_boto_log_levels(logging.WARNING)
 
 # If process is running locally, activate dev mode
 DEV_MODE = 'MODE' in os.environ and os.environ.get('MODE') == 'dev'
@@ -75,24 +80,40 @@ data_source_annotations = read_text(os.path.join('static', 'data_source_annotati
 ### LOAD MODELS
 spell_correct_chain = combine_documents_chain = filter = compressor = None
 
+# if use_llm:
+#     try:
+#         endpoint_type = generator_config['ENDPOINT_TYPE']
+#         if endpoint_type.lower() == 'bedrock':            
+#             bedrock=boto3.client(service_name="bedrock-runtime")
+#             base_llm = Bedrock(model_id="meta.llama3-8b-instruct-v1:0",client=bedrock,
+#                 model_kwargs={'max_gen_len':512})
+#             spell_correct_chain = llms.load_spell_chain(base_llm, generator_config['MODEL_NAME'], verbose=VERBOSE_LLMS)
+#             filter = llms.load_chain_filter(base_llm, generator_config['MODEL_NAME'], verbose=VERBOSE_LLMS)
+#             qa_prompt = prompts.default_qa_prompt
+#             combine_documents_chain = load_qa_chain(llm=base_llm, chain_type="stuff", prompt=qa_prompt, verbose=VERBOSE_LLMS)
+#             compressor = LLMChainExtractor.from_llm(base_llm)
+#             print("Successfully initialized LLM components")
+#     except Exception as e:
+#         print(f"Error initializing LLM components: {e}")
+#         raise
+# else:
+#     print("LLM mode is disabled")
+
 if use_llm:
-    try:
-        endpoint_type = generator_config['ENDPOINT_TYPE']
-        if endpoint_type.lower() == 'bedrock':            
-            bedrock=boto3.client(service_name="bedrock-runtime")
-            base_llm = Bedrock(model_id="meta.llama3-8b-instruct-v1:0",client=bedrock,
-                model_kwargs={'max_gen_len':512})
-            spell_correct_chain = llms.load_spell_chain(base_llm, generator_config['MODEL_NAME'], verbose=VERBOSE_LLMS)
-            filter = llms.load_chain_filter(base_llm, generator_config['MODEL_NAME'], verbose=VERBOSE_LLMS)
-            qa_prompt = prompts.default_qa_prompt
-            combine_documents_chain = load_qa_chain(llm=base_llm, chain_type="stuff", prompt=qa_prompt, verbose=VERBOSE_LLMS)
-            compressor = LLMChainExtractor.from_llm(base_llm)
-            print("Successfully initialized LLM components")
-    except Exception as e:
-        print(f"Error initializing LLM components: {e}")
-        raise
-else:
-    print("LLM mode is disabled")
+    # LLMs
+    base_llm, qa_prompt = llms.load_model_and_prompt(generator_config['ENDPOINT_TYPE'], generator_config['ENDPOINT_NAME'], 
+                                                     param_manager.region, generator_config['MODEL_NAME'], dev_mode=DEV_MODE)
+                                                     
+    logger.info(f"qa_prompt from langchain_inference.py: {qa_prompt}")          
+    logger.info(f"base_llm from langchain_inference.py: {base_llm}")
+
+    # Chains
+    spell_correct_chain = llms.load_spell_chain(base_llm, generator_config['MODEL_NAME'], verbose=VERBOSE_LLMS)
+    combine_documents_chain = load_qa_chain(llm=base_llm, chain_type="stuff", prompt=qa_prompt, verbose=VERBOSE_LLMS)
+
+    # Document compressors
+    filter = llms.load_chain_filter(base_llm, generator_config['MODEL_NAME'], verbose=VERBOSE_LLMS)
+    compressor = LLMChainExtractor.from_llm(base_llm)
 
 # Retriever
 retriever: Retriever = load_retriever(retriever_config['RETRIEVER_NAME'], dev_mode=DEV_MODE, 
@@ -142,7 +163,7 @@ def highlight_compressed_sections(original_text: str, compressed_text: str):
     compressed_sentences = compressed_text.split('\n')
 
     # Vicuna likes to add numbers to each returned sentence, this removes the numbers
-    compressed_sentences = [re.sub('\d(\.)\s','',sent.strip()) for sent in compressed_sentences]
+    # compressed_sentences = [re.sub('\d(\.)\s','',sent.strip()) for sent in compressed_sentences]
 
     for sent in compressed_sentences:
         if len(sent) == 0: continue 
@@ -152,7 +173,7 @@ def highlight_compressed_sections(original_text: str, compressed_text: str):
         if sent[-1] == '"': sent = sent[:-1]
 
         # Vicuna likes to add numbers to each returned sentence, this removes the numbers
-        sent = re.sub('\d(\.)\s','',sent)
+        # sent = re.sub('\d(\.)\s','',sent)
 
         if match := re.search(sent, original_text):
             # Add italics markings as the indicator to highlight
