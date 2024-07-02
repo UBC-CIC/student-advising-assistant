@@ -1,6 +1,8 @@
 pandas
 flask
 langchain
+langchain-aws
+langchain-community
 faiss-cpu
 sentence-transformers
 networkx

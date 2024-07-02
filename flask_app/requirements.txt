@@ -2,6 +2,8 @@ pandas
 flask
 gunicorn
 langchain
+langchain-aws
+langchain-community
 sentence-transformers
 faiss-cpu
 networkx
