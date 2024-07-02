@@ -120,6 +120,7 @@ def check_if_documents_relates(docs, user_prompt, llm):
                         Avoid any unrelated information or questions."""
 
     doc_relates = []
+    additional_docs = []
     for doc in docs:
         if llm.model_id == LLAMA_3_8B or llm.model_id == LLAMA_3_70B:
             prompt = f"""
@@ -140,9 +141,15 @@ def check_if_documents_relates(docs, user_prompt, llm):
                 Here is the text from a document: {doc['text']}.
                 {system_prompt}
                 """
-        response = llm.invoke(prompt)
-        doc_relates_dict = {"url": doc['url'], "text": doc['text'], "relate": response}
-        doc_relates.append(doc_relates_dict)
+        response = llm.invoke(prompt).strip()
+
+        doc_info = {"url": doc['url'], "text": doc['text'], "relate": response}
+        if response.startswith("Yes"):
+            doc_relates.append(doc_info)
+        else:
+            additional_docs.append(doc_info)
+
+    return [doc_relates, additional_docs]
 
     return doc_relates
 
@@ -186,7 +193,7 @@ def answer_prompt(user_prompt, number_of_docs):
 
     check_docs = check_if_documents_relates(docs, user_prompt, llm)
 
-    return {"answer": answer, "check_docs": check_docs}
+    return {"answer": answer, "docs": check_docs[0], "additional_docs": check_docs[1]}
         
 @application.route('/', methods=['GET'])
 def home():
@@ -229,20 +236,36 @@ async def answer():
 
     response = answer_prompt(formatted_question, 5)
         
-    # Neatly format the response
-    formatted_response = {
-        "answer": response["answer"],
-        "related_documents": []
-    }
+    # # Neatly format the response in a JSON for debugging purposes
+    # formatted_response = {
+    #     "answer": response["answer"],
+    #     "related_documents": []
+    # }
 
-    for doc in response["check_docs"]:
-        formatted_response["related_documents"].append({
-            "url": doc["url"],
-            "text": doc["text"],
-            "related": doc["relate"]
-        })
+    # for doc in response["docs"]:
+    #     formatted_response["related_documents"].append({
+    #         "url": doc["url"],
+    #         "text": doc["text"],
+    #         "related": doc["relate"]
+    #     })
+    
+    # for doc in response["additional_docs"]:
+    #     formatted_response["related_documents"].append({
+    #         "url": doc["url"],
+    #         "text": doc["text"],
+    #         "related": doc["relate"]
+    #     })
 
-    return json.dumps(formatted_response, indent=4)
+    # return json.dumps(formatted_response, indent=4)
+
+    # Log the question
+    context_str = ' : '.join([value for value in list(program_info.values()) + [topic] if len(value) > 0])
+    # log_question(question, context_str, main_response, [doc.metadata['doc_id'] for doc in docs])
+    
+    # Render the results
+    return render_template('ans.html',title=app_title,question=question,context=context_str,docs=response["docs"],
+                           form=request.form.to_dict(), main_response=response["answer"],
+                           removed_docs=response["additional_docs"], last_updated=last_updated_time)
 
 @application.route('/feedback', methods=['POST'])
 async def feedback():
