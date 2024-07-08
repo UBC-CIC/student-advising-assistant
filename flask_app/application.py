@@ -98,7 +98,12 @@ def get_docs(query_embedding, number):
     try:
         cur = conn.cursor()
         # Get the top N most similar documents using the KNN <=> operator
-        cur.execute(f"SELECT url, text FROM test_embeddings ORDER BY embedding <=> %s LIMIT {number}", (embedding_array,))
+        cur.execute(f"""
+                        SELECT url, text
+                        FROM test_embeddings
+                        ORDER BY embedding <=> %s
+                        LIMIT {number}
+                    """, (embedding_array,))
         results = cur.fetchall()
         # Each item in list will be a dictionary with key values 'url' and 'text'
         for result in results:
@@ -112,15 +117,23 @@ def get_docs(query_embedding, number):
         cur.close()
     return top_docs
 
+# Split documents based on character limit, 8,000 tokens is roughly 32,000 characters, set max characters to 25,000
+def split_docs(docs, max_chars=25000):
+    total_length = len(format_docs(docs))
+    print(total_length)
+    removed_docs = []
+
+    while total_length > max_chars and docs:
+        removed_doc = docs.pop()
+        removed_docs.append(removed_doc)
+        total_length = len(format_docs(docs))
+    return {"docs": docs, "removed_docs": removed_docs}
+
 def check_if_documents_relates(docs, user_prompt, llm):
 
-    system_prompt = """You are tasked with determining if the document helps answer the question. 
-                        Either provide an answer saying "Yes, ..." with a short explaination 
-                        or "No, ..." with a short explaination based on your analysis.
-                        Avoid any unrelated information or questions."""
+    system_prompt = "Provide a short explaination if the document is relevant to the question or not."
 
     doc_relates = []
-    additional_docs = []
     for doc in docs:
         if llm.model_id == LLAMA_3_8B or llm.model_id == LLAMA_3_70B:
             prompt = f"""
@@ -144,12 +157,7 @@ def check_if_documents_relates(docs, user_prompt, llm):
         response = llm.invoke(prompt).strip()
 
         doc_info = {"url": doc['url'], "text": doc['text'], "relate": response}
-        if response.startswith("Yes"):
-            doc_relates.append(doc_info)
-        else:
-            additional_docs.append(doc_info)
-
-    return [doc_relates, additional_docs]
+        doc_relates.append(doc_info)
 
     return doc_relates
 
@@ -160,7 +168,9 @@ def answer_prompt(user_prompt, number_of_docs):
 
     docs = get_docs(embeddings.embed_query(user_prompt), number_of_docs)
 
-    documents = format_docs(docs)
+    divided_docs = split_docs(docs)
+
+    documents = format_docs(divided_docs["docs"])
 
     # Get the LLM we want to invoke
     llm = BedrockLLM(
@@ -191,9 +201,10 @@ def answer_prompt(user_prompt, number_of_docs):
 
     answer = llm.invoke(prompt)
 
-    check_docs = check_if_documents_relates(docs, user_prompt, llm)
+    check_docs = check_if_documents_relates(divided_docs["docs"], user_prompt, llm)
+    check_removed_docs = check_if_documents_relates(divided_docs["removed_docs"], user_prompt, llm)
 
-    return {"answer": answer, "docs": check_docs[0], "additional_docs": check_docs[1]}
+    return {"answer": answer, "docs": check_docs, "removed_docs": check_removed_docs}
         
 @application.route('/', methods=['GET'])
 def home():
@@ -265,7 +276,7 @@ async def answer():
     # Render the results
     return render_template('ans.html',title=app_title,question=question,context=context_str,docs=response["docs"],
                            form=request.form.to_dict(), main_response=response["answer"],
-                           removed_docs=response["additional_docs"], last_updated=last_updated_time)
+                           removed_docs=response["removed_docs"], last_updated=last_updated_time)
 
 @application.route('/feedback', methods=['POST'])
 async def feedback():
