@@ -16,6 +16,7 @@ from flask import Flask, request, render_template, Response
 import json
 import os 
 import numpy as np
+import ast
 from typing import List
 from importlib import reload 
 from aws_helpers.rds_tools import execute_and_fetch
@@ -110,7 +111,7 @@ def get_docs(query_embedding, number):
                         "url": result[1],
                         "titles": result[2],
                         "text": result[3],
-                        "links": result[4]}
+                        "links": ast.literal_eval(result[4])}
             top_docs.append(doc_dict)
         cur.close()
     except Exception as e:

@@ -144,20 +144,15 @@
                 <script type="text/markdown">{{doc['text']}}</script>
               </zero-md>
               <strong>Source</strong>
-              <p> {{doc['url']}} </p>
               <p>Url: <a href="{{doc['url']}}">{{doc['url']}}</a></p>
               {% if doc['links'] %}
               <strong>
                 Relevant Links
               </strong>
               <ul>
-                {% for title,link in doc['links'] %}
+                {% for link in doc['links'] %}
                 <li>
-                  <p>{{title}}: <a href="{{link}}">{{link}}</a></p>
-                  {% if doc['doc_id'] %}
-                  <button id="ask" type="submit" class="btn btn-outline-secondary" onclick="post_form({{doc_id}})">Ask
-                    Cali about this link</button>
-                  {% endif %}
+                  <p><a href="{{link}}">{{link}}</a></p>
                 </li>
                 {% endfor %}
               </ul>
@@ -174,7 +169,7 @@
             <div class="accordion-item">
               <h2 class="accordion-header" id="filtered-heading{{loop.index}}">
                 <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#filtered-collapse{{loop.index}}" aria-expanded="true" aria-controls="filtered-collapse{{loop.index}}">
-                  Reference {{docs|length + loop.index + 1}}
+                  Reference {{docs|length + loop.index}}
                 </button>
               </h2>
               <div id="filtered-collapse{{loop.index}}" class="accordion-collapse collapse" aria-labelledby="filtered-heading{{loop.index}}" data-bs-parent="#removed-docs-accordion">
@@ -191,16 +186,15 @@
                     <script type="text/markdown">{{doc['text']}}</script>
                   </zero-md>
                   <strong>Source</strong>
-                  <p> {{doc['url']}} </p>
                   <p>Url: <a href="{{doc['url']}}">{{doc['url']}}</a></p>
                   {% if doc['links'] %}
                   <strong>
                     Relevant Links
                   </strong>
                   <ul>
-                    {% for title,link in doc['links'] %}
+                    {% for link in doc['links'] %}
                     <li>
-                      <p>{{title}}: <a href="{{link}}">{{link}}</a></p>
+                      <p><a href="{{link}}">{{link}}</a></p>
                     </li>
                     {% endfor %}
                   </ul>
