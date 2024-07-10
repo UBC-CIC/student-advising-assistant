@@ -101,7 +101,7 @@
                 <input 
                 type="hidden" 
                 name="feedback-hidden-reference-ids" 
-                value="{% for doc in docs + removed_docs %}{{loop.index}}{% if not loop.last %},{% endif %}{% endfor %}">
+                value="{% for doc in docs + removed_docs%}{{doc.metadata['doc_id']}},{% endfor %}">
                 <input type="hidden" name="feedback-hidden-response" value="{{main_response}}">
 
                 <div class="mt-3">
@@ -134,8 +134,13 @@
               Reference {{loop.index}}
             </div>
             <div class="card-body pt-0">
+              {% if 'generated_response' in doc.metadata%}
+              <strong>Generated Response</strong>
+              <p>{{doc.metadata['generated_response']}}</p>
+              {% endif %}
               <zero-md>
                 <template>
+                  <!-- Define your own styles inside a `<style>` tag -->
                   <style>
                     em {
                       font-style: normal;
@@ -143,14 +148,33 @@
                     }
                   </style>
                 </template>
-                <script type="text/markdown">{{doc['text']}}</script>
+                <script type="text/markdown">{{doc.page_content}}</script>
               </zero-md>
-              {% if doc['relate'] %}
+              {% if 'keep_reason' in doc.metadata %}
               <strong>Is this document relevant?</strong>
-              <p>{{doc['relate']}}</p>
+              <p> {{doc.metadata['keep_reason']}} </p>
               {% endif %}
               <strong>Source</strong>
-              <p>Url: <a href="{{doc['url']}}">{{doc['url']}}</a></p>
+              {% if 'source' in doc.metadata %}
+              <p> {{doc.metadata['source']}} </p>
+              {% endif %}
+              <p>Url: <a href="{{doc.metadata['url']}}">{{doc.metadata['url']}}</a></p>
+              {% if 'related_links' in doc.metadata and doc.metadata['related_links']|length > 0 %}
+              <strong>
+                Relevant Links
+              </strong>
+              <ul>
+                {% for title,link,doc_id in doc.metadata['related_links'] %}
+                <li>
+                  <p>{{title}}: <a href="{{link}}">{{link}}</a></p>
+                  {% if doc_id %}
+                  <button id="ask" type="submit" class="btn btn-outline-secondary" onclick="post_form({{doc_id}})">Ask
+                    Cali about this link</button>
+                  {% endif %}
+                </li>
+                {% endfor %}
+              </ul>
+              {% endif %}
             </div>
           </div>
           {% endfor %}
@@ -177,14 +201,17 @@
                         }
                       </style>
                     </template>
-                    <script type="text/markdown">{{doc['text']}}</script>
+                    <script type="text/markdown">{{doc.page_content}}</script>
                   </zero-md>
-                  {% if doc['relate'] %}
+                  {% if 'keep_reason' in doc.metadata %}
                     <strong>Is this document relevant?</strong>
-                    <p>{{doc['relate']}}</p>
+                    <p> {{doc.metadata['keep_reason']}} </p>
                     {% endif %}
                     <strong>Source</strong>
-                    <p>Url: <a href="{{doc['url']}}">{{doc['url']}}</a></p>
+                    {% if 'source' in doc.metadata %}
+                    <p> {{doc.metadata['source']}} </p>
+                    {% endif %}
+                    <p>Url: <a href="{{doc.metadata['url']}}">{{doc.metadata['url']}}</a></p>
                   </div>
                 </div>
               </div>
@@ -198,6 +225,7 @@
 <script type="text/javascript">
   let form_params = {{ form | tojson | safe}}
 
+  // <![CDATA[
   function post_form(doc_id) {
     path = window.location.pathname
     path += '?doc=' + doc_id
@@ -235,6 +263,8 @@
       $("#feedback-hidden-helpful").val(feedbackToggleVal)
     });
   });
+  
+  // ]]>
 </script>
 </body>
 </html>

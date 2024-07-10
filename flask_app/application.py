@@ -89,7 +89,6 @@ def get_docs(query_embedding, number):
     # Get RDS connection
     try:
         conn = initialize_module.return_connection()
-        curr = conn.cursor()
     except Exception as e:
         print(f"Error: {str(e)}")
         return []
@@ -99,15 +98,19 @@ def get_docs(query_embedding, number):
         cur = conn.cursor()
         # Get the top N most similar documents using the KNN <=> operator
         cur.execute(f"""
-                        SELECT url, text
-                        FROM test_embeddings
+                        SELECT doc_id, url, titles, text, links
+                        FROM phase_2_embeddings
                         ORDER BY embedding <=> %s
                         LIMIT {number}
                     """, (embedding_array,))
         results = cur.fetchall()
         # Each item in list will be a dictionary with key values 'url' and 'text'
         for result in results:
-            doc_dict = {"url": result[0], "text": result[1]}
+            doc_dict = doc_dict = {"doc_id": result[0],
+                        "url": result[1],
+                        "titles": result[2],
+                        "text": result[3],
+                        "links": result[4]}
             top_docs.append(doc_dict)
         cur.close()
     except Exception as e:
@@ -156,7 +159,12 @@ def check_if_documents_relates(docs, user_prompt, llm):
                 """
         response = llm.invoke(prompt).strip()
 
-        doc_info = {"url": doc['url'], "text": doc['text'], "relate": response}
+        doc_info = {"doc_id": doc['doc_id'],
+                    "url": doc['url'],
+                    "titles": doc['titles'],
+                    "text": doc['text'],
+                    "links": doc['links'],
+                    "relate": response}
         doc_relates.append(doc_info)
 
     return doc_relates
@@ -177,7 +185,7 @@ def answer_prompt(user_prompt, number_of_docs):
                         model_id=LLAMA_3_8B
                     )
 
-    system_prompt = "You are a helpful UBC student advising assistant who answers with kindness while being concise. Only generate one human readable answer"
+    system_prompt = "You are a helpful UBC student advising assistant who answers with kindness while being concise."
 
     if llm.model_id == LLAMA_3_8B or llm.model_id == LLAMA_3_70B:
         prompt = f"""
@@ -246,36 +254,19 @@ async def answer():
     formatted_question += question
 
     response = answer_prompt(formatted_question, 5)
-        
-    # # Neatly format the response in a JSON for debugging purposes
-    # formatted_response = {
-    #     "answer": response["answer"],
-    #     "related_documents": []
-    # }
 
-    # for doc in response["docs"]:
-    #     formatted_response["related_documents"].append({
-    #         "url": doc["url"],
-    #         "text": doc["text"],
-    #         "related": doc["relate"]
-    #     })
-    
-    # for doc in response["additional_docs"]:
-    #     formatted_response["related_documents"].append({
-    #         "url": doc["url"],
-    #         "text": doc["text"],
-    #         "related": doc["relate"]
-    #     })
-
-    # return json.dumps(formatted_response, indent=4)
+    # Get the answer returned by the LLM
+    main_response = response["answer"]
+    # Get the documents used to help generate the answer
+    docs = response["docs"]
 
     # Log the question
     context_str = ' : '.join([value for value in list(program_info.values()) + [topic] if len(value) > 0])
-    # log_question(question, context_str, main_response, [doc.metadata['doc_id'] for doc in docs])
+    log_question(question, context_str, main_response, [doc['doc_id'] for doc in docs])
     
     # Render the results
-    return render_template('ans.html',title=app_title,question=question,context=context_str,docs=response["docs"],
-                           form=request.form.to_dict(), main_response=response["answer"],
+    return render_template('ans.html',title=app_title,question=question,context=context_str,docs=docs,
+                           form=request.form.to_dict(), main_response=main_response,
                            removed_docs=response["removed_docs"], last_updated=last_updated_time)
 
 @application.route('/feedback', methods=['POST'])
