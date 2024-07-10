@@ -12,16 +12,26 @@ import sys
 sys.path.append('..')
 
 # Imports
-from flask import Flask, request, render_template, Response
+from flask import Flask, request, render_template, Response, redirect, url_for, session
 import json
-import os 
+import os
 import numpy as np
 import ast
 from typing import List
-from importlib import reload 
+from importlib import reload
 from aws_helpers.rds_tools import execute_and_fetch
 from langchain_community.embeddings.bedrock import BedrockEmbeddings
 from langchain_aws import BedrockLLM
+from flask_session import Session
+from aws_helpers.param_manager import get_param_manager
+
+### LOAD AWS CONFIG
+param_manager = get_param_manager()
+
+# Additional Constants for Authentication
+VALID_USERNAME = param_manager.get_parameter("USERNAME")
+VALID_PASSWORD = param_manager.get_parameter("PASSWORD")
+SESSION_TYPE = 'filesystem'
 
 ### Constants
 FACULTIES_PATH = os.path.join('data','documents','faculties.json')
@@ -42,6 +52,11 @@ faculties = {}
 last_updated_time = None
 initialize_module = None
 store_feedback_module = None
+
+# Session Configuration
+application.config["SESSION_PERMANENT"] = False
+application.config["SESSION_TYPE"] = SESSION_TYPE
+Session(application)
 
 # Helper functions
 def read_text(filename: str, as_json = False):
@@ -215,7 +230,35 @@ def answer_prompt(user_prompt, number_of_docs):
 
     return {"answer": answer, "docs": check_docs, "removed_docs": check_removed_docs}
         
+# Authentication decorator
+def login_required(f):
+    def wrap(*args, **kwargs):
+        if 'logged_in' not in session:
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    wrap.__name__ = f.__name__
+    return wrap
+
+@application.route('/login', methods=['GET', 'POST'])
+def login():
+    error = None
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        if username != VALID_USERNAME or password != VALID_PASSWORD:
+            error = 'Invalid Credentials. Please try again.'
+        else:
+            session['logged_in'] = True
+            return redirect(url_for('home'))
+    return render_template('login.html', error=error)
+
+@application.route('/logout')
+def logout():
+    session.pop('logged_in', None)
+    return redirect(url_for('login'))
+
 @application.route('/', methods=['GET'])
+@login_required
 def home():
     if not initialize_module:
         # App is not yet initialized
@@ -290,6 +333,7 @@ async def feedback():
     return render_template('feedback.html',title=app_title)
 
 @application.route('/initialize', methods=['GET'])
+@login_required
 def initialize():
     """
     Imports files and runs all initial setup of the app

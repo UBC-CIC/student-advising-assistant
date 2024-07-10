@@ -1,5 +1,6 @@
 pandas
 flask
+flask-session
 gunicorn
 langchain
 langchain-aws
