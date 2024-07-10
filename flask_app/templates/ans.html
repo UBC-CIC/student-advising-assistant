@@ -131,6 +131,9 @@
               Reference {{loop.index}}
             </div>
             <div class="card-body pt-0">
+              {% if doc['titles'] %}
+              <p>The following reference is about {{doc['titles'] | join(' -> ')}}</p>
+              {% endif %}
               <zero-md>
                 <template>
                   <!-- Define your own styles inside a `<style>` tag -->
@@ -178,6 +181,9 @@
               </h2>
               <div id="filtered-collapse{{loop.index}}" class="accordion-collapse collapse" aria-labelledby="filtered-heading{{loop.index}}" data-bs-parent="#removed-docs-accordion">
                 <div class="accordion-body">
+                  {% if doc['titles'] %}
+                  <p>The following reference is about {{doc['titles'] | join(' -> ')}}</p>
+                  {% endif %}
                   <zero-md>
                     <template>
                       <style>

@@ -124,7 +124,7 @@ def get_docs(query_embedding, number):
         for result in results:
             doc_dict = doc_dict = {"doc_id": result[0],
                         "url": result[1],
-                        "titles": result[2],
+                        "titles": ast.literal_eval(result[2]),
                         "text": result[3],
                         "links": ast.literal_eval(result[4])}
             top_docs.append(doc_dict)
