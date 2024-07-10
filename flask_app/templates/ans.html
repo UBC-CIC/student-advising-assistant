@@ -143,6 +143,10 @@
                 </template>
                 <script type="text/markdown">{{doc['text']}}</script>
               </zero-md>
+              {% if doc['relate'] %}
+              <strong>Is this document relevant?</strong>
+              <p> {{doc['relate']}} </p>
+              {% endif %}
               <strong>Source</strong>
               <p>Url: <a href="{{doc['url']}}">{{doc['url']}}</a></p>
               {% if doc['links'] %}
@@ -185,6 +189,10 @@
                     </template>
                     <script type="text/markdown">{{doc['text']}}</script>
                   </zero-md>
+                  {% if doc['relate'] %}
+                  <strong>Is this document relevant?</strong>
+                  <p> {{doc['relate']}} </p>
+                  {% endif %}
                   <strong>Source</strong>
                   <p>Url: <a href="{{doc['url']}}">{{doc['url']}}</a></p>
                   {% if doc['links'] %}
