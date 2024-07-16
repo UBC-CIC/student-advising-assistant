@@ -185,6 +185,18 @@ def answer_prompt(user_prompt, number_of_docs):
     # Initialize the Bedrock Embeddings model
     embeddings = BedrockEmbeddings()
 
+    # Validate user_input
+    if not isinstance(user_prompt, str):
+        raise ValueError("user_input must be a string")
+    if not user_prompt.strip():
+        raise ValueError("user_input cannot be empty")
+    
+    # Validate number_of_docs
+    if not isinstance(number_of_docs, int):
+        raise ValueError("number_of_docs must be an integer")
+    if number_of_docs < 1:
+        raise ValueError("number_of_docs must be greater than 0")
+
     docs = get_docs(embeddings.embed_query(user_prompt), number_of_docs)
 
     divided_docs = split_docs(docs)

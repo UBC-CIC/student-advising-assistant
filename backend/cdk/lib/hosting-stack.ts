@@ -91,6 +91,7 @@ export class HostingStack extends cdk.Stack {
         blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
         publicReadAccess: false,
         removalPolicy: cdk.RemovalPolicy.DESTROY,
+        enforceSSL: true,
       });
     }
 
@@ -132,18 +133,15 @@ export class HostingStack extends cdk.Stack {
       iam.ManagedPolicy.fromAwsManagedPolicyName("SecretsManagerReadWrite")
     );
 
-    const instanceProfName = "beanstalk-ec2-instance-profile"
-    let instanceProfile = iam.InstanceProfile.fromInstanceProfileName(this, instanceProfName, instanceProfName)
-    if (!instanceProfile.instanceProfileName) {
-      instanceProfile = new iam.InstanceProfile(
-        this,
-        instanceProfName,
-        {
-          role: ec2IamRole,
-          instanceProfileName: instanceProfName,
-        }
-      );
-    }
+    const instanceProfName = "beanstalk-ec2-instance-profile-1"
+    let instanceProfile = new iam.InstanceProfile(
+      this,
+      instanceProfName,
+      {
+        role: ec2IamRole,
+        instanceProfileName: instanceProfName,
+      }
+    );
 
     const appName = "student-advising-demo-app";
     const app = new elasticbeanstalk.CfnApplication(
@@ -171,7 +169,7 @@ export class HostingStack extends cdk.Stack {
     appVersionProps.node.addDependency(appDeploymentZip);  
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const cnamePrefix = "student-advising-demo"; // Prefix for the web app's url
+    const cnamePrefix = "student-advising-demo-aman"; // Prefix for the web app's url
     const elbEnv = new elasticbeanstalk.CfnEnvironment(this, "Environment", {
       environmentName: "student-advising-demo-app-env",
       cnamePrefix: cnamePrefix,

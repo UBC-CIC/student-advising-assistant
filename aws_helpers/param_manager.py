@@ -25,12 +25,6 @@ class ParamManager():
         dev_mode = 'MODE' in os.environ and os.environ.get('MODE') == 'dev'
         self.region = os.environ.get("AWS_DEFAULT_REGION")
         
-        # Debug: Print environment variables
-        print("AWS_ACCESS_KEY_ID:", os.environ.get("AWS_ACCESS_KEY_ID"))
-        print("AWS_SECRET_ACCESS_KEY:", os.environ.get("AWS_SECRET_ACCESS_KEY"))
-        print("AWS_SESSION_TOKEN:", os.environ.get("AWS_SESSION_TOKEN"))
-        print("AWS_DEFAULT_REGION:", self.region)
-        
         if dev_mode:
             self.prefix += '/dev'
         
@@ -52,7 +46,7 @@ class ParamManager():
         try:
             get_secret_value_response = self.secret_client.get_secret_value(SecretId=secret_id)
         except ClientError as e:
-            print(f"Error getting secret '{secret_id}': {e}")
+            print(f"Error getting secret: {e}")
             raise e
         
         # Decrypts secret using the associated KMS key.

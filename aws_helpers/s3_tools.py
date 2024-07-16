@@ -34,19 +34,38 @@ def download_s3_directory(directory: str, s3_client = default_client, output_pre
     """
     if not os.path.exists(output_prefix):
         os.mkdir(output_prefix)
-    
-    for obj in s3_client.list_objects_v2(Bucket=bucket_name, StartAfter=f"{directory}/", Prefix=f"{directory}/")['Contents']:
-        directory_list = obj['Key'].split(f"{directory}/")[-1].split('/')
-        out_path = os.path.join(output_prefix,*directory.split('/'),*directory_list)
-        dirpath =  os.path.dirname(out_path)
-        if os.path.exists(out_path):
-            if os.path.getmtime(out_path) >= obj['LastModified'].timestamp():
-                log.info(f"Skipping '{obj['Key']}', no changes since last download to '{out_path}'")
-                continue
-        if not os.path.exists(dirpath):
-            os.makedirs(dirpath, exist_ok=True)
-        log.info(f"Downloading '{obj['Key']}' to '{out_path}'")
-        s3_client.download_file(bucket_name, obj['Key'], out_path)
+
+    continuation_token = None
+    while True:
+
+        list_kwargs = {
+                'Bucket': bucket_name,
+                'StartAfter': f"{directory}/",
+                'Prefix': f"{directory}/",
+            }
+        
+        if continuation_token:
+            list_kwargs['ContinuationToken'] = continuation_token
+                
+        response = s3_client.list_objects_v2(**list_kwargs)
+        
+        for obj in response['Contents']:
+            directory_list = obj['Key'].split(f"{directory}/")[-1].split('/')
+            out_path = os.path.join(output_prefix,*directory.split('/'),*directory_list)
+            dirpath =  os.path.dirname(out_path)
+            if os.path.exists(out_path):
+                if os.path.getmtime(out_path) >= obj['LastModified'].timestamp():
+                    log.info(f"Skipping '{obj['Key']}', no changes since last download to '{out_path}'")
+                    continue
+            if not os.path.exists(dirpath):
+                os.makedirs(dirpath, exist_ok=True)
+            log.info(f"Downloading '{obj['Key']}' to '{out_path}'")
+            s3_client.download_file(bucket_name, obj['Key'], out_path)
+        
+        if 'NextContinuationToken' not in response:
+            break
+
+        continuation_token = response['NextContinuationToken']
         
 def upload_directory_to_s3(directory: str, s3_client = default_client, bucket_name: str = default_bucket_name):
 

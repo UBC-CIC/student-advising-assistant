@@ -53,6 +53,7 @@ export class InferenceStack extends Stack {
       publicReadAccess: false,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       encryption: s3.BucketEncryption.S3_MANAGED,
+      enforceSSL: true,
     });
 
     // Create the SSM parameter with the string value representing the S3 bucket name

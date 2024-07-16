@@ -1,7 +1,7 @@
 """
 Entry point script for document embedding and upload to index
 Depending on the value of the SSM Parameter '/student-advising/dev/retriever/RETRIEVER_NAME',
-will upload embedded documents either to RDS
+will upload embedded documents to RDS
 
 Requires that the associated secret credentials are supplied in secrets manager:
 - RDS: student-advising/credentials/RDSCredentials
@@ -31,7 +31,10 @@ else:
 
 try:
     if retriever_name == "pgvector":
-        subprocess.run(["python", "rds_combined_script.py", *args])
+        command = ["python", "rds_combined_script.py"] + args
+        # Ensure that the arguments are sanitized and valid
+        safe_args = [str(arg) for arg in args]
+        subprocess.run(command + safe_args, check=True)
     else:
         raise ValueError(f"Unsupported retriever type '{retriever_name}', supported type is 'pgvector'.")
 except Exception as e:
@@ -47,7 +50,7 @@ execute_and_commit(sql)
 
 # Ping the Flask app to initialize
 app_url = param_manager.get_parameter('BEANSTALK_URL')
-initialize_url = 'http://' + app_url + '/initialize'
+initialize_url = app_url + '/initialize'
 
 print(f"Formatted URL: {initialize_url}")
 
