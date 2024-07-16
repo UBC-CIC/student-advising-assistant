@@ -12,7 +12,6 @@ import shutil
 import pathlib
 import ast
 import doc_loader
-import batcher
 import torch
 from combined_embeddings import concat_embeddings
 import sys
@@ -23,7 +22,7 @@ from aws_helpers.s3_tools import download_s3_directory, upload_directory_to_s3
 from aws_helpers.ssh_forwarder import start_ssh_forwarder
 
 ### CONFIGURATION
-# AWS Secrets Manager config for the Pinecone secret API key and region
+# AWS Secrets Manager config for the RDS secret
 secret_name = "credentials/RDSCredentials"
 param_manager = get_param_manager()
 

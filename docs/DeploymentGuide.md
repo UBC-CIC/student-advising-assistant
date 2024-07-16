@@ -6,8 +6,7 @@
   - [Table of Contents](#table-of-contents)
   - [Requirements](#requirements)
   - [Pre-Deployment](#pre-deployment)
-    - [Customize Static Website Content](#customize-static-website-content)
-    - [Set Up Pinecone Index **(Optional)**](#set-up-pinecone-index-optional)
+    - [Customize Static Website Content](#customize-static-website-content)    
   - [Deployment](#deployment)
     - [Step 1: Clone The Repository](#step-1-clone-the-repository)
     - [Step 2: CDK Deployment](#step-2-cdk-deployment)
@@ -73,31 +72,6 @@ The files under `/flask_app/static` are customizable:
 }
 ```
 
-### Set Up Pinecone Index **(Optional)**
-This step is only necessary if you choose to use the Pinecone retriever instead of PGVector.
-
-1. Sign up for a [Pinecone.io](https://www.pinecone.io/) account
-2. From the Pinecone console, click 'API Keys', and either create a new key or take note of the environment and value of the 'default' key
-![Pinecone API Key](./images/pinecone_api_key.png)
-3. Run the following command, replacing the values between '<>'
-
-```bash
-aws secretsmanager create-secret \
-    --name student-advising/retriever/PINECONE \
-    --description "API key and region for Pinecone.io account" \
-    --secret-string "{\"PINECONE-KEY\":\"<api key>\",\"PINECONE-REGION\":\"<region>\"}" \
-    --profile <profile-name>
-```
-- You should replace `<api key>` with the Pinecone api key value from step 2, and `<region>` with the environment from step 2
-- For example, with the api key `1000`, region `us`, and profile name `profile`:
-```bash
-aws secretsmanager create-secret \
-    --name student-advising/retriever/PINECONE \
-    --description "API key and region for Pinecone.io account" \
-    --secret-string "{\"PINECONE-KEY\":\"1000\",\"PINECONE-REGION\":\"us\"}" \
-    --profile profile
-``` 
-
 ## Deployment 
 
 ### Step 1: Clone The Repository
@@ -145,10 +119,8 @@ The configuration options are in the `/backend/cdk/config.json` file. By default
     "llm_mode": "ec2"
 }
 ```
-- `retriever_type` allowed values: "pgvector", "pinecone"
+- `retriever_type` allowed values: "pgvector"
 - `llm_mode` allowed values: "ec2", "sagemaker", "none"
-
-If you chose to use Pinecone.io retriever, replace the `"pgvector"` value with `"pinecone"`.
 
 If you would prefer not to deploy the LLM, replace the `"ec2"` value with `"none"`. The system will not deploy a LLM endpoint, and it will return references from the information sources only, without generated responses. 
 

@@ -1,11 +1,9 @@
 """
 Entry point script for document embedding and upload to index
 Depending on the value of the SSM Parameter '/student-advising/dev/retriever/RETRIEVER_NAME',
-will upload embedded documents either to Pinecone or RDS
+will upload embedded documents either to RDS
 
 Requires that the associated secret credentials are supplied in secrets manager:
-- Pinecone: student-advising/dev/retriever/PINECONE
-    - keys: PINECONE_KEY, PINECONE_REGION
 - RDS: student-advising/credentials/RDSCredentials
 
 Note: If using for RDS, this must be run within the same VPC
@@ -32,12 +30,10 @@ else:
     args.append("--no-gpu_available")
 
 try:
-    if retriever_name == "pinecone":
-        subprocess.run(["python", "pinecone_combined_script.py", *args])
-    elif retriever_name == "pgvector":
+    if retriever_name == "pgvector":
         subprocess.run(["python", "rds_combined_script.py", *args])
     else:
-        raise ValueError(f"Unsupported retriever type '{retriever_name}', supported types are 'pinecone' and 'pgvector'.")
+        raise ValueError(f"Unsupported retriever type '{retriever_name}', supported type is 'pgvector'.")
 except Exception as e:
     raise e
 

@@ -79,9 +79,9 @@ Since a disproportionate amount of the ‘meaning’ of an extract is expressed 
 
 **Vector Store**
 
-After computing the embeddings for each extract, the system uploads them to a vector store, which is a database designed to store vector embeddings. The system supports two choices of vector stores: RDS with pgvector, or Pinecone.io (see [Document Retrieval](#document-retrieval) for more details).
+After computing the embeddings for each extract, the system uploads them to a vector store, which is a database designed to store vector embeddings. The system supports two choices of vector stores: RDS with pgvector (see [Document Retrieval](#document-retrieval) for more details).
 
-Both services can perform similarity search, hybrid search, and metadata filtering. RDS is more integrated with the AWS CDK and thus easier to deploy, while Pinecone offers a free-tier hosted service which is sufficient to contain up to 50,000 extracts. Both services are scalable.
+RDS supports similarity search, hybrid search, and metadata filtering while being scalable. It is integrated with the AWS CDK and thus easy to deploy.
 
 The system uploads the vector embeddings with a set of metadata such as titles, text content (un-embedded), and url.
 
@@ -94,15 +94,11 @@ At the front end of the question answering system, a user enters a question, and
 **Semantic Search**
 The system combines the user-inputted context with the question and embeds the text. The embedded text is sent to the vectorstore to perform a search for semantically similar extracts using the embedded query. The semantic search filters on metadata for faculty and/or program, if provided, so that only extracts within the user’s selected faculty and/or program will be returned. If the user includes their specialization and year level, this is included in the query used for semantic search, but the system does not strictly filter extracts on these fields.
 
-See below for more details depending on the chosen retriever: pgvector or Pinecone.
+See below for more details depending on the chosen retriever: pgvector.
 ___
 **RDS with pgvector**
 
-If the admin chose to use the pgvector retriever, then the embedded query is sent to the RDS DB and compared with all vectors in the DB by cosine similarity search. If the user provides their faculty and/or program, only entries matching the faculty and program are returned. 
-___
-**Pinecone.io**
-
-If the admin chose to use the Pinecone retriever, then the system also computes the BM25 sparse vector of the query, then sends both the sparse and dense (embedded) vectors for the query to Pinecone servers via the Pinecone API. Pinecone performs hybrid search over the vectorstore, by combining the dot product similarity scores of the sparse and dense vectors. The advantage of the hybrid search is that it takes into account both semantic similarity (dense vector) and keyword similarity (sparse vector).
+If the admin chose to use the pgvector retriever, then the embedded query is sent to the RDS DB and compared with all vectors in the DB by cosine similarity search. If the user provides their faculty and/or program, entries matching the faculty and program are more likely to be returned.
 ___
 
 **LLM Filter**
@@ -242,7 +238,7 @@ Information related to VPC networking specifications can be separately found [he
 
 1. A user (eg. a student) interacts with the web UI of the application hosted on AWS Elastic Beanstalk, and submits a query. 
 2. Using semantic search over the embedded documents in the Amazon RDS PostgreSQL database, the app fetches documents that are most closely related to the user’s query.
-    1. The diagram illustrates the case where documents are stored in Amazon RDS. In the case that the system is using the Pinecone retriever, the app would instead make a request to the Pinecone.io API.
+    1. The diagram illustrates the case where documents are stored in Amazon RDS.
 3. The app invokes a [HuggingFace Text Generation Inference Endpoint](https://github.com/huggingface/text-generation-inference) hosted on an EC2 Instance, prompting it to respond to the user’s query using the retrieved documents from step 2 as context. It then displays the response and the reference documents to the user in the web UI.
 4. The system logs all questions and answers, storing them in the Amazon RDS PostgreSQL database by making a request to an AWS Lambda Function as a proxy. Users can provide feedback to help improve the solution, which is also stored in the Amazon RDS PostgreSQL database using the AWS Lambda Function.
 
@@ -251,7 +247,7 @@ Information related to VPC networking specifications can be separately found [he
 5. When an Admin wants to configure the underlying settings of the data processing pipeline (eg. website scraping settings), they can modify and upload a config file to the predetermined folder on an Amazon S3 Bucket.
 6. The S3 Bucket triggers an invocation of an AWS Lambda Function to start a Task with the container cluster on Amazon ECS.
 7. This container cluster starts a Task that first performs web scraping of the configured websites, then processes the pages into extracts, and computes the vector embedding of the extracts. Finally, it stores the embeddings in the Amazon RDS PostgreSQL database (with pgvector support enabled). The Task is also scheduled to run every 4 months by default with a CRON-expression scheduler. An Admin/Developer can modify the schedule on-demand via the ECS console.
-    1. The diagram illustrates the case where documents are stored in Amazon RDS. In the case that the system is using the Pinecone retriever, the Task would instead send the embedded extracts to the Pinecone API.
+    1. The diagram illustrates the case where documents are stored in Amazon RDS.
 
 ## Database Schema
 

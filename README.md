@@ -71,7 +71,7 @@ For instructions on how to develop the application, refer to the [Developer Guid
     - `/filters`: Classes relating to document filters
     - `/llms`: Classes relating to LLMs, adapters to connect to LLMs, and helpers to load LLMs
     - `/prompts`: Prompt template definitions
-    - `/retrievers`: Retriever classes for PGVector and Pinecone
+    - `/retrievers`: Retriever classes for PGVector
     - `/static`: Static web content as .md or .json
     - `/templates`: HTML files with Jinja2 templates for the web app's pages
 6. `/misc`: Contains various other useful scripts, contents described in the [Developer Guide](./docs/DeveloperGuide.md)

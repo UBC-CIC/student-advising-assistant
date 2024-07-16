@@ -11,7 +11,3 @@ sshtunnel
 # PGVector requirements
 pgvector
 psycopg2-binary
-
-# Pinecone requirements
-pinecone-client
-pinecone-text

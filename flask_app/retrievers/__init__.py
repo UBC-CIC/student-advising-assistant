@@ -1,12 +1,10 @@
 from .base import Retriever
-from .pinecone_retriever import PineconeRetriever
 from .pgvector_retriever import PGVectorRetriever, PGVector
 from aws_helpers.param_manager import get_param_manager
 from aws_helpers.rds_tools import start_ssh_forwarder
 
 # Names of AWS secret manager secrets for each supported retriever type
-RETRIEVER_SECRETS = { 
-    'pinecone': 'retriever/PINECONE',
+RETRIEVER_SECRETS = {
     'pgvector': 'credentials/RDSCredentials'
 }
     
@@ -14,17 +12,14 @@ def load_retriever(retriever_name: str, dev_mode: bool = False, **kwargs) -> Ret
     """
     Loads a supported retriever type
     Requires that the associated secrets are set in AWS secret manager
-    - retriever_name: 'pinecone' or 'pgvector'
+    - retriever_name: 'pgvector'
     - dev_mode: if true, tries to use a workaround for local development
                 when connecting to a rds database (for pgvector)
     """
     param_manager = get_param_manager()
     secret = param_manager.get_secret(RETRIEVER_SECRETS[retriever_name])
     
-    if retriever_name == 'pinecone':
-        print('Using pinecone retriever')
-        return PineconeRetriever(secret['PINECONE_KEY'], secret['PINECONE_REGION'], **kwargs)
-    elif retriever_name == 'pgvector':
+    if retriever_name == 'pgvector':
         print('Using pgvector retriever')
         forwarder_port = None
         if dev_mode:
