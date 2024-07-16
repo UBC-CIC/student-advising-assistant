@@ -227,7 +227,7 @@ This section provides an overview of the AWS components used in the system archi
 
 ## Architecture Diagram 
 
-![Architecture Diagram](./images/ArchiectureDiagram-EC2-tgi-inference.drawio.png)
+![Architecture Diagram](./images/ArchitectureDiagram-Phase-2.drawio.png)
 
 **Amazon Virtual Private Cloud (VPC)**
 Various components of the infrastructure are placed inside a VPC for a more isolated and secure cloud environment.
