@@ -31,6 +31,7 @@ param_manager = get_param_manager()
 # Additional Constants for Authentication
 VALID_USERNAME = param_manager.get_parameter("USERNAME")
 VALID_PASSWORD = param_manager.get_parameter("PASSWORD")
+MODEL_NAME = param_manager.get_parameter(['generator','MODEL_NAME'])
 SESSION_TYPE = 'filesystem'
 
 ### Constants
@@ -38,12 +39,6 @@ FACULTIES_PATH = os.path.join('data','documents','faculties.json')
 TITLE_PATH = os.path.join('static','app_title.txt')
 DEFAULTS_PATH = os.path.join('static','defaults.json')
 DEV_MODE = 'MODE' in os.environ and os.environ.get('MODE') == 'dev'
-
-# Defining Constants for LLMs
-LLAMA_3_8B = "meta.llama3-8b-instruct-v1:0"
-LLAMA_3_70B = "meta.llama3-70b-instruct-v1:0"
-MISTRAL_7B = "mistral.mistral-7b-instruct-v0:2"
-MISTRAL_LARGE = "mistral.mistral-large-2402-v1:0"
 
 ### Globals (set upon load)
 application = Flask(__name__)
@@ -154,7 +149,7 @@ def check_if_documents_relates(docs, user_prompt, llm):
 
     doc_relates = []
     for doc in docs:
-        if llm.model_id == LLAMA_3_8B or llm.model_id == LLAMA_3_70B:
+        if MODEL_NAME == "meta.llama3-8b-instruct-v1:0" or MODEL_NAME == "meta.llama3-70b-instruct-v1:0":
             prompt = f"""
                 <|begin_of_text|>
                 <|start_header_id|>system<|end_header_id|>
@@ -198,12 +193,12 @@ def answer_prompt(user_prompt, number_of_docs):
 
     # Get the LLM we want to invoke
     llm = BedrockLLM(
-                        model_id=LLAMA_3_8B
+                        model_id = MODEL_NAME
                     )
 
     system_prompt = "You are a helpful UBC student advising assistant who answers with kindness while being concise."
 
-    if llm.model_id == LLAMA_3_8B or llm.model_id == LLAMA_3_70B:
+    if MODEL_NAME == "meta.llama3-8b-instruct-v1:0" or MODEL_NAME == "meta.llama3-70b-instruct-v1:0":
         prompt = f"""
             <|begin_of_text|>
             <|start_header_id|>system<|end_header_id|>

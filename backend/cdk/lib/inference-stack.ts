@@ -320,7 +320,13 @@ export class InferenceStack extends Stack {
       }
     );
 
-    // LLM configuration
+    /*
+     LLM configuration: Can choose any of the following models
+     - Llama 3 8B:     "meta.llama3-8b-instruct-v1:0"
+     - Llama 3 70B:    "meta.llama3-70b-instruct-v1:0"
+     - Mistral 7B:     "mistral.mistral-7b-instruct-v0:2"
+     - Mistral Large:  "mistral.mistral-large-2402-v1:0"
+    */
     const MODEL_NAME = "meta.llama3-8b-instruct-v1:0";
 
     if (config.llm_mode == "sagemaker") {
