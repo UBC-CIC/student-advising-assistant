@@ -239,7 +239,7 @@ Information related to VPC networking specifications can be separately found [he
 1. A user (eg. a student) interacts with the web UI of the application hosted on AWS Elastic Beanstalk, and submits a query. 
 2. Using semantic search over the embedded documents in the Amazon RDS PostgreSQL database, the app fetches documents that are most closely related to the user’s query.
     1. The diagram illustrates the case where documents are stored in Amazon RDS.
-3. The app invokes a [HuggingFace Text Generation Inference Endpoint](https://github.com/huggingface/text-generation-inference) hosted on an EC2 Instance, prompting it to respond to the user’s query using the retrieved documents from step 2 as context. It then displays the response and the reference documents to the user in the web UI.
+3. The app makes an API Request to a model hosted on Amazon Bedrock, prompting it to respond to the user’s query using the retrieved documents from step 2 as context. The app then displays the response and the reference documents to the user in the web UI.
 4. The system logs all questions and answers, storing them in the Amazon RDS PostgreSQL database by making a request to an AWS Lambda Function as a proxy. Users can provide feedback to help improve the solution, which is also stored in the Amazon RDS PostgreSQL database using the AWS Lambda Function.
 
 **Data Processing**

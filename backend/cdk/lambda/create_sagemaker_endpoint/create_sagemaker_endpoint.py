@@ -9,28 +9,37 @@ SM_ROLE_ARN = os.environ["SM_ROLE_ARN"]
 
 sm_client = boto3.client("sagemaker", region_name=SM_REGION)
 
-# Specify the URI for the SageMaker Llama 3 8B Instruct model container
-image_uri = f"339712838191.dkr.ecr.us-west-2.amazonaws.com/sagemaker-llama3-8b-instruct:latest"
+# copy directly from the jumpstart notebook / Model tab on Sagemaker console
+# HuggingFace Text Generation Inference Containers
+# Framework: PyTorch 2.0.0 with HuggingFace TGI, Python v3.9
+# see: https://github.com/aws/deep-learning-containers/blob/master/available_images.md
+image_uri = f"763104351884.dkr.ecr.{SM_REGION}.amazonaws.com/huggingface-pytorch-tgi-inference:2.0.0-tgi0.8.2-gpu-py39-cu118-ubuntu20.04"
 
-MODEL_NAME = os.environ["MODEL_NAME"]
+HF_MODEL_ID = os.environ["HF_MODEL_ID"]
+MODEL_NAME = os.environ["MODEL_NAME"] 
 INSTANCE_TYPE = os.environ["INSTANCE_TYPE"]
 NUM_GPUS = os.environ["NUM_GPUS"]
 SM_ENDPOINT_NAME = os.environ["SM_ENDPOINT_NAME"] # the name of the endpoint that we will create and make request to
 
 # container's env variables (copy from the Jumpstart notebook)
 hub = {
-    'SM_NUM_GPUS': NUM_GPUS,
+    'HF_MODEL_ID': HF_MODEL_ID,
+	'SM_NUM_GPUS': NUM_GPUS,
+    'HF_TASK':'text-generation',
     'MAX_INPUT_LENGTH': json.dumps(1024),  # Max length of input text
     'MAX_TOTAL_TOKENS': json.dumps(2048),  # Max length of the generation (including input text)
     'SAGEMAKER_REGION': SM_REGION,
     'SAGEMAKER_CONTAINER_LOG_LEVEL': json.dumps(20)
 }
 
-model_name = f'{MODEL_NAME}-sagemaker' # identifier
-endpoint_config_name = f'{MODEL_NAME}-endpoint-config' # identifier
+if "HF_API_TOKEN" in os.environ:
+    hub["HF_API_TOKEN"] = os.environ["HF_API_TOKEN"]
+
+model_name = f'{MODEL_NAME}-huggingface' # just an identifier, not the actual full huggingface model card name
+endpoint_config_name = f'{MODEL_NAME}-endpoint-config' # also just an identifier
 
 def lambda_handler(event, context):
-    # Create model
+    #Create model
     try:
         print("Creating Model")
         create_model_response = sm_client.create_model(
@@ -44,7 +53,7 @@ def lambda_handler(event, context):
         print("Model creation finished")
     except ClientError as e:
         print(e.response["Error"]["Message"])
-
+    
     try:
         print("Creating Endpoint Configuration")
         endpoint_config_response = sm_client.create_endpoint_config(
@@ -52,7 +61,7 @@ def lambda_handler(event, context):
             ProductionVariants=[
                 {
                     "VariantName": "variant1", # The name of the production variant.
-                    "ModelName": model_name,
+                    "ModelName": model_name, 
                     "InstanceType": INSTANCE_TYPE, # Specify the compute instance type.
                     "InitialInstanceCount": 1 # Number of instances to launch initially.
                 }
@@ -61,12 +70,12 @@ def lambda_handler(event, context):
         print("Finished creating Endpoint Configuration")
     except ClientError as e:
         print(e.response["Error"]["Message"])
-
+    
     try:
         print("Creating Inference Endpoint")
         create_endpoint_response = sm_client.create_endpoint(
-            EndpointName=SM_ENDPOINT_NAME,
+            EndpointName=SM_ENDPOINT_NAME, 
             EndpointConfigName=endpoint_config_name
-        )
+        ) 
     except ClientError as e:
         print(e.response["Error"]["Message"])
