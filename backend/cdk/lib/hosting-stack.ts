@@ -191,7 +191,7 @@ export class HostingStack extends cdk.Stack {
     appVersionProps.node.addDependency(appDeploymentZip);  
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const cnamePrefix = "student-advising-demo-aman"; // Prefix for the web app's url
+    const cnamePrefix = "student-advising-demo"; // Prefix for the web app's url
     const elbEnv = new elasticbeanstalk.CfnEnvironment(this, "Environment", {
       environmentName: "student-advising-demo-app-env",
       cnamePrefix: cnamePrefix,
