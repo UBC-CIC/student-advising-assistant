@@ -2,7 +2,7 @@ import os
 import psycopg2
 from pgvector.psycopg2 import register_vector
 from aws_helpers.param_manager import get_param_manager
-from aws_helpers.s3_tools import download_single_file
+from aws_helpers.s3_tools import download_s3_directory
 
 # If process is running locally, activate dev mode
 DEV_MODE = 'MODE' in os.environ and os.environ.get('MODE') == 'dev'
@@ -13,16 +13,17 @@ param_manager = get_param_manager()
 # Set variable to represent connection to RDS
 connection = None
 
-def download_faculties_json():
+def download_all_dirs():
     """
-    Downloads the faculties.json file from the documents directory in S3.
+    Downloads the directories from s3 necessary for the flask app
     """
-    s3_key = 'documents/faculties.json'
-    local_path = 'data/documents/faculties.json'
-    download_single_file(s3_key, local_path)
-
-# Download the 'faculties.json' file from S3
-download_faculties_json()
+    # Specify directories to download
+    dirs = ['documents']
+        
+    for dir in dirs:
+        download_s3_directory(dir, output_prefix='data')
+        
+download_all_dirs()
 
 # Get RDS secrets to get connection parameters
 db_secret = param_manager.get_secret("credentials/RDSCredentials")

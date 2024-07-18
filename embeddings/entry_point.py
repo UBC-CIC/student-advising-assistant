@@ -31,7 +31,7 @@ else:
 
 try:
     if retriever_name == "pgvector":
-        command = ["python", "rds_combined_script.py"] + args
+        command = ["python", "rds_data_ingestion.py"] + args
         # Ensure that the arguments are sanitized and valid
         safe_args = [str(arg) for arg in args]
         subprocess.run(command + safe_args, check=True)
@@ -50,7 +50,7 @@ execute_and_commit(sql)
 
 # Ping the Flask app to initialize
 app_url = param_manager.get_parameter('BEANSTALK_URL')
-initialize_url = app_url + '/initialize'
+initialize_url = 'http://' + app_url + '/initialize'
 
 print(f"Formatted URL: {initialize_url}")
 

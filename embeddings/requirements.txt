@@ -4,6 +4,7 @@ huggingface_hub
 transformers
 langchain==0.0.240
 pandas
+numpy
 sentence-transformers
 python-dotenv
 sshtunnel
@@ -11,3 +12,6 @@ sshtunnel
 # PGVector requirements
 pgvector
 psycopg2-binary
+
+# Embeddings requirements
+langchain-community

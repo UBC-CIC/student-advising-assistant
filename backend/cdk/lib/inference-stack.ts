@@ -93,6 +93,17 @@ export class InferenceStack extends Stack {
         resources: ["*"],
       })
     );
+    ecsTaskRole.addToPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          "bedrock:InvokeModel"
+        ],
+        resources: [
+          `arn:aws:bedrock:${this.region}::foundation-model/amazon.titan-embed-text-v1`
+        ]
+      })
+    );
 
     const fargateCluster = new ecs.Cluster(this, "datapipeline-cluster", {
       vpc: vpc,
