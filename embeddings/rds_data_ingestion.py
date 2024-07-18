@@ -191,7 +191,7 @@ try:
 
     # Function to convert string representation of list to numpy array
     def parse_embedding(embedding_str):
-        return np.array(eval(embedding_str))
+        return np.array(ast.literal_eval(embedding_str))
 
     # Apply the function to the embedding column if it's a string
     if isinstance(first_row['embedding'], str):

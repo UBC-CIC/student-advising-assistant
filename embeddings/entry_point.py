@@ -50,7 +50,10 @@ execute_and_commit(sql)
 
 # Ping the Flask app to initialize
 app_url = param_manager.get_parameter('BEANSTALK_URL')
-initialize_url = 'http://' + app_url + '/initialize'
+# Without SSL Certificate, this ping will fail but do not worry!
+# If you only have an HTTP URL, manually add '/initialize' at the end of URL
+# to initialize app after embedding task is complete.
+initialize_url = app_url + '/initialize'
 
 print(f"Formatted URL: {initialize_url}")
 
