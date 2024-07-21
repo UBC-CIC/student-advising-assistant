@@ -62,9 +62,22 @@ export class InferenceStack extends Stack {
       stringValue: inferenceBucket.bucketName, // Replace 'your-s3-bucket-name' with the actual S3 bucket name
     });
 
+    // Define the authorized TCP ports
+    const authorizedTcpPorts = [80, 443];
+
+    // Create a security group
     const clusterSg = new ec2.SecurityGroup(this, "cluster-sg", {
       vpc: vpc,
       allowAllOutbound: true,
+    });
+
+    // Add rules to allow incoming traffic on authorized ports
+    authorizedTcpPorts.forEach(port => {
+      clusterSg.addIngressRule(
+        ec2.Peer.anyIpv4(),
+        ec2.Port.tcp(port),
+        'Allow incoming traffic on port ' + port
+      );
     });
 
     // this role will be used for both task role and task execution role
@@ -421,6 +434,7 @@ export class InferenceStack extends Stack {
         disableInlineRules: true
       });
 
+      // Allow only necessary ports
       ec2SG.addIngressRule(
         ec2.Peer.ipv4(vpcStack.cidr),
         ec2.Port.tcp(22),
