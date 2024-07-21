@@ -108,12 +108,12 @@ def get_docs(query_embedding, number):
     try:
         cur = conn.cursor()
         # Get the top N most similar documents using the KNN <=> operator
-        cur.execute(f"""
+        cur.execute("""
                         SELECT doc_id, url, titles, text, links
                         FROM phase_2_embeddings
                         ORDER BY embedding <=> %s
-                        LIMIT {number}
-                    """, (embedding_array,))
+                        LIMIT %s
+                    """, (embedding_array, number))
         results = cur.fetchall()
         # Each item in list will be a dictionary with key values 'url' and 'text'
         for result in results:
