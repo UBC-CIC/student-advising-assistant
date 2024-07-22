@@ -41,7 +41,7 @@ export class DatabaseStack extends Stack {
     });
 
     // Less privileged user credentials
-    const secretPathUserName = "student-advising-dbUserCredentials";
+    const secretPathUserName = "student-advising/credentials/dbUserCredentials";
     this.secretPathUser = new sm.Secret(this, secretPathUserName, {
       description: "Credentials for the less privileged database user",
       removalPolicy: cdk.RemovalPolicy.DESTROY,

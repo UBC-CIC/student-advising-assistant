@@ -285,7 +285,6 @@ export class InferenceStack extends Stack {
         ],
         resources: [
           `arn:aws:secretsmanager:${this.region}:${this.account}:secret:student-advising/credentials/*`,
-          `arn:aws:secretsmanager:${this.region}:${this.account}:secret:student-advising-dbUserCredentials`,
         ],
       })
     );
