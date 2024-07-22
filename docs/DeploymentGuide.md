@@ -12,6 +12,8 @@
     - [Step 2: CDK Deployment](#step-2-cdk-deployment)
       - [**Extra: Taking down the deployed stacks**](#extra-taking-down-the-deployed-stacks)
     - [Step 3: Uploading the configuration file](#step-3-uploading-the-configuration-file)
+  - [HTTPS URL](#https-url)
+  - [Potential Issues](#potential-issues)
 
 ## Requirements
 
@@ -142,74 +144,6 @@ You may  run the following command to deploy the stacks all at once. Please repl
 cdk deploy --all --profile <profile-name>
 ```
 
-#### **If facing issue where Docker image fails to build or initialization does not work**
-A potential reason this error might be occuring might be due to a missing IAM Role. The Hosting Stack script ```hosting-stack.ts``` assumes you already have this role. In the future, the script will be modified where in the case it is missing, the script will automatically generate it.
-
-Go to the AWS Console, then IAM, and click on Roles. Here, select Create role.
-Select "AWS service" as the Trusted entity type and "EC2" as the Use case. Click on Next and add the following permission policies:
-
-1. AWSElasticBeanstalkMulticontainerDocker
-2. AWSElasticBeanstalkWebTier
-3. AWSElasticBeanstalkWorkerTier
-
-Click on Next, name the role "beanstalk-ec2-instance-profile",  and then click on Create role.
-Go back to IAM and click on Roles again. Select ```beanstalk-ec2-instance-profile``` and click on
-Add permission. A dropdown will appear. Click on Create inline policy. Select JSON and paste the following:
-
-```
-{
-	"Version": "2012-10-17",
-	"Statement": [
-		{
-			"Effect": "Allow",
-			"Action": [
-				"secretsmanager:GetResourcePolicy",
-				"secretsmanager:GetSecretValue",
-				"secretsmanager:DescribeSecret",
-				"secretsmanager:ListSecretVersionIds",
-				"ssm:GetParameter",
-				"ssm:GetParametersByPath",
-				"ssm:DescribeParameters",
-				"s3:ListBucket",
-				"s3:GetObject",
-				"bedrock:InvokeModel"
-			],
-			"Resource": [
-				"arn:aws:secretsmanager:<region>:<account-ID>:secret:<secret-name>",
-				"arn:aws:ssm:<region>:<account_number>:parameter/*",
-				"arn:aws:s3:::<bucket_for_inferencestack>",
-				"arn:aws:s3:::<bucket_for_inferencestack>/*",
-				"arn:aws:bedrock:us-west-2::foundation-model/meta.llama3-70b-instruct-v1:0",
-				"arn:aws:bedrock:us-west-2::foundation-model/meta.llama3-8b-instruct-v1:0"
-			]
-		},
-		{
-			"Effect": "Allow",
-			"Action": [
-				"secretsmanager:ListSecrets",
-				"ssm:DescribeParameters"
-			],
-			"Resource": "*"
-		}
-	]
-}
-```
-
-1. Open a new tab (keep the one you are using to create the inline policy open).
-2. Go to Secrets Manager on the AWS Console.
-3. Click on student-advising/credentials/RDSCredentials.
-4. Replace ```arn:aws:secretsmanager:<region>:<account-ID>:secret:<secret-name>``` in the tab to create the inline policy with the ARN of that secret.
-5. On the other tab, navigate to S3 on the AWS Console.
-6. Click on the ```inferencestack-studentadvisings3bucket...``` bucket.
-7. Replace ```arn:aws:s3:::<bucket_for_inferencestack>``` in the tab to create the inline policy with the ARN of that bucket.
-8. On the tab to create the inline policy, click on Next, provide a name for that policy, and click on Create policy.
-
-This role grants the necessary permissions for our Elastic Beanstalk application to access AWS resources such as Secrets Manager, SSM Parameter Store, and S3 buckets. Without it, we run into issues where the Docker container unexpectedly stops running or the /initialize endpoint leads to an internal server error.
-
-#### **If facing issue that says you are requesting more vCPU capacity than your current limit**
-If you face this issue when trying to delpy the Inference Stack, then you need to submit a Service 
-quota request. Go to Service Quotas through the AWS Console. Click on AWS service on the menu on the left of the screen. Select Amazon Elastic Compute Cloud (Amazon EC2). Search and select "Running Dedicated g5 Hosts" and then click on Request increase at account level. Fill in the appropriate blanks and under New quota value, enter 8 (this was 14 in the script before I took it on, I requested 14 but they gave me 8, the script is already edited to use 8). Type a proper Use case description mentioning where you work and why you need it. They respond within a couple of hours.
-
 #### **Extra: Taking down the deployed stacks**
 
 To take down the deployed stack for a fresh redeployment in the future, navigate to AWS Cloudformation, click on the stack(s) and hit Delete. Please wait for the stacks in each step to be properly deleted before deleting the stack downstream. The deletion order is as followed:
@@ -222,3 +156,52 @@ To take down the deployed stack for a fresh redeployment in the future, navigate
 ### Step 3: Uploading the configuration file
 
 To complete the deployment, you will need to upload a configuration file specifying the websites to scrape for information. Continue with the [User Guide](./UserGuide.md#updating-the-configuration-file) for this step.
+
+## HTTPS URL
+#### **We are using Let's Encrypt to create SSL certificate**
+1. Use Session Manager to connect to ```student-advising-demo-app-env``` EC2 Instance
+2. Once connected, run ```sudo amazon-linux-extras install epel```. This is used on Amazon Linux systems to install the Extra Packages for Enterprise Linux (EPEL) repository
+3. Install Certbot with ```sudo yum install certbot```. Certbot is a tool that automates the process of obtaining and renewing Let's Encrypt certificates
+4. Since we need port 80 to be available, check for open files and network connections using ```sudo lsof -i :80```
+5. If you see something running on port 80, for example nginx, run ```sudo systemctl stop nginx``` to stop the process for now
+6. Run ```sudo certbot certonly --standalone --preferred-challenges http -d student-advising-demo.us-west-2.elasticbeanstalk.com,www.student-advising-demo.us-west-2.elasticbeanstalk.com```. This will helps obtain an SSL certificate for the domain(s) we have specified using Certbot. Answer the prompts the program asks after running the command
+7. To restart the processes stopped in Step 5, for example if nginx was stopped, run ```sudo systemctl start nginx```
+8. When the process in Step 6 completes successfully, you should get a message like this:
+IMPORTANT NOTES:
+ - Congratulations! Your certificate and chain have been saved at:
+   /etc/letsencrypt/live/student-advising-demo.us-west-2.elasticbeanstalk.com/fullchain.pem
+   Your key file has been saved at:
+   /etc/letsencrypt/live/student-advising-demo.us-west-2.elasticbeanstalk.com/privkey.pem
+   Your certificate will expire on 2024-10-10. To obtain a new or
+   tweaked version of this certificate in the future, simply run
+   certbot again. To non-interactively renew *all* of your
+   certificates, run "certbot renew"
+
+These mention where the certificates are saved. To copy the certificates into a preferred location, run the following commands:
+```bash
+sudo cp /etc/letsencrypt/live/student-advising-demo.us-west-2.elasticbeanstalk.com/fullchain.pem /path/to/your/location/
+sudo cp /etc/letsencrypt/live/student-advising-demo.us-west-2.elasticbeanstalk.com/privkey.pem /path/to/your/location/
+```
+9. You can now go to the preferred location where the certificates are saved with ```cd /path/to/your/location/``` and print the contents within each certificate with ```cat fullchain.pem``` and ```cat privkey.pem```
+10. Go to AWS Certificate Manager using the AWS Console. Then click on "Import" in the top right corner. Then you should see the screen below:
+![Step 10: Import Certificate](./images/import-certificate.png)
+11. Copy the first block within ```fullchain.pem``` into "Certificate body." Copy the second block within ```fullchain.pem``` into "Certificate chain" which is optional. Copy the private key within ```privkey.pem``` into "Certificate private key." Click on "Import Certificate" to complete this process and you should see the new certificate listed in Certificate Manager.
+12. Go to the ```student-advising-demo-app-env``` Elastic Beanstalk environment through the AWS Console. Click on "Configuration". Then edit the "Instance traffic and scaling" settings
+![Step 12: Configuration, Instance traffic and scaling Locations](./images/configuration-instance-traffic-and-scaling-locations.png)
+13. After clicking on the "Edit" button, scroll down to "Listeners" and a listener with the following configuration:
+	- Listener port: 443
+	- Listener protocal: HTTPS
+	- SSL certificate: select the one created in Step 11
+You should then see the new listener like this:
+![Step 13: Listeners](./images/listeners.png)
+14. Click on "Apply" at the bottom and wait for the environment to update
+15. You should now be able to go to an HTTPS URL. To redirect HTTP protocols to HTTPS, go to AWS EC2 through the AWS Console. Click on "Load Balancers" and then click the load balancer for the project. Go to the "Listeners and rules" tab. There you should see 2 listerns and rules. Select the HTTP listener and click on "Edit listener"
+![Step 15: Load Balancer Listeners](./images/load-balancer-listeners.png)
+16. In the screenshot above, the HTTP Listener already redirects to HTTPS. To make it redirect to HTTPS, after clicking "Edit listener," select the "Redirect to URL" Routing action and select HTTPS Protocol with Port 443. Then click "Save changes." HTTP should now redirect to HTTPS.
+![Step 16: Load Balancer Listener Configuration](./images/load-balancer-listener-configuration.png)
+
+## Potential Issues
+
+#### **If facing issue that says you are requesting more vCPU capacity than your current limit**
+If you face this issue when trying to delpy the Inference Stack, then you need to submit a Service 
+quota request. Go to Service Quotas through the AWS Console. Click on AWS service on the menu on the left of the screen. Select Amazon Elastic Compute Cloud (Amazon EC2). Search and select "Running Dedicated g5 Hosts" and then click on Request increase at account level. Fill in the appropriate blanks and under New quota value, enter 8 (this was 14 in the script before I took it on, I requested 14 but they gave me 8, the script is already edited to use 8). Type a proper Use case description mentioning where you work and why you need it. They respond within a couple of hours.
