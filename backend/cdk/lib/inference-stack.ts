@@ -285,6 +285,7 @@ export class InferenceStack extends Stack {
         ],
         resources: [
           `arn:aws:secretsmanager:${this.region}:${this.account}:secret:student-advising/credentials/*`,
+          `arn:aws:secretsmanager:${this.region}:${this.account}:secret:student-advising-dbUserCredentials`,
         ],
       })
     );
@@ -348,7 +349,7 @@ export class InferenceStack extends Stack {
     );
 
     // Add the Lambda function to create the less privileged user and grant privileges
-    const createUserLambda = new lambda.Function(this, "createUserLambda", {
+    const createUserLambda = new triggers.TriggerFunction(this, "createUserLambda", {
       functionName: "student-advising-create-db-user",
       runtime: lambda.Runtime.PYTHON_3_9,
       handler: "create_db_user.lambda_handler",

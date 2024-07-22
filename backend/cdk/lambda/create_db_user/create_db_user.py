@@ -33,10 +33,10 @@ def lambda_handler(event, context):
     cursor = connection.cursor()
 
     # Create the less privileged user and grant privileges
-    cursor.execute(f"CREATE USER {db_user_secret["username"]} WITH PASSWORD '{db_user_secret["password"]}'")
-    cursor.execute(f"GRANT CONNECT ON DATABASE {db_secret["dbname"]} TO {db_user_secret["username"]}")
-    cursor.execute(f"GRANT USAGE ON SCHEMA public TO {db_user_secret["username"]}")
-    cursor.execute(f"GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO {db_user_secret["username"]}")
+    cursor.execute(f"CREATE USER {db_user_secret['username']} WITH PASSWORD '{db_user_secret['password']}'")
+    cursor.execute(f"GRANT CONNECT ON DATABASE {db_secret['dbname']} TO {db_user_secret['username']}")
+    cursor.execute(f"GRANT USAGE ON SCHEMA public TO {db_user_secret['username']}")
+    cursor.execute(f"GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO {db_user_secret['username']}")
 
     cursor.close()
     connection.close()
