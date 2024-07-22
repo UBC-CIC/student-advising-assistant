@@ -202,6 +202,12 @@ You should then see the new listener like this:
 
 ## Potential Issues
 
-#### **If facing issue that says you are requesting more vCPU capacity than your current limit**
+#### **Update aws-cdk-lib and Postgres Engine Version in database-stack.ts**
+Go to backend/cdk/package.json to updated "aws-cdk-lib" version. Then, go to backend/cdk/lib/database-stack.ts. There you can change the Postgres Engine Version. For example, you can change ```version: rds.PostgresEngineVersion.VER_15_2``` to ```version: rds.PostgresEngineVersion.VER_16```
+
+#### **Update Beanstalk Platform/Solution Stack Name in hosting-stack.ts**
+Go to https://docs.aws.amazon.com/elasticbeanstalk/latest/platforms/platform-history-docker.html and find the latest platform that runs Docker (has "running Docker" in the end of the name). Update Solution Stack Name in backend/cdk/hosting-stack.ts. For example, you can change ```solutionStackName: "64bit Amazon Linux 2 v3.6.0 running Docker"``` to ```solutionStackName: "64bit Amazon Linux 2 v3.8.1 running Docker"```
+
+#### **Requesting more vCPU capacity than your current limit**
 If you face this issue when trying to delpy the Inference Stack, then you need to submit a Service 
 quota request. Go to Service Quotas through the AWS Console. Click on AWS service on the menu on the left of the screen. Select Amazon Elastic Compute Cloud (Amazon EC2). Search and select "Running Dedicated g5 Hosts" and then click on Request increase at account level. Fill in the appropriate blanks and under New quota value, enter 8 (this was 14 in the script before I took it on, I requested 14 but they gave me 8, the script is already edited to use 8). Type a proper Use case description mentioning where you work and why you need it. They respond within a couple of hours.
