@@ -43,7 +43,7 @@ export class HostingStack extends cdk.Stack {
         timeout: cdk.Duration.seconds(300),
         memorySize: 512,
         environment: {
-          DB_SECRET_NAME: databaseStack.secretPath,
+          DB_SECRET_NAME: databaseStack.secretPathAdminName,
         },
         vpc: vpcStack.vpc,
         code: lambda.Code.fromAsset("./lambda/store_feedback"),
@@ -62,7 +62,7 @@ export class HostingStack extends cdk.Stack {
         timeout: cdk.Duration.seconds(300),
         memorySize: 512,
         environment: {
-          DB_SECRET_NAME: databaseStack.secretPath,
+          DB_SECRET_NAME: databaseStack.secretPathAdminName,
           BUCKET_PARAM_NAME: 	inferenceStack.S3_SSM_PARAM_NAME
         },
         vpc: vpcStack.vpc,

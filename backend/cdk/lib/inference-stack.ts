@@ -338,7 +338,7 @@ export class InferenceStack extends Stack {
         timeout: Duration.seconds(300),
         memorySize: 512,
         environment: {
-          DB_SECRET_NAME: databaseStack.secretPath,
+          DB_SECRET_NAME: databaseStack.secretPathAdminName,
         },
         vpc: vpcStack.vpc,
         code: lambda.Code.fromAsset("./lambda/trigger_lambda"),
@@ -346,6 +346,23 @@ export class InferenceStack extends Stack {
         role: lambdaRole,
       }
     );
+
+    // Add the Lambda function to create the less privileged user and grant privileges
+    const createUserLambda = new lambda.Function(this, "createUserLambda", {
+      functionName: "student-advising-create-db-user",
+      runtime: lambda.Runtime.PYTHON_3_9,
+      handler: "create_db_user.lambda_handler",
+      timeout: Duration.seconds(300),
+      memorySize: 512,
+      environment: {
+        DB_SECRET_NAME: databaseStack.secretPathAdminName,
+        DB_USER_SECRET_NAME: databaseStack.secretPathUser.secretName
+      },
+      vpc: vpcStack.vpc,
+      code: lambda.Code.fromAsset("./lambda/create_db_user"),
+      layers: [psycopg2],
+      role: lambdaRole,
+    });
 
     /*
      LLM configuration: Can choose any of the following models
