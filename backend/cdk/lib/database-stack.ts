@@ -51,7 +51,7 @@ export class DatabaseStack extends Stack {
         excludeNumbers: true,
         passwordLength: 17,
         generateStringKey: "password",
-        secretStringTemplate: JSON.stringify({ "username": "appUser" }),
+        secretStringTemplate: JSON.stringify({ "username": "appuser" }),
       },
     });
 
