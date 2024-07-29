@@ -283,10 +283,7 @@ Below is the schema for the AWS RDS PostgreSQL database.
 
 ![Database Schema](./images/database_schema.png)
 
-- feedback: stores the feedback provided by users
-- logging: stores inputted questions and the system-generated responses
-- update_logs: record the latest date that the system updated the data (pulled from information websites)
-
-
-There are other tables automatically created and maintained by the Langchain library to store and manage the document embeddings with PGVector. These are not included in the schema since they are managed by Langchain and subject to change with new Langchain versions.
-
+- feedback: Stores the feedback provided by users. Specifically, stores if the response was helpful or not, the user’s inputted question, the generated response, the documents IDs that refer to the documents that helped create the response, the most relevant document, abd the user’s comment.
+- logging: Stores the user’s inputted questions, the generated responses, the context of the question (faculty, program, specialization, and year if provided), and documents IDs that refer to the documents that helped create the response.
+- update_logs: Records the latest date that the system updated the data pulled from the websites provided.
+- phase_2_embeddings: This is the embeddings table of the project. The data under the “embeddings” column are vectors created from the data under the “text” column and the “context,” “program,” “faculty,” and “specialization” data extracted from the scraped websites.
