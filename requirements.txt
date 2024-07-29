@@ -11,3 +11,5 @@ flask[async]
 boto3
 fschat
 sshtunnel
+selenium
+webdriver-manager

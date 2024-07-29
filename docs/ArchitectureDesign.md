@@ -234,20 +234,48 @@ Various components of the infrastructure are placed inside a VPC for a more isol
 
 Information related to VPC networking specifications can be separately found [here](NetworkingSpecifications.md). Please familiarize yourself with the services in the architecture first before going through the Networking document mentioned above.
 
-**Question Answering**
+**Text Generation**
 
-1. A user (eg. a student) interacts with the web UI of the application hosted on AWS Elastic Beanstalk, and submits a query. 
+1. A user (eg. a student) interacts with the web UI of the application hosted on Amazon Elastic Beanstalk, and submits a query. The response collected from the model will be displayed back to the user.
+
 2. Using semantic search over the embedded documents in the Amazon RDS PostgreSQL database, the app fetches documents that are most closely related to the user’s query.
-    1. The diagram illustrates the case where documents are stored in Amazon RDS.
-3. The app makes an API Request to a model hosted on Amazon Bedrock, prompting it to respond to the user’s query using the retrieved documents from step 2 as context. The app then displays the response and the reference documents to the user in the web UI.
-4. The system logs all questions and answers, storing them in the Amazon RDS PostgreSQL database by making a request to an AWS Lambda Function as a proxy. Users can provide feedback to help improve the solution, which is also stored in the Amazon RDS PostgreSQL database using the AWS Lambda Function.
 
-**Data Processing**
+3. The app makes an API Request to a model hosted on Amazon Bedrock, prompting it to respond to the user’s query using the retrieved documents from Step 2 as context. The app then displays the response and the reference documents to the user in the web UI.
 
-5. When an Admin wants to configure the underlying settings of the data processing pipeline (eg. website scraping settings), they can modify and upload a config file to the predetermined folder on an Amazon S3 Bucket.
-6. The S3 Bucket triggers an invocation of an AWS Lambda Function to start a Task with the container cluster on Amazon ECS.
-7. This container cluster starts a Task that first performs web scraping of the configured websites, then processes the pages into extracts, and computes the vector embedding of the extracts. Finally, it stores the embeddings in the Amazon RDS PostgreSQL database (with pgvector support enabled). The Task is also scheduled to run every 4 months by default with a CRON-expression scheduler. An Admin/Developer can modify the schedule on-demand via the ECS console.
-    1. The diagram illustrates the case where documents are stored in Amazon RDS.
+4. The system logs all questions and answers, storing them in the Amazon RDS PostgreSQL database by making a request to an Amazon Lambda Function as a proxy. Users can provide feedback to help improve the solution, which is also stored in the Amazon RDS PostgreSQL database using the Amazon Lambda Function.
+
+5. Logs and feedback are stored in the Amazon RDS PostgreSQL database in their respective tables.
+
+**Lambda Functions**
+
+6. A request to an Amazon Lambda Function is made during the Inference Stack to create a user in the database with less privileges. This user’s credentials will be used in Step 2 to retrieve documents from the Amazon RDS PostgreSQL database. This user will only be allowed to create, update, and delete data without administrator powers for security purposes.
+
+7. The Lambda function obtains the secret from Amazon Secret Manger for credentials created in the Database Stack. It then creates the user with less privileges.
+
+8. A request to an Amazon Lambda Function is made during the Inference Stack to create the feedback, logging, and update logs tables if they do not already exist.
+
+9. The Lambda function obtains the secret from Amazon Secret Manger for credentials created in the Database Stack. It then creates the feedback, logging, and update logs tables.
+
+**Data Ingestion**
+
+10. An Administrator can navigate to Amazon Lambda using the Amazon Console. Here, the <project-name>-fetch_feedback-logs Lambda function should reside. The Administrator can then run the function by clicking on the Test tab and then clicking the Test button.
+
+11. The Lambda function retrieves the logs and feedback data from the Amazon RDS PostgreSQL database, formats the data into readable CSV files, and stores the formatted data into an S3 Bucket created during the Inference Stack under the documents folder.
+
+12. When an Admin wants to configure the underlying settings of the data processing pipeline (eg. website scraping settings), they can modify and upload a config file named “dump_config.json5”  to the document_scraping folder in the Amazon S3 Bucket created during the Inference Stack.
+
+13. The S3 Bucket triggers an Amazon Lambda Function to start tasks with the container cluster on Amazon ECS.
+
+14. This Lambda function triggers an ECS Task within a container cluster that performs the following operations:
+- Web Scraping: Scrapes configured websites for data.
+- Data Processing: Processes the scraped web pages into extracts.
+- Vector Embedding: Computes vector embeddings for the extracted data.
+- Storage: Stores the embeddings in an Amazon RDS PostgreSQL database with PGVector support enabled.
+The task is scheduled to run every 4 months using a CRON-expression scheduler. The schedule can be modified on-demand by an Admin/Developer via the ECS console.
+
+15. The Embedding Task on Amazon Elastic Container Service populates the Amazon RDS PostgreSQL database with vector embeddings.
+
+16. Amazon Elastic Container Registry (ECR) provides a secure, scalable, and reliable way to store, manage, and deploy Docker container images. By integrating ECR with Amazon Elastic Container Service (ECS), we ensure that the latest versions of our container images are always available for deployment. This connection allows ECS to automatically pull the required container images from ECR whenever a task or service is launched, ensuring seamless updates and efficient management of containerized applications.
 
 ## Database Schema
 
