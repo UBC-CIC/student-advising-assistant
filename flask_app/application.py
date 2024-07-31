@@ -13,6 +13,7 @@ sys.path.append('..')
 
 # Imports
 from flask import Flask, request, render_template, Response, redirect, url_for, session
+import boto3
 import json
 import os
 import numpy as np
@@ -20,7 +21,6 @@ import ast
 from typing import List
 from importlib import reload
 from aws_helpers.rds_tools import execute_and_fetch
-from langchain_community.embeddings.bedrock import BedrockEmbeddings
 from langchain_aws import BedrockLLM
 from flask_session import Session
 from aws_helpers.param_manager import get_param_manager
@@ -39,6 +39,8 @@ FACULTIES_PATH = os.path.join('data','documents','faculties.json')
 TITLE_PATH = os.path.join('static','app_title.txt')
 DEFAULTS_PATH = os.path.join('static','defaults.json')
 DEV_MODE = 'MODE' in os.environ and os.environ.get('MODE') == 'dev'
+REGION = os.environ.get("AWS_DEFAULT_REGION")
+VECTOR_DIMENSION = 1024
 
 ### Globals (set upon load)
 application = Flask(__name__)
@@ -88,13 +90,46 @@ def get_last_updated_time():
     result = execute_and_fetch(sql, dev_mode=DEV_MODE)
     return result[0][0].strftime("%m/%d/%Y, %H:%M:%S (UTC)")
 
+### METHOD TO CONVERT DATA TO EMBEDDINGS
+def get_bedrock_embeddings(input_text, model_id="amazon.titan-embed-text-v2:0", region_name=REGION):
+    # Initialize the boto3 client for Bedrock
+    bedrock = boto3.client(
+        service_name='bedrock-runtime',
+        region_name=region_name
+    )
+
+    # Prepare the prompt and request body
+    body = json.dumps({
+        "inputText": input_text,
+        "dimensions": VECTOR_DIMENSION,
+        "normalize": True
+    })
+
+    # Set the model ID and content type
+    accept = "*/*"
+    content_type = "application/json"
+
+    # Invoke the Bedrock model to get embeddings
+    response = bedrock.invoke_model(
+        body=body,
+        modelId=model_id,
+        accept=accept,
+        contentType=content_type
+    )
+
+    # Read and parse the response
+    response_body = json.loads(response['body'].read())
+    embedding = response_body.get('embedding')
+
+    return embedding
+
 # Format all texts in the doc as one string when we pass prompt to LLM
 def format_docs(docs):
     formatted_docs = "\n".join([f"Document {idx}:\n{doc['text']}" for idx, doc in enumerate(docs, 1)])
     return formatted_docs
 
 # Get most similar documents from the database
-def get_docs(query_embedding, number):
+def get_docs(query_embedding, number, embedding_column):
     embedding_array = np.array(query_embedding)
 
     # Get RDS connection
@@ -108,28 +143,55 @@ def get_docs(query_embedding, number):
     try:
         cur = conn.cursor()
         # Get the top N most similar documents using the KNN <=> operator
-        cur.execute("""
-                        SELECT doc_id, url, titles, text, links
+        cur.execute(f"""
+                        SELECT doc_id, url, titles, text, links, {embedding_column} <=> %s AS similarity
                         FROM phase_2_embeddings
-                        ORDER BY embedding <=> %s
+                        ORDER BY similarity
                         LIMIT %s
                     """, (embedding_array, number))
         results = cur.fetchall()
-        # Each item in list will be a dictionary with key values 'url' and 'text'
         for result in results:
-            doc_dict = doc_dict = {"doc_id": result[0],
+            doc_dict = {"doc_id": result[0],
                         "url": result[1],
                         "titles": ast.literal_eval(result[2]),
                         "text": result[3],
-                        "links": ast.literal_eval(result[4])}
+                        "links": ast.literal_eval(result[4]),
+                        "score": result[5]}
             top_docs.append(doc_dict)
         cur.close()
     except Exception as e:
-        print(f"Error when retrieving! {str(e)}")
+        print(f"Error when retrieving: {e}")
         conn.rollback()
     finally:
         cur.close()
     return top_docs
+
+def get_combined_docs(query_embedding, number):
+    text_docs = get_docs(query_embedding, number, embedding_column='text_embedding')
+    title_docs = get_docs(query_embedding, number, embedding_column='title_embedding')
+
+    # Combine documents, avoiding duplicates. Use doc['text'] as key since different doc IDs have been observed to have the same text
+    combined_docs = {}
+    for doc in text_docs:
+        doc_text = doc['text']
+        if doc_text not in combined_docs:
+            combined_docs[doc_text] = doc
+        else:
+            # Choose lower score if document already exists
+            combined_docs[doc_text]['score'] = min(combined_docs[doc_text]['score'], doc['score'])
+
+    for doc in title_docs:
+        doc_text = doc['text']
+        if doc_text not in combined_docs:
+            combined_docs[doc_text] = doc
+        else:
+            # Choose lower score if document already exists
+            combined_docs[doc_text]['score'] = min(combined_docs[doc_text]['score'], doc['score'])
+
+    # Sort documents by score in ascending order (since lower score indicates higher similarity)
+    sorted_docs = sorted(combined_docs.values(), key=lambda x: x['score'])
+
+    return sorted_docs
 
 # Split documents based on character limit, 8,000 tokens is roughly 32,000 characters, set max characters to 25,000
 def split_docs(docs, max_chars=25000):
@@ -182,9 +244,6 @@ def check_if_documents_relates(docs, user_prompt, llm):
 
 def answer_prompt(user_prompt, number_of_docs):
 
-    # Initialize the Bedrock Embeddings model
-    embeddings = BedrockEmbeddings()
-
     # Validate user_input
     if not isinstance(user_prompt, str):
         raise ValueError("user_input must be a string")
@@ -196,8 +255,11 @@ def answer_prompt(user_prompt, number_of_docs):
         raise ValueError("number_of_docs must be an integer")
     if number_of_docs < 1:
         raise ValueError("number_of_docs must be greater than 0")
+        
+    # Convert user's prompt to embedding
+    embedding = get_bedrock_embeddings(user_prompt)
 
-    docs = get_docs(embeddings.embed_query(user_prompt), number_of_docs)
+    docs = get_combined_docs(embedding, number_of_docs)
 
     divided_docs = split_docs(docs)
 

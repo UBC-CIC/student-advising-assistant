@@ -8,7 +8,6 @@ import ast
 import math
 from psycopg2.extras import execute_values
 from pgvector.psycopg2 import register_vector
-from langchain_community.embeddings.bedrock import BedrockEmbeddings
 import sys
 import shutil
 import logging
