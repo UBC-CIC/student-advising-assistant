@@ -1,4 +1,5 @@
 import os
+import boto3
 import pandas as pd
 import numpy as np
 import json
@@ -25,6 +26,9 @@ logger = logging.getLogger(__name__)
 secret_name = "credentials/RDSCredentials"
 param_manager = get_param_manager()
 
+### CONSTANTS
+VECTOR_DIMENSION = 1024
+
 ### DOCUMENT LOADING
 # Load the csv of documents from s3
 docs_dir = 'documents'
@@ -32,6 +36,39 @@ download_s3_directory(docs_dir)
 extracts_df = pd.read_csv(os.path.join(docs_dir, "website_extracts.csv"))
 # Print first 5 rows of CSV
 logger.info(f"First 5 rows of the CSV:\n{extracts_df.head()}")
+
+### METHOD TO CONVERT DATA TO EMBEDDINGS
+def get_bedrock_embeddings(input_text, model_id="amazon.titan-embed-text-v2:0", region_name="us-west-2"):
+    # Initialize the boto3 client for Bedrock
+    bedrock = boto3.client(
+        service_name='bedrock-runtime',
+        region_name=region_name
+    )
+
+    # Prepare the prompt and request body
+    body = json.dumps({
+        "inputText": input_text,
+        "dimensions": VECTOR_DIMENSION,
+        "normalize": True
+    })
+
+    # Set the model ID and content type
+    accept = "*/*"
+    content_type = "application/json"
+
+    # Invoke the Bedrock model to get embeddings
+    response = bedrock.invoke_model(
+        body=body,
+        modelId=model_id,
+        accept=accept,
+        contentType=content_type
+    )
+
+    # Read and parse the response
+    response_body = json.loads(response['body'].read())
+    embedding = response_body.get('embedding')
+
+    return embedding
 
 ### CREATING moded.csv and moded_with_embeddings.csv
 # Select only the columns we want
@@ -52,6 +89,33 @@ def transform_links(links_str):
 # Apply the transformation to the 'links' column
 selected_columns_df['links'] = selected_columns_df['links'].apply(transform_links)
 
+# Modify the titles column to include parent_titles followed by titles
+def combine_titles(row):
+    try:
+        # Parse parent_titles if it is not NaN
+        parent_titles = ast.literal_eval(row['parent_titles']) if pd.notna(row['parent_titles']) else []
+
+        # Parse titles if it is not NaN
+        titles = ast.literal_eval(row['titles']) if pd.notna(row['titles']) else []
+
+        # Remove the first element if it's an empty string
+        if titles and titles[0] == '':
+            titles = titles[1:]
+
+        # Combine parent_titles and titles, ensuring no duplication if the last of parent_titles is the first of titles
+        if parent_titles and titles:
+            combined_titles = parent_titles + titles if parent_titles[-1] != titles[0] else parent_titles + titles[1:]
+        else:
+            combined_titles = parent_titles + titles
+
+        return combined_titles
+    except (SyntaxError, ValueError):
+        # Return the original titles if there's an error
+        return row['titles']
+
+# Apply the combine_titles function to the 'titles' column
+selected_columns_df['titles'] = selected_columns_df.apply(combine_titles, axis=1)
+
 # Define the path for the new CSV file
 file_path = 'moded.csv'
 
@@ -67,36 +131,36 @@ try:
     # Load the CSV file
     data = pd.read_csv(file_path)
 
-    # Initialize the Bedrock Embeddings model
-    embeddings = BedrockEmbeddings()
-
-    # Initialize a list to store the embeddings
-    embeddings_list = []
+    # Initialize lists to store the embeddings
+    text_embeddings_list = []
+    title_embeddings_list = []
 
     # Iterate over each row in the DataFrame
     for index, row in data.iterrows():
-        # Get text
-        raw_text = row['text']
-        text = "text: " + raw_text
+        # Get text and titles
+        text = row['text']
 
-        # Prepare a list of column names to be concatenated
-        columns = ['context', 'program', 'faculty', 'specialization']
-        data_to_be_embedded = text
+        titles = " ".join(ast.literal_eval(row['titles']))  # Convert titles list to a single string
 
-        # Concatenate non-null columns to the data_to_be_embedded
-        for col in columns:
-            raw_value = row[col]
-            if not pd.isna(raw_value):
-                data_to_be_embedded += f" {col}: {raw_value}"
+        # Generate the embedding for text if it's not empty
+        if text.strip():
+            text_embedding = get_bedrock_embeddings(text)
+        else:
+            text_embedding = []  # Or some default value
+        text_embeddings_list.append(text_embedding)
 
-        # Generate the embedding
-        embedding = embeddings.embed_query(data_to_be_embedded)
-        embeddings_list.append(embedding)
+        # Generate the embedding for titles if it's not empty
+        if titles.strip():
+            title_embedding = get_bedrock_embeddings(titles)
+        else:
+            title_embedding = []  # Or some default value
+        title_embeddings_list.append(title_embedding)
         if (index + 1) % 500 == 0:
             logger.info(f"Processed {index + 1}/{len(data)} rows")
 
     # Add the embeddings to the DataFrame
-    data['embedding'] = embeddings_list
+    data['text_embedding'] = text_embeddings_list
+    data['title_embedding'] = title_embeddings_list
 
     # Save the updated DataFrame to a new CSV file
     data.to_csv('moded_with_embeddings.csv', index=False)
@@ -158,21 +222,55 @@ try:
     # Register the vector type with psycopg2
     register_vector(connection)
 
+    # Function to terminate process holding the lock
+    def terminate_locking_process(table_name):
+        get_pid_query = f"""
+        SELECT pid
+        FROM pg_locks l
+        JOIN pg_class t ON l.relation = t.oid AND t.relkind = 'r'
+        WHERE t.relname = '{table_name}';
+        """
+        cur.execute(get_pid_query)
+        locking_process = cur.fetchone()
+        if locking_process:
+            pid = locking_process[0]
+            terminate_query = f"SELECT pg_terminate_backend({pid});"
+            cur.execute(terminate_query)
+            connection.commit()
+            print(f"Terminated process {pid} holding lock on {table_name}.")
+
+    # Drop the table if it already exists
+    drop_table_command = "DROP TABLE IF EXISTS phase_2_embeddings;"
+
+    try:
+        # Terminate the process holding the lock if any
+        terminate_locking_process('phase_2_embeddings')
+
+        # Drop the table if it exists
+        cur.execute(drop_table_command)
+        connection.commit()
+        logger.info("Table dropped if it existed.")
+    except psycopg2.Error as e:
+        logger.error(f"Error dropping embeddings table: {e}")
+        connection.rollback()
+
     ### CREATE EMBEDDINGS TABLE
     # Create table to store embeddings and metadata
-    table_create_command = """
-    CREATE TABLE IF NOT EXISTS phase_2_embeddings (
+    table_create_command = f"""
+    CREATE TABLE phase_2_embeddings (
                 id bigserial primary key,
                 doc_id text,
                 url text,
                 titles jsonb,
                 text text,
                 links jsonb,
-                embedding vector(1536)
+                text_embedding vector({VECTOR_DIMENSION}),
+                title_embedding vector({VECTOR_DIMENSION})
                 );
                 """
 
     try:
+        # Create the new table
         cur.execute(table_create_command)
         connection.commit()
         logger.info("Table created!")
@@ -185,49 +283,87 @@ try:
     logger.info("Loading the CSV file...")
     data_with_embeddings = pd.read_csv(file_path_with_embeddings)
 
-    # Check the type of the embedding column
-    embedding_type = type(first_row['embedding'])
-    logger.info(f"The type of the embedding column is: {embedding_type}")
+    # Check the type of the embedding columns
+    text_embedding_type = type(first_row['text_embedding'])
+    title_embedding_type = type(first_row['title_embedding'])
+    logger.info(f"The type of the text_embedding column is: {text_embedding_type}")
+    logger.info(f"The type of the title_embedding column is: {title_embedding_type}")
 
     # Function to convert string representation of list to numpy array
     def parse_embedding(embedding_str):
-        return np.array(ast.literal_eval(embedding_str))
+        return np.array(eval(embedding_str))
 
-    # Apply the function to the embedding column if it's a string
-    if isinstance(first_row['embedding'], str):
-        logger.info("Converting the embedding column to numpy arrays...")
-        data_with_embeddings['embedding'] = data_with_embeddings['embedding'].apply(parse_embedding)
+    # Apply the function to the text_embedding column if it's a string
+    if isinstance(first_row['text_embedding'], str):
+        logger.info("Converting the text_embedding column to numpy arrays...")
+        data_with_embeddings['text_embedding'] = data_with_embeddings['text_embedding'].apply(parse_embedding)
         logger.info("Conversion complete.")
     else:
-        logger.info("Embeddings are not strings, they are a list of floats")
+        logger.info("Text Embeddings are not strings, they are a list of floats")
+
+    # Apply the function to the title_embedding column if it's a string
+    if isinstance(first_row['title_embedding'], str):
+        logger.info("Converting the title_embedding column to numpy arrays...")
+        data_with_embeddings['title_embedding'] = data_with_embeddings['title_embedding'].apply(parse_embedding)
+        logger.info("Conversion complete.")
+    else:
+        logger.info("Title Embeddings are not strings, they are a list of floats")
 
     # Verify the conversion
     first_row_converted = data_with_embeddings.iloc[0]
-    logger.info(f"The first row after converting the 'embedding' column:\n{first_row_converted.to_dict()}")
+    logger.info(f"The first row after converting the 'text_embedding' and 'title_embedding' columns:\n{first_row_converted.to_dict()}")
 
     # Convert 'titles' and 'links' columns to JSON format
     data_with_embeddings['titles'] = data_with_embeddings['titles'].apply(json.dumps)
     data_with_embeddings['links'] = data_with_embeddings['links'].apply(json.dumps)
 
-    # Prepare the list of tuples to insert
-    logger.info("Preparing the list of tuples for insertion...")
-    data_list = [(row['doc_id'],
-                  row['url'],
-                  row['titles'],
-                  row['text'],
-                  row['links'],
-                  row['embedding']) for index, row in data_with_embeddings.iterrows()]
-    logger.info("Preparation complete.")
+    # Function to ensure embeddings are lists, not empty, and pad with zeros to the correct dimensionality
+    def ensure_list_and_pad_embedding(embedding, expected_dim=VECTOR_DIMENSION):
+        if isinstance(embedding, np.ndarray):
+            embedding = embedding.tolist()
+        if not embedding:
+            embedding = [0] * expected_dim  # Replace empty embeddings with a list of zeros of the correct dimensionality
+        elif len(embedding) < expected_dim:
+            embedding.extend([0] * (expected_dim - len(embedding)))  # Pad with zeros
+        return embedding
+
+    data_with_embeddings['text_embedding'] = data_with_embeddings['text_embedding'].apply(ensure_list_and_pad_embedding)
+    data_with_embeddings['title_embedding'] = data_with_embeddings['title_embedding'].apply(ensure_list_and_pad_embedding)
+
+    # Prepare the list of tuples for insertion in batches
+    batch_size = 500  # Set a smaller batch size
+    total_rows = len(data_with_embeddings)
+    num_batches = (total_rows // batch_size) + 1
+
+    logger.info(f"Total rows: {total_rows}, Batch size: {batch_size}, Number of batches: {num_batches}")
 
     # Use execute_values to perform batch insertion
-    logger.info("Performing batch insertion...")
-    execute_values(cur, "INSERT INTO phase_2_embeddings (doc_id, url, titles, text, links, embedding) VALUES %s", data_list)
+    for batch in range(num_batches):
+        start_idx = batch * batch_size
+        end_idx = min(start_idx + batch_size, total_rows)
+        batch_data = data_with_embeddings.iloc[start_idx:end_idx]
 
-    # Commit after we insert all embeddings
-    logger.info("Committing the transaction...")
-    connection.commit()
+        data_list = [(row['doc_id'],
+                    row['url'],
+                    row['titles'],
+                    row['text'],
+                    row['links'],
+                    row['text_embedding'],
+                    row['title_embedding']) for index, row in batch_data.iterrows()]
 
-    logger.info("Batch insertion complete!")
+        logger.info(f"Inserting batch {batch + 1}/{num_batches}...")
+
+        try:
+            execute_values(cur, "INSERT INTO test_embeddings (doc_id, url, titles, text, links, text_embedding, title_embedding) VALUES %s", data_list)
+        except Exception as e:
+            logger.error(f"Error when populating table in batch {batch + 1}: {e}")
+            connection.rollback()
+        
+        # Commit after each batch
+        connection.commit()
+        logger.info(f"Batch {batch + 1}/{num_batches} insertion complete!")
+    
+    logger.info("All batches inserted successfully!")
 
     ### SANITY CHECKS ON EMBEDDINGS TABLE
     num_records = 0
@@ -273,7 +409,8 @@ try:
         drop_existing_indexes()
         try:
             if index_method == 'hnsw':
-                cur.execute(f'CREATE INDEX ON phase_2_embeddings USING hnsw (embedding {distance_measure})')
+                cur.execute(f'CREATE INDEX ON test_embeddings USING hnsw (text_embedding {distance_measure})')
+                cur.execute(f'CREATE INDEX ON test_embeddings USING hnsw (title_embedding {distance_measure})')
             elif index_method == 'ivfflat':
                 num_lists = num_records / 1000
                 if num_lists < 10:
@@ -281,7 +418,8 @@ try:
                 if num_records > 1000000:
                     num_lists = math.sqrt(num_records)
 
-                cur.execute(f'CREATE INDEX ON phase_2_embeddings USING ivfflat (embedding {distance_measure}) WITH (lists = {num_lists});')
+                cur.execute(f'CREATE INDEX ON test_embeddings USING ivfflat (text_embedding {distance_measure}) WITH (lists = {num_lists});')
+                cur.execute(f'CREATE INDEX ON test_embeddings USING ivfflat (title_embedding {distance_measure}) WITH (lists = {num_lists});')
 
             connection.commit()
             logger.info("Created Index!")
@@ -325,7 +463,8 @@ try:
             connection.rollback()
 
     # Verify details of the created index
-    get_index_details('phase_2_embeddings_embedding_idx')
+    get_index_details('phase_2_embeddings_text_embedding_idx')
+    get_index_details('phase_2_embeddings_title_embedding_idx')
 finally:
     cur.close()
     connection.close()
