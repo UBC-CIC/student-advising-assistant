@@ -157,7 +157,7 @@ export class InferenceStack extends Stack {
         },
         essential: false,
         // gpuCount: 1,
-        // readonlyRootFilesystem: true
+        readonlyRootFilesystem: true
       }
     );
     const embedding_container = ecsTaskDef.addContainer(
@@ -180,7 +180,7 @@ export class InferenceStack extends Stack {
           // ECS_ENABLE_GPU_SUPPORT: "true",
           AWS_DEFAULT_REGION: this.region
         },
-        // readonlyRootFilesystem: true
+        readonlyRootFilesystem: true
       }
     );
     // only start the embedding container when the scraping container successfully exits without error

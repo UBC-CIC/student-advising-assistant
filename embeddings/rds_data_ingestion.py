@@ -353,7 +353,7 @@ try:
         logger.info(f"Inserting batch {batch + 1}/{num_batches}...")
 
         try:
-            execute_values(cur, "INSERT INTO test_embeddings (doc_id, url, titles, text, links, text_embedding, title_embedding) VALUES %s", data_list)
+            execute_values(cur, "INSERT INTO phase_2_embeddings (doc_id, url, titles, text, links, text_embedding, title_embedding) VALUES %s", data_list)
         except Exception as e:
             logger.error(f"Error when populating table in batch {batch + 1}: {e}")
             connection.rollback()
@@ -408,8 +408,8 @@ try:
         drop_existing_indexes()
         try:
             if index_method == 'hnsw':
-                cur.execute(f'CREATE INDEX ON test_embeddings USING hnsw (text_embedding {distance_measure})')
-                cur.execute(f'CREATE INDEX ON test_embeddings USING hnsw (title_embedding {distance_measure})')
+                cur.execute(f'CREATE INDEX ON phase_2_embeddings USING hnsw (text_embedding {distance_measure})')
+                cur.execute(f'CREATE INDEX ON phase_2_embeddings USING hnsw (title_embedding {distance_measure})')
             elif index_method == 'ivfflat':
                 num_lists = num_records / 1000
                 if num_lists < 10:
@@ -417,8 +417,8 @@ try:
                 if num_records > 1000000:
                     num_lists = math.sqrt(num_records)
 
-                cur.execute(f'CREATE INDEX ON test_embeddings USING ivfflat (text_embedding {distance_measure}) WITH (lists = {num_lists});')
-                cur.execute(f'CREATE INDEX ON test_embeddings USING ivfflat (title_embedding {distance_measure}) WITH (lists = {num_lists});')
+                cur.execute(f'CREATE INDEX ON phase_2_embeddings USING ivfflat (text_embedding {distance_measure}) WITH (lists = {num_lists});')
+                cur.execute(f'CREATE INDEX ON phase_2_embeddings USING ivfflat (title_embedding {distance_measure}) WITH (lists = {num_lists});')
 
             connection.commit()
             logger.info("Created Index!")
