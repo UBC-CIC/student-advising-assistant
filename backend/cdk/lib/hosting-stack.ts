@@ -197,7 +197,7 @@ export class HostingStack extends cdk.Stack {
       cnamePrefix: cnamePrefix,
       description: "Docker environment for Python Flask application",
       applicationName: app.applicationName || appName,
-      solutionStackName: "64bit Amazon Linux 2 v3.8.3 running Docker",
+      solutionStackName: "64bit Amazon Linux 2 v4.0.0 running Docker",
       optionSettings: [
         // https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/command-options-general.html
         {

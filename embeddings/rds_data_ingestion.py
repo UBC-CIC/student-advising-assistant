@@ -71,7 +71,7 @@ def get_bedrock_embeddings(input_text, model_id="amazon.titan-embed-text-v2:0", 
 
 ### CREATING moded.csv and moded_with_embeddings.csv
 # Select only the columns we want
-selected_columns_df = extracts_df[['doc_id', 'url', 'titles', 'text', 'links', 'context', 'program', 'faculty', 'specialization']]
+selected_columns_df = extracts_df[['doc_id', 'url', 'parent_titles', 'titles', 'text', 'links']]
 
 # Remove rows where 'text' is null
 selected_columns_df = selected_columns_df.dropna(subset=['text'])
