@@ -23,7 +23,8 @@ import * as s3 from "aws-cdk-lib/aws-s3";
 import * as s3n from "aws-cdk-lib/aws-s3-notifications";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
-import {readFileSync} from 'fs';
+import * as efs from "aws-cdk-lib/aws-efs";
+import { readFileSync } from 'fs';
 import config from '../config.json';
 
 export class InferenceStack extends Stack {
@@ -42,7 +43,7 @@ export class InferenceStack extends Stack {
   ) {
     super(scope, id, props);
 
-    this.S3_SSM_PARAM_NAME = "/student-advising/documents/S3_BUCKET_NAME"
+    this.S3_SSM_PARAM_NAME = "/student-advising/documents/S3_BUCKET_NAME";
     const vpc = vpcStack.vpc;
 
     // Bucket for files related to inference
@@ -139,12 +140,40 @@ export class InferenceStack extends Stack {
       }
     );
 
-    // Define the volumes
+    // Create an EFS file system
+    const fileSystem = new efs.FileSystem(this, 'DataEfsFileSystem', {
+      vpc,
+      lifecyclePolicy: efs.LifecyclePolicy.AFTER_14_DAYS, // Optional, lifecycle policy
+      performanceMode: efs.PerformanceMode.GENERAL_PURPOSE, // Default
+      throughputMode: efs.ThroughputMode.BURSTING, // Default
+      removalPolicy: RemovalPolicy.DESTROY,
+    });
+
+    const accessPoint = new efs.AccessPoint(this, 'DataEfsAccessPoint', {
+      fileSystem,
+      path: '/data',
+      createAcl: {
+        ownerUid: '1001',
+        ownerGid: '1001',
+        permissions: '755',
+      },
+      posixUser: {
+        uid: '1001',
+        gid: '1001',
+      },
+    });
+
+    // Define the EFS volume
     const volumeName = "data-volume";
     ecsTaskDef.addVolume({
       name: volumeName,
-      host: {
-        sourcePath: "/ecs/volumes/data",
+      efsVolumeConfiguration: {
+        fileSystemId: fileSystem.fileSystemId,
+        transitEncryption: 'ENABLED', // Enable transit encryption
+        authorizationConfig: {
+          accessPointId: accessPoint.accessPointId,
+          iam: 'ENABLED', // Use IAM for authorization
+        },
       },
     });
 
@@ -152,23 +181,23 @@ export class InferenceStack extends Stack {
     const scraping_container = ecsTaskDef.addContainer(
       "datapipeline-scraping",
       {
-      containerName: "scraping-container",
-      image: ecs.ContainerImage.fromAsset(
-        path.join(__dirname, "..", "..", ".."),
-        {
-          file: path.join("scraping.Dockerfile"),
-        }
-      ),
-      logging: ecs.LogDrivers.awsLogs({
-        streamPrefix: "student-advising",
-        logRetention: RetentionDays.ONE_YEAR,
-      }),
-      environment: {
-        AWS_DEFAULT_REGION: this.region
-      },
-      essential: false,
-      // gpuCount: 1,
-      readonlyRootFilesystem: true
+        containerName: "scraping-container",
+        image: ecs.ContainerImage.fromAsset(
+          path.join(__dirname, "..", "..", ".."),
+          {
+            file: path.join("scraping.Dockerfile"),
+          }
+        ),
+        logging: ecs.LogDrivers.awsLogs({
+          streamPrefix: "student-advising",
+          logRetention: RetentionDays.ONE_YEAR,
+        }),
+        environment: {
+          AWS_DEFAULT_REGION: this.region
+        },
+        essential: false,
+        // gpuCount: 1,
+        readonlyRootFilesystem: true
       }
     );
 
