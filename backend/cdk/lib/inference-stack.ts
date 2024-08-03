@@ -138,28 +138,47 @@ export class InferenceStack extends Stack {
         family: "scraping-and-embedding-16cpu-32gb",
       }
     );
+
+    // Define the volumes
+    const volumeName = "data-volume";
+    ecsTaskDef.addVolume({
+      name: volumeName,
+      host: {
+        sourcePath: "/ecs/volumes/data",
+      },
+    });
+
+    // Scraping container
     const scraping_container = ecsTaskDef.addContainer(
       "datapipeline-scraping",
       {
-        containerName: "scraping-container",
-        image: ecs.ContainerImage.fromAsset(
-          path.join(__dirname, "..", "..", ".."),
-          {
-            file: path.join("scraping.Dockerfile"),
-          }
-        ),
-        logging: ecs.LogDrivers.awsLogs({
-          streamPrefix: "student-advising",
-          logRetention: RetentionDays.ONE_YEAR,
-        }),
-        environment: {
-          AWS_DEFAULT_REGION: this.region
-        },
-        essential: false,
-        // gpuCount: 1,
-        readonlyRootFilesystem: true
+      containerName: "scraping-container",
+      image: ecs.ContainerImage.fromAsset(
+        path.join(__dirname, "..", "..", ".."),
+        {
+          file: path.join("scraping.Dockerfile"),
+        }
+      ),
+      logging: ecs.LogDrivers.awsLogs({
+        streamPrefix: "student-advising",
+        logRetention: RetentionDays.ONE_YEAR,
+      }),
+      environment: {
+        AWS_DEFAULT_REGION: this.region
+      },
+      essential: false,
+      // gpuCount: 1,
+      readonlyRootFilesystem: true
       }
     );
+
+    // Add the bind mount to the scraping container
+    scraping_container.addMountPoints({
+      sourceVolume: volumeName,
+      containerPath: "/app/data",
+      readOnly: false,
+    });
+
     const embedding_container = ecsTaskDef.addContainer(
       "datapipeline-document-embeddings",
       {
@@ -183,6 +202,14 @@ export class InferenceStack extends Stack {
         readonlyRootFilesystem: true
       }
     );
+
+    // Add the bind mount to the embedding container
+    embedding_container.addMountPoints({
+      sourceVolume: volumeName,
+      containerPath: "/app/data",
+      readOnly: false,
+    });
+
     // only start the embedding container when the scraping container successfully exits without error
     embedding_container.addContainerDependencies({
       container: scraping_container,
