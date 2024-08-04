@@ -26,10 +26,10 @@ downstream tasks.
 
 ### CONSTANTS
 # Input files
-CONFIG_FILEPATH = 'dump_config.json5' # Filepath to the dump config file in current working dir
+CONFIG_FILEPATH = '/app/data/dump_config.json5' # Filepath to the dump config file in current working dir
 
 # Output files
-BASE_DUMP_PATH = 'site_dumps' # Directory where site dump files are saved
+BASE_DUMP_PATH = '/app/data/site_dumps' # Directory where site dump files are saved
 DOCUMENTS_DIR = 'documents' # Directory where processed extracts are saved
 REDIRECT_FILEPATH = os.path.join(BASE_DUMP_PATH,'redirects.txt') # Filepath for dict of redirects
 FACULTIES_UNPRUNED_FILEPATH = os.path.join(DOCUMENTS_DIR, "faculties_unpruned.json")
@@ -164,20 +164,20 @@ def write_json_file(filepath: str, item: Dict):
 def process_site_dumps(doc_extractor: DocExtractor, dump_configs: list[DumpConfig], 
                        redirect_map_path: str, out_path: str):
     
-    # Read the redirect map
-    if redirect_map_path:
-        with open(redirect_map_path,'r') as f:
+    # Read the redirect map if it exists
+    if os.path.exists(redirect_map_path):
+        with open(redirect_map_path, 'r') as f:
             redirect_map = json.loads(f.read())
             doc_extractor.link_redirects = redirect_map
 
-    doc_extractor.parse_folder(dump_configs,out_path)
+    doc_extractor.parse_folder(dump_configs, out_path)
 
 def main():
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
     set_boto_log_levels(logging.INFO) # Quiet boto logs, debug clogs up stdout
     
     # Download the config file from s3
-    download_single_file(f"document_scraping/{CONFIG_FILEPATH}", CONFIG_FILEPATH)
+    download_single_file(f"document_scraping/dump_config.json5", CONFIG_FILEPATH)
 
     # Pull and process sites
     doc_extractor, dump_configs = load_config(CONFIG_FILEPATH)

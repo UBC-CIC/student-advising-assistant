@@ -12,6 +12,12 @@ RUN python -m spacy download en_core_web_sm
 COPY aws_helpers/ ./aws_helpers/
 COPY document_scraping/ ./document_scraping/
 
+# Change ownership of the working directory
+RUN chown -R 1001:1001 /usr/src/app
+
+# Switch to the user 1001:1001
+USER 1001:1001
+
 WORKDIR /usr/src/app/document_scraping
 
 CMD [ "python", "data_pipeline.py" ]

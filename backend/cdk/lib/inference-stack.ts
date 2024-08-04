@@ -81,6 +81,18 @@ export class InferenceStack extends Stack {
       );
     });
 
+    // Create a security group for EFS
+    const efsSecurityGroup = new ec2.SecurityGroup(this, "EfsSecurityGroup", {
+      vpc: vpc,
+      allowAllOutbound: true,
+    });
+
+    efsSecurityGroup.addIngressRule(
+      ec2.Peer.anyIpv4(),
+      ec2.Port.tcp(2049),
+      "Allow NFS traffic from VPC"
+    );
+
     // this role will be used for both task role and task execution role
     const ecsTaskRole = new iam.Role(this, "ecs-task-role", {
       assumedBy: new iam.ServicePrincipal("ecs-tasks.amazonaws.com"),
@@ -147,6 +159,7 @@ export class InferenceStack extends Stack {
       performanceMode: efs.PerformanceMode.GENERAL_PURPOSE, // Default
       throughputMode: efs.ThroughputMode.BURSTING, // Default
       removalPolicy: RemovalPolicy.DESTROY,
+      securityGroup: efsSecurityGroup,  // Attach the security group for EFS
     });
 
     const accessPoint = new efs.AccessPoint(this, 'DataEfsAccessPoint', {
