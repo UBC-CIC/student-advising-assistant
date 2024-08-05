@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 ### CONFIGURATION
 # AWS Secrets Manager config for the RDS secret
 secret_name = "credentials/RDSCredentials"
+user_secret_name = "credentials/dbUserCredentials"
 param_manager = get_param_manager()
 
 ### CONSTANTS
@@ -275,6 +276,19 @@ try:
         logger.info("Table created!")
     except psycopg2.Error as e:
         logger.error(f"Error creating embeddings table: {e}")
+        connection.rollback()
+
+    ### GRANT PRIVILEGES TO db_user_secret['username']
+    try:
+        db_user_secret = param_manager.get_secret(user_secret_name)
+        grant_privileges_command = f"""
+        GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE phase_2_embeddings TO {db_user_secret['username']};
+        """
+        cur.execute(grant_privileges_command)
+        connection.commit()
+        logger.info(f"Privileges granted to {db_user_secret['username']} on phase_2_embeddings!")
+    except psycopg2.Error as e:
+        logger.error(f"Error granting privileges to {db_user_secret['username']}: {e}")
         connection.rollback()
 
     ### POPULATE EMBEDDINGS TABLE
