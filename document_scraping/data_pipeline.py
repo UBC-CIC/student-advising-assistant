@@ -30,10 +30,13 @@ CONFIG_FILEPATH = '/app/data/dump_config.json5' # Filepath to the dump config fi
 
 # Output files
 BASE_DUMP_PATH = '/app/data/site_dumps' # Directory where site dump files are saved
-DOCUMENTS_DIR = 'documents' # Directory where processed extracts are saved
-REDIRECT_FILEPATH = os.path.join(BASE_DUMP_PATH,'redirects.txt') # Filepath for dict of redirects
-FACULTIES_UNPRUNED_FILEPATH = os.path.join(DOCUMENTS_DIR, "faculties_unpruned.json")
-FACULTIES_FILEPATH = os.path.join(DOCUMENTS_DIR, "faculties.json")
+LOCAL_DOCUMENTS_DIR = '/app/data/documents' # Local directory where processed extracts are saved
+S3_DOCUMENTS_DIR = 'documents' # S3 directory where processed extracts are saved
+REDIRECT_FILEPATH = os.path.join(BASE_DUMP_PATH, 'redirects.txt') # Filepath for dict of redirects
+LOCAL_FACULTIES_UNPRUNED_FILEPATH = os.path.join(LOCAL_DOCUMENTS_DIR, "faculties_unpruned.json")
+LOCAL_FACULTIES_FILEPATH = os.path.join(LOCAL_DOCUMENTS_DIR, "faculties.json")
+S3_FACULTIES_UNPRUNED_FILEPATH = os.path.join(S3_DOCUMENTS_DIR, "faculties_unpruned.json")
+S3_FACULTIES_FILEPATH = os.path.join(S3_DOCUMENTS_DIR, "faculties.json")
 
 # Other constants
 redirect_log_re = re.compile('http[^\n]*(\n[^\n]*){2}301 Moved Permanently\nLocation:\s[^\n\s]*')
@@ -182,22 +185,22 @@ def main():
     # Pull and process sites
     doc_extractor, dump_configs = load_config(CONFIG_FILEPATH)
     pull_sites(dump_configs, output_folder = BASE_DUMP_PATH)
-    process_site_dumps(doc_extractor, dump_configs, redirect_map_path=REDIRECT_FILEPATH, out_path=DOCUMENTS_DIR)
+    process_site_dumps(doc_extractor, dump_configs, redirect_map_path=REDIRECT_FILEPATH, out_path=LOCAL_DOCUMENTS_DIR)
 
     # Upload the website_extracts.csv and website_graph.txt
-    upload_file_to_s3(os.path.join(DOCUMENTS_DIR, "website_extracts.csv"), f"{DOCUMENTS_DIR}/website_extracts.csv")
-    upload_file_to_s3(os.path.join(DOCUMENTS_DIR, "website_graph.txt"), f"{DOCUMENTS_DIR}/website_graph.txt")
+    upload_file_to_s3(os.path.join(LOCAL_DOCUMENTS_DIR, "website_extracts.csv"), f"{S3_DOCUMENTS_DIR}/website_extracts.csv")
+    upload_file_to_s3(os.path.join(LOCAL_DOCUMENTS_DIR, "website_graph.txt"), f"{S3_DOCUMENTS_DIR}/website_graph.txt")
     
     # Find the diff between the previous iteration of faculties.json, if the files exist
-    download_s3_directory(DOCUMENTS_DIR)
-    new_unpruned_faculties = find_program_options(os.path.join(DOCUMENTS_DIR, "website_extracts.csv"))
-    new_pruned_faculties = apply_previous_difs(new_unpruned_faculties, FACULTIES_UNPRUNED_FILEPATH, FACULTIES_FILEPATH)
+    download_s3_directory(S3_DOCUMENTS_DIR)
+    new_unpruned_faculties = find_program_options(os.path.join(LOCAL_DOCUMENTS_DIR, "website_extracts.csv"))
+    new_pruned_faculties = apply_previous_difs(new_unpruned_faculties, LOCAL_FACULTIES_UNPRUNED_FILEPATH, LOCAL_FACULTIES_FILEPATH)
     
     # Upload faculties files
-    write_json_file(FACULTIES_UNPRUNED_FILEPATH,new_unpruned_faculties)
-    write_json_file(FACULTIES_FILEPATH,new_pruned_faculties)
-    upload_file_to_s3(FACULTIES_UNPRUNED_FILEPATH, f"{DOCUMENTS_DIR}/faculties_unpruned.json")
-    upload_file_to_s3(FACULTIES_FILEPATH, f"{DOCUMENTS_DIR}/faculties.json")
+    write_json_file(LOCAL_FACULTIES_UNPRUNED_FILEPATH, new_unpruned_faculties)
+    write_json_file(LOCAL_FACULTIES_FILEPATH, new_pruned_faculties)
+    upload_file_to_s3(LOCAL_FACULTIES_UNPRUNED_FILEPATH, S3_FACULTIES_UNPRUNED_FILEPATH)
+    upload_file_to_s3(LOCAL_FACULTIES_FILEPATH, S3_FACULTIES_FILEPATH)
 
 if __name__ == '__main__':
     main()

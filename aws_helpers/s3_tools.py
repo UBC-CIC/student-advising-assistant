@@ -24,14 +24,18 @@ def download_single_file(s3_key:str, local_path:str, bucket_name=default_bucket_
     except Exception as e:
         print(f"Error downloading file: {e}")
 
-def download_s3_directory(directory: str, s3_client = default_client, output_prefix: str = './', bucket_name: str = default_bucket_name):
+def download_s3_directory(directory: str, ecs_task: bool = False, s3_client = default_client, output_prefix: str = './', bucket_name: str = default_bucket_name):
     """
     Download a folder from s3
     - s3_client: s3 client to use
     - directory: the path of the s3 directory 
     - output_prefix: the path to save the directory in
     - bucket: the bucket name to use
+    - ecs_task: boolean indicating if the download is being performed by an ECS task
     """
+    if ecs_task:
+        output_prefix = '/app/data'
+
     if not os.path.exists(output_prefix):
         os.mkdir(output_prefix)
 
