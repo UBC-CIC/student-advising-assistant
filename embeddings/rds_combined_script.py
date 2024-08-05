@@ -21,6 +21,8 @@ from aws_helpers.param_manager import get_param_manager
 from aws_helpers.s3_tools import download_s3_directory, upload_directory_to_s3
 from aws_helpers.ssh_forwarder import start_ssh_forwarder
 
+# /app/data is where ECS Tasks have writing privilegs due to EFS from Inference Stack
+
 ### CONFIGURATION
 # AWS Secrets Manager config for the RDS secret
 secret_name = "credentials/RDSCredentials"

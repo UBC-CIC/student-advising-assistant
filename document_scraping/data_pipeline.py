@@ -24,6 +24,8 @@ Script to download the data sources using wget, and then split all pages into do
 downstream tasks.
 """
 
+# /app/data is where ECS Tasks have writing privilegs due to EFS from Inference Stack
+
 ### CONSTANTS
 # Input files
 CONFIG_FILEPATH = '/app/data/dump_config.json5' # Filepath to the dump config file in current working dir
