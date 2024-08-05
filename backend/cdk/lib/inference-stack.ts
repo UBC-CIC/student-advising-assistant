@@ -87,10 +87,11 @@ export class InferenceStack extends Stack {
       allowAllOutbound: true,
     });
 
+    // Allow traffic from within the VPC only on port 2049 for NFS
     efsSecurityGroup.addIngressRule(
-      ec2.Peer.anyIpv4(),
+      ec2.Peer.ipv4(vpc.vpcCidrBlock),
       ec2.Port.tcp(2049),
-      "Allow NFS traffic from VPC"
+      "Allow NFS traffic from within VPC"
     );
 
     // this role will be used for both task role and task execution role
