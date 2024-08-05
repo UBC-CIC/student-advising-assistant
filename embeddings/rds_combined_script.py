@@ -62,7 +62,7 @@ if not args.gpu_available:
 
 # Load the csv of documents from s3
 docs_dir = 'documents' 
-download_s3_directory(docs_dir)
+download_s3_directory(docs_dir, ecs_task=True)
 docs = doc_loader.load_docs(os.path.join(docs_dir, "website_extracts.csv"), eval_strings=False)
 metadatas = [doc.metadata for doc in docs]
 ids = [doc.metadata['doc_id'] for doc in docs]
@@ -70,7 +70,7 @@ ids = [doc.metadata['doc_id'] for doc in docs]
 # Load precomputed embeddings
 embed_dir = f"embeddings-{index_config['namespace']}"
 if not args.compute_embeddings: 
-    download_s3_directory(embed_dir)
+    download_s3_directory(embed_dir, ecs_task=True)
 
 # Create the different lists of texts for embedding
 title_sep = ' : ' # separator to use to join titles into strings

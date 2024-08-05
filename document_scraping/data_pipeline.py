@@ -192,7 +192,7 @@ def main():
     upload_file_to_s3(os.path.join(LOCAL_DOCUMENTS_DIR, "website_graph.txt"), f"{S3_DOCUMENTS_DIR}/website_graph.txt")
     
     # Find the diff between the previous iteration of faculties.json, if the files exist
-    download_s3_directory(S3_DOCUMENTS_DIR)
+    download_s3_directory(S3_DOCUMENTS_DIR, ecs_task=True)
     new_unpruned_faculties = find_program_options(os.path.join(LOCAL_DOCUMENTS_DIR, "website_extracts.csv"))
     new_pruned_faculties = apply_previous_difs(new_unpruned_faculties, LOCAL_FACULTIES_UNPRUNED_FILEPATH, LOCAL_FACULTIES_FILEPATH)
     
@@ -204,4 +204,3 @@ def main():
 
 if __name__ == '__main__':
     main()
- 
