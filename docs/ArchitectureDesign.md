@@ -73,17 +73,36 @@ The processing step also keeps track of the relationships between extracts. ‘P
 
 **Embedding**
 
-To support the question answering system’s document retrieval by semantic search (see x.x.x), the text extracts are ‘embedded’ using the all-mpnet-base-v2 model. The model converts free text into dense vectors in a high-dimensional space, where the vectors represent the topic and meaning of the text.
+To support the question answering system’s document retrieval by semantic search (see x.x.x), the text extracts are ‘embedded’ using Amazon Titan Text Embeddings V2. The model converts free text into dense vectors in a high-dimensional space, where the vectors represent the topic and meaning of the text.
 
-Since a disproportionate amount of the ‘meaning’ of an extract is expressed by its titles (as discussed in 4.1.2) as opposed to its actual content, the embedding step takes an unusual approach. For each extract, it embeds the ‘parent titles’ (the titles of parent web pages), ‘page titles’ (the titles leading up to an extract within a particular page), and the extract’s text individually, and then concatenates the resulting embeddings to create a longer vector. As a result, when the question answering system performs semantic search over these vectors, the titles have a large impact on which extracts are returned. This is very helpful in the context of student advising, where it is essential that the system returns the right extracts for a student’s faculty/program/etc. 
+The ‘parent titles’ (the titles of parent web pages) and ‘page titles’ (the titles leading up to an extract within a particular page) are combined into one list. For example, the the 'parent titles are [A, B, C] and the 'page titles' are [C, D, E], then the combined list is [A, B, C, D, E]. This list is then converted into vectors and stored in a column called 'title_embedding.' The text containing the page's content is also converted into vectors and is stored in a different column called 'text_embedding.' With this, when the the question answering system performs semantic search, the embeddings in both these columns are considered. The titles have an equal impact on which extracts are returned along with the text. This is very helpful in the context of student advising, where it is essential that the system returns the right extracts for a student’s faculty/program/etc. 
 
 **Vector Store**
 
-After computing the embeddings for each extract, the system uploads them to a vector store, which is a database designed to store vector embeddings. The system supports two choices of vector stores: RDS with pgvector (see [Document Retrieval](#document-retrieval) for more details).
+After computing the embeddings for each extract, the system uploads them to a vector store, which is a database designed to store vector embeddings. The system supports the RDS with pgvector vector store (see [Document Retrieval](#document-retrieval) for more details).
 
 RDS supports similarity search, hybrid search, and metadata filtering while being scalable. It is integrated with the AWS CDK and thus easy to deploy.
 
-The system uploads the vector embeddings with a set of metadata such as titles, text content (un-embedded), and url.
+We create a custom embeddings table with the following columns:
+- doc_id: the ID of the document stored in this row
+- url: the URL where this document was found
+- titles: the combined list of 'parent titles' and 'page titles'
+- text: the content found in this document
+- links: the relevant links mentioned in the document
+- text_embedding: vectors representing the text found in the document
+- title_embedding: vectors representing the combined titles of the document
+
+When semantic search is conducted, with this design of the embeddings table, we can get the document details corresponding to the vectors in constant time.
+
+Rather than scanning through each embedding in the table to find the closest match, the project uses a method called indexing, which organizes the data prior to the search. We use Hierarchical Navigable Small Worlds (HNSW) indexing, although this method can be swapped out for another even after deployment. HNSW indexing places embeddings or vertices on a proximity graph, where similar vertices are linked together, forming a connected graph.
+
+A distance strategy refers to the method used to measure and compare the similarity between embeddings. The project uses Euclidean Distance, which measures the straight-line distance between two vectors in a vector space. The measurement ranges from 0 to infinity, where 0 represents identical vectors, and larger values represent increasingly dissimilar vectors. We employ Euclidean distance as the distance strategy in conjunction with HNSW. Before performing semantic search, it calculates the Euclidean distance between vertices, linking those with values closer to 0 to create the proximity graph.
+
+We leverage indexing and distance measures in a flexible manner that allows both techniques to be changed without modifying the underlying code. We utilize PGVector, an extension for PostgreSQL that provides vector data types and functions for semantic searches. This extension enables the storage and querying of high-dimensional vectors, which are essential for machine learning and AI applications. Specifically, it uses ‘hnsw’ for HNSW indexing and ‘vector_l2_ops’ for the Euclidean distance measure.
+
+By simply swapping these methods with other supported options in PGVector, the indexing and distance measurement strategies for the embeddings table can be easily altered. This setup ensures that stronger or more efficient methods can be adopted as they are developed in the future, requiring only a change in the method names. This flexibility enhances the robustness and future-proofing of the system, allowing it to stay current with the latest advancements in semantic search techniques.
+
+By pairing HNSW indexing with the Euclidean distance strategy, we organize the embeddings table prior to the semantic search, thereby reducing the latency in finding similar documents.
 
 ## Question Answering System
 
@@ -92,120 +111,69 @@ At the front end of the question answering system, a user enters a question, and
 ### Document Retrieval
 
 **Semantic Search**
-The system combines the user-inputted context with the question and embeds the text. The embedded text is sent to the vectorstore to perform a search for semantically similar extracts using the embedded query. The semantic search filters on metadata for faculty and/or program, if provided, so that only extracts within the user’s selected faculty and/or program will be returned. If the user includes their specialization and year level, this is included in the query used for semantic search, but the system does not strictly filter extracts on these fields.
+The system combines the user-inputted context with the question and embeds the text. The embedded text is sent to the vectorstore to perform a search for semantically similar extracts using the embedded query. The embedded text is put into a custom retriever that uses the K-Nearest Neighbor (KNN) algorithm, which finds the k most similar documents to a given query based on a specified distance measure. In our case, the Euclidean Distance measure is used. The HNSW indexing paired with the Euclidean distance measure ensures that the embeddings table is organized with closely related documents linked together. Combining KNN with HNSW indexing significantly speeds up document retrieval.
 
-See below for more details depending on the chosen retriever: pgvector.
-___
-**RDS with pgvector**
-
-If the admin chose to use the pgvector retriever, then the embedded query is sent to the RDS DB and compared with all vectors in the DB by cosine similarity search. If the user provides their faculty and/or program, entries matching the faculty and program are more likely to be returned.
-___
-
-**LLM Filter**
-
-The documents that the retriever returns are the most semantically similar to the user’s question, but this does not necessarily mean they will be relevant to answer the question. The system then performs a second level of filtering using the LLM, by prompting the LLM to predict whether each extract is relevant to answer the question or not. If not, it is removed from the pool. This step helps to remove irrelevant information and reduce hallucinations in the answer generation step. Depending on the LLM model used, the LLM may respond to the prompt with an explanation in addition to its yes/no answer. The system will record and display the reasoning if given.
-
-**Context Zooming**
-
-If the filter step removes all returned documents, then the system removes some of the provided context and redoes the semantic search, effectively ‘zooming out’ the context, in case the answer lies in a more general section of the information sources. For example, a student in a particular program may ask a question where the answer lies under the general University policies, rather than in the pages specifically for their program. By zooming out the context, the system can retrieve the relevant information.
+Semantic search is conducted over both the 'text_embedding' and 'title_embedding' columns to find documents relevant to the embedded text.The documents are then combined and prepared to be sent to the model for generating an answer.
 
 ### Answer Generation
 
-Using the remaining filtered extracts as context, the system prompts the LLM to generate a response that answers the user’s query. The prompt is engineered to encourage the LLM to use the provided context to answer the question and no prior knowledge, but it is always possible that a generative model will hallucinate, or misinterpret the given context.
+Using the documents collected, the system prompts the LLM to generate a response that answers the user’s query. The prompt is engineered to encourage the LLM to use the provided context to answer the question.
 
-Finally, the system displays the generated answer in the web UI. Since the generated answer is more experimental, it also displays the extracts that it used as references, and links to their original webpages. 
+Finally, the system displays the generated answer in the web UI. Since the generated answer is more experimental, it also displays the extracts that it used as references, the links to their original webpages, and a short text checking if the reference relates to the user's question or not.
 
 **LLM Model Comparison**
 
-By default, the system uses the Vicuna 7b LLM published by [lmsys](https://lmsys.org/). 
+By default, the system uses the Llama 3 8B Intruct LLM published by [Meta](https://www.meta.ai/). 
 When choosing a model, the following requirements were taken into account:
 - Open source and viable for commercial use
     - For public institutions such as Universities, permission for commercial use may not be required, but the commercial use clause allows more safety and flexibility
-- 7B (7 billion) parameters or less, to reduce cost of running the LLM.
-    - Models with larger number of parameters require more expensive cloud instances, which may cause the system to be out of budget.
-    - 7B is the minimum size for most leading LLMs as of the time of writing (August 2023).
+- Available on Amazon Bedrock
+    - The project uses Amazon Bedrock since it is serverless and models can be easily changed.
 
-The more traditional, non-generative models based on BERT were considered first, since they are smaller than modern generative LLMs would be far more cost-effective to run. However, these models demonstrate a lack of general language and logic understanding necessary to answer complex questions. See **LLM Sample Questions** below, for some sample responses from `distilbert-base-cased-distilled-squad`, a BERT-type model that is finetuned for extractive question answering. The answers demonstrate that the model is not strong enough for this purpose.
-
-The [Open LLM Leaderboard](https://huggingface.co/spaces/HuggingFaceH4/open_llm_leaderboard) by huggingface lists open source LLMs ranked by several metrics. At the time of writing (August 2023), the leading models of size 7B or less are:
-- LLaMa-2 Variants
-    - [StableBeluga-7B](https://huggingface.co/stabilityai/StableBeluga-7B), fine-tuned on an Orca-style dataset (non-commercial)
-    - [Nous-Hermes-llama-2-7b](https://huggingface.co/NousResearch/Nous-Hermes-llama-2-7b), fine-tuned on an instruction-following dataset, also synthetic from GPT-4
-    - [Llama2-7B-sharegpt4](https://huggingface.co/beaugogh/Llama2-7b-sharegpt4), finetuned on the ShareGPT dataset, which consists of user-shared conversations with ChatGPT
-    - [Vicuna-7B](https://huggingface.co/lmsys/vicuna-7b-v1.5), also finetuned using the ShareGPT dataset
-        - Other versions of Vicuna-7B are also high ranking in the leaderboard
-        - v1.3 is tuned from LLaMa-1 and thus non-commercial, but v1.5 is tuned from LLaMa-2 and viable for commercial use
-    - [Manatee-7B](https://huggingface.co/ashercn97/manatee-7b), finetuned on Orca datasets (non-commercial)
-    - [Llama-2-7b-chat](https://huggingface.co/meta-llama/Llama-2-7b-chat-hf), plain Llama-2 chat version
-    - [Airoboros-7b](https://huggingface.co/jondurbin/airoboros-l2-7b-gpt4-1.4.1), finetuned on synthetic data generated by GPT4
-    - ... The list of LLaMa-2 variants continues, and is in constant development. This list is limited to those with an average score of 55 or higher
-- [MPT-7B-chat](https://huggingface.co/mosaicml/mpt-7b-chat) (non-commercial)
-    - This model is more difficult to deploy on SageMaker endpoints, and as such was not considered, since it could not be deployed in a 'plug and play' manner like the other models.
-- [Falcon-7B Instruct](https://huggingface.co/tiiuae/falcon-7b)
-
-With average scores of 49.95 and 47 respectively, MPT-7B and Falcon-7B fall considerably behind the LLaMa-2-7B variants which have scores up to 59. MPT is not supported out of the box for Sagemaker Inference Endoints, so it was not tested. Falcon-7B was tested, and despite prompt engineering, it had a high tendency for hallucinations.
-
-There is also a leaderboard of models ranked by human evaluation in the [lmsys chatbot arena](https://huggingface.co/spaces/lmsys/chatbot-arena-leaderboard). Some models that perform well according to automatic metrics may not perform well when ranked by human evaluators, and vice versa. As of August 2023, the leading <= 7B model in this leaderboard is `Vicuna-7b`, though the other Llama-2 variants listed in the Open LLM leaderboard were not included in the comparison. 
-
-According to another leaderboard, [Alpaca Eval](https://tatsu-lab.github.io/alpaca_eval/), `Vicuna-7b` is also the leading 7B model. This leaderboard uses GPT4 and Claude to automatically rank models by the quality of their responses.
+Here is a list of models tested in Phase 2:
+- Llama 3 8B Instruct
+- Llama 3 70B Instruct
+- Mistral 7B Instruct
+- Mistral Large
 
 **LLM Sample Questions**
 
-See the [Model Comparison](./Model%20Comparison.xlsx) worksheet for a list of sample questions asked on different contexts. The models tested were `Vicuna-7b`, `Nous-Hermes-llama-2-7b`, and `Llama-2-7b-chat` since they are leading `7b` models with licenses allowing for commercial use. Also included was `distilbert-base-cased-distilled-squad`, a non-generative question answering model that responds to questions by extracting a portion of the provided context.
+See the [Model Comparison](./Model%20Comparison.xlsx) worksheet for a list of sample questions asked to each model. The models tested were `Llama 3 8B Instruct`, `Llama 3 70B Instruct`, `Mistral 7B Instruct`, and `Mistral Large` since they match the criteria of being available on Amazon Bedrock and are open source.
 
-The following prompt was used for the sample questions:
+When generating the main answer, the `Llama 3 8B Instruct` and `Llama 3 70B Instruct` have the following prompt template:
 ```
-Please answer the question based on the context below.
-Use only the context provided to answer the question, and no other information.
-If the context doesn't have enough information to answer, explain what information is missing.
-```
-
-The inputted context and question were provided in the format below, with {context} replaced by the context and {question} replacd by the question.
-```
-Context:
-{context}
-
-Question:
-{question}
-```
-
-Each of the LLaMa-based models have a different expected input format. The following formats were used, with {prompt} replaced by the prompt copied above and {input} replaced by the context and question as shown in the template above.
-- `Vicuna-7b`
-```
-USER:
-{prompt}
-{input}
-ASSISTANT:
-```
-- `Nous-Hermes-llama-2-7b`
-```
-### Instruction:
-{prompt}
-
-### Input:
-{input}
-
-### Response:
-```
-- `Llama-2-7b-chat`
-```
-<s>[INST] <<SYS>>
-{prompt}
-<</SYS>>
-{input}
-[/INST]
+prompt = f"""
+          <|begin_of_text|>
+          <|start_header_id|>system<|end_header_id|>
+          {system_prompt}
+          <|eot_id|>
+          <|start_header_id|>user<|end_header_id|>
+          {user_prompt}
+          <|eot_id|>
+          <|start_header_id|>documents<|end_header_id|>
+          {documents}
+          <|eot_id|>
+          <|start_header_id|>assistant<|end_header_id|>
+          """
 ```
 
-The model testing was done with SageMaker inference endpoints, and the following parameters:
+The `Mistral 7B Instruct` and `Mistral Large` models have the following prompt template:
 ```
-"parameters": {
-    "do_sample": False,
-    "max_new_tokens": 200,
-    "temperature": 0.1
-}
+prompt = f"""{system_prompt}.
+            Here is the question: {user_prompt}.
+            Here are the source documents: {documents}
+            """
 ```
+
+The ```system_prompt``` is specified as ```"Provide a short explaination if the document is relevant to the question or not."``` and can be changed in ```application.py``` in the ```flask_app``` of the project.
+
+The ```user_prompt``` corresponds to the user's question and ```documents```refers to the documents fetched from the retrieval process.
 
 **LLM Licenses**
+
+[Meta Llama 3 Community License Agreement](https://llama.meta.com/llama3/license/)
+
+[Mistral Legal terms and conditions](https://mistral.ai/terms/)
 
 Note that all LLaMA-2 variants are not 100% "open" since they are subject to the [LLAMA 2 COMMUNITY LICENSE AGREEMENT](https://github.com/facebookresearch/llama/blob/main/LICENSE), which allows for commercial use, but places some restrictions such as the requirement that the model not be used for illegal purposes.
 
