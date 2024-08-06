@@ -24,7 +24,7 @@ Script to download the data sources using wget, and then split all pages into do
 downstream tasks.
 """
 
-# /app/data is where ECS Tasks have writing privilegs due to EFS from Inference Stack
+# /app/data is where ECS Tasks have writing privileges due to EFS from Inference Stack
 
 ### CONSTANTS
 # Input files

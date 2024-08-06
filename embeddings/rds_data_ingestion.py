@@ -16,7 +16,7 @@ from aws_helpers.param_manager import get_param_manager
 from aws_helpers.s3_tools import download_s3_directory, upload_directory_to_s3, upload_file_to_s3
 from aws_helpers.ssh_forwarder import start_ssh_forwarder
 
-# /app/data is where ECS Tasks have writing privilegs due to EFS from Inference Stack
+# /app/data is where ECS Tasks have writing privileges due to EFS from Inference Stack
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -288,9 +288,9 @@ try:
         """
         cur.execute(grant_privileges_command)
         connection.commit()
-        logger.info(f"Privileges granted to {db_user_secret['username']} on phase_2_embeddings!")
+        logger.info(f"Privileges granted!")
     except psycopg2.Error as e:
-        logger.error(f"Error granting privileges to {db_user_secret['username']}: {e}")
+        logger.error(f"Error granting privileges: {e}")
         connection.rollback()
 
     ### POPULATE EMBEDDINGS TABLE
