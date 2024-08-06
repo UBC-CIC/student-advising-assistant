@@ -50,11 +50,15 @@ def connect_and_callback(callback, dev_mode = False):
         params["host"] = "localhost"
         params["port"] = server.local_bind_port
         
-    connection = psycopg2.connect(**params)
-    cursor = connection.cursor()
-    callback(connection, cursor)
-    cursor.close()
-    connection.close()
+    try: 
+        connection = psycopg2.connect(**params)
+        cursor = connection.cursor()
+        callback(connection, cursor)
+    except:
+        connection.rollback()
+    finally:
+        cursor.close()
+        connection.close()
     
     if dev_mode:
         server.close()

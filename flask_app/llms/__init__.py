@@ -5,4 +5,5 @@ __all__ = [
     'query_context_split',
     'load_model_and_prompt', 
     'load_chain_filter',
-    'load_spell_chain']
+    'load_spell_chain'
+]

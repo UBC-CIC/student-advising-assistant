@@ -42,8 +42,11 @@ If you are on a Windows device, it is recommended to install the [Windows Subsys
 
 This section includes aspects that should by considered when setting up this system for a particular University / Faculty. Ideally, these should be modified by a developer, hence including them in the Developer Guide rather than the User Guide.
 
+**Retrieval Over 2 Columns**
+In Phase 2, the system performs retrieval on both the ```text_embedding``` and ```title_embedding``` columns in the ```phase_2_embedding``` embeddings table. Both these columns have the same dimensions which can be modified in the ```rds_data_ingestion.py``` script in the ```embeddings``` folder (the embedding task on ECS will have to be run again for the changes to take effect). During retrieval, both the columns are weighted equally as well (retrieval takes place in the ```get_docs``` method in ```application.py```). Since new technologies and methods for RAG are being released frequently, different strategies could be used in the future to improve the performance of the project.
+
 **Zoom-out Retrieval**
-By default, during the document retrieval step, the system performs a ‘zoom-out’ retrieval. The code for this is in `flask_app/langchain_inference.py`. If the system fails to find any relevant documents with the full user-provided context, it will successively remove parts of the context to see if the relevant documents are in a more general section of the information sources. This way, it will check faculty-specific policies first, then zoom out to University-wide policies if it does not find the answer there.
+In Phase 1, during the document retrieval step, the system performs a ‘zoom-out’ retrieval. The code for this is in `flask_app/langchain_inference.py`. If the system fails to find any relevant documents with the full user-provided context, it will successively remove parts of the context to see if the relevant documents are in a more general section of the information sources. This way, it will check faculty-specific policies first, then zoom out to University-wide policies if it does not find the answer there.
 If a University or faculty has a different policy hierarchy, they will need to change this behaviour.
 
 **Faculty & Program Titles**
@@ -52,6 +55,47 @@ This step may have some false positives (eg. identifies ‘Major Programs’ as 
 This step could be improved if the University has an index of all faculties, programs, and specializations which can be used instead. However, you will have to ensure that the names of faculties and programs aligns with the names of faculties and programs in the extract metadata, in order for the metadata filtering to work during document retrieval.
 
 **Changing the LLM**
+
+***Phase 2***
+
+On the Amazon Systems Manager, the model name under the ```/student-advising/generator/MODEL_NAME``` parameter in Parameter Store can be changed to any of the following:
+- Llama 3 8B:     "meta.llama3-8b-instruct-v1:0"
+- Llama 3 70B:    "meta.llama3-70b-instruct-v1:0"
+- Mistral 7B:     "mistral.mistral-7b-instruct-v0:2"
+- Mistral Large:  "mistral.mistral-large-2402-v1:0"
+
+If you would like to use another model, ensure it is available on Amazon Bedrock and add it's Model ID (found in the Providers tab) to the parameter ```/student-advising/generator/MODEL_NAME```. Since the project does not have access to this new model, make sure to do the following steps:
+- Request for Model Access on the account used to deploy the project
+![Bedrock Model Access](./images/bedrock_model_access.png)
+
+- There is a policy called ```customBedrockPolicy``` attached to the EC2 IAM Role for the project. Within ```hosting-stack.ts```, add the new Model ID here. In the example below, replace ```new-model-id``` with the new Model ID:
+```
+// Add custom inline policy for Bedrock access
+    const customBedrockPolicy = new iam.Policy(this, "custom-bedrock-policy", {
+      statements: [
+        new iam.PolicyStatement({
+          effect: iam.Effect.ALLOW,
+          actions: ["bedrock:InvokeModel"],
+          resources: [
+            "arn:aws:bedrock:" + this.region + "::foundation-model/meta.llama3-70b-instruct-v1:0",
+            "arn:aws:bedrock:" + this.region + "::foundation-model/meta.llama3-8b-instruct-v1:0",
+            "arn:aws:bedrock:" + this.region + "::foundation-model/mistral.mistral-7b-instruct-v0:2",
+            "arn:aws:bedrock:" + this.region + "::foundation-model/mistral.mistral-large-2402-v1:0",
+            "arn:aws:bedrock:" + this.region + "::foundation-model/amazon.titan-embed-text-v2:0",
+            "arn:aws:bedrock:" + this.region + "::foundation-model/<new-model-id>"
+          ],
+        }),
+        new iam.PolicyStatement({
+          effect: iam.Effect.ALLOW,
+          actions: ["ssm:DescribeParameters", "secretsmanager:ListSecrets"],
+          resources: ["*"],
+        }),
+      ],
+    });
+```
+
+***Phase 1***
+
 As progress unfolds in the LLM field, you will likely want to change the language model used. The system will work relatively plug-and-play with any Huggingface Hub text generation model that is supported by the [Text Generation Inference](https://github.com/huggingface/text-generation-inference#optimized-architectures) container. However, you may need to update the prompts (defined in `/flask_app/prompts/prompt_templates.py`) to suit the format expected by a new model.
 
 The Flask App is configured to work with several types of hosted models, and the settings can be changed through the system's SSM Parameters.

@@ -32,6 +32,9 @@
             <p><strong>Answering question: </strong>{{question}}</p>
             <p><strong>Context: </strong>{% if context == '' %} None {% else %} {{context}}{% endif %}</p>
           </div>
+          {% for alert in alerts %}
+          <div class="alert alert-warning alert-dismissible fade show" role="alert">{{alert}}</div>
+          {% endfor %}
           <div class="card border-primary mb-3 border-2 bg-opacity-10">
             <div class="card-body">
               {% if main_response %}
@@ -98,7 +101,7 @@
                 <input 
                 type="hidden" 
                 name="feedback-hidden-reference-ids" 
-                value="{% for doc in docs + removed_docs%}{{doc['doc_id']}},{% endfor %}">
+                value="{% for doc in docs + removed_docs%}{{doc.metadata['doc_id']}},{% endfor %}">
                 <input type="hidden" name="feedback-hidden-response" value="{{main_response}}">
 
                 <div class="mt-3">
@@ -131,8 +134,9 @@
               Reference {{loop.index}}
             </div>
             <div class="card-body pt-0">
-              {% if doc['titles'] %}
-              <p>The following reference is about {{doc['titles'] | join(' -> ')}}</p>
+              {% if 'generated_response' in doc.metadata%}
+              <strong>Generated Response</strong>
+              <p>{{doc.metadata['generated_response']}}</p>
               {% endif %}
               <zero-md>
                 <template>
@@ -144,22 +148,29 @@
                     }
                   </style>
                 </template>
-                <script type="text/markdown">{{doc['text']}}</script>
+                <script type="text/markdown">{{doc.page_content}}</script>
               </zero-md>
-              {% if doc['relate'] %}
+              {% if 'keep_reason' in doc.metadata %}
               <strong>Is this document relevant?</strong>
-              <p> {{doc['relate']}} </p>
+              <p> {{doc.metadata['keep_reason']}} </p>
               {% endif %}
               <strong>Source</strong>
-              <p>Url: <a href="{{doc['url']}}">{{doc['url']}}</a></p>
-              {% if doc['links'] %}
+              {% if 'source' in doc.metadata %}
+              <p> {{doc.metadata['source']}} </p>
+              {% endif %}
+              <p>Url: <a href="{{doc.metadata['url']}}">{{doc.metadata['url']}}</a></p>
+              {% if 'related_links' in doc.metadata and doc.metadata['related_links']|length > 0 %}
               <strong>
                 Relevant Links
               </strong>
               <ul>
-                {% for link in doc['links'] %}
+                {% for title,link,doc_id in doc.metadata['related_links'] %}
                 <li>
-                  <p><a href="{{link}}">{{link}}</a></p>
+                  <p>{{title}}: <a href="{{link}}">{{link}}</a></p>
+                  {% if doc_id %}
+                  <button id="ask" type="submit" class="btn btn-outline-secondary" onclick="post_form({{doc_id}})">Ask
+                    Cali about this link</button>
+                  {% endif %}
                 </li>
                 {% endfor %}
               </ul>
@@ -181,9 +192,6 @@
               </h2>
               <div id="filtered-collapse{{loop.index}}" class="accordion-collapse collapse" aria-labelledby="filtered-heading{{loop.index}}" data-bs-parent="#removed-docs-accordion">
                 <div class="accordion-body">
-                  {% if doc['titles'] %}
-                  <p>The following reference is about {{doc['titles'] | join(' -> ')}}</p>
-                  {% endif %}
                   <zero-md>
                     <template>
                       <style>
@@ -193,36 +201,26 @@
                         }
                       </style>
                     </template>
-                    <script type="text/markdown">{{doc['text']}}</script>
+                    <script type="text/markdown">{{doc.page_content}}</script>
                   </zero-md>
-                  {% if doc['relate'] %}
-                  <strong>Is this document relevant?</strong>
-                  <p> {{doc['relate']}} </p>
-                  {% endif %}
-                  <strong>Source</strong>
-                  <p>Url: <a href="{{doc['url']}}">{{doc['url']}}</a></p>
-                  {% if doc['links'] %}
-                  <strong>
-                    Relevant Links
-                  </strong>
-                  <ul>
-                    {% for link in doc['links'] %}
-                    <li>
-                      <p><a href="{{link}}">{{link}}</a></p>
-                    </li>
-                    {% endfor %}
-                  </ul>
-                  {% endif %}
+                  {% if 'keep_reason' in doc.metadata %}
+                    <strong>Is this document relevant?</strong>
+                    <p> {{doc.metadata['keep_reason']}} </p>
+                    {% endif %}
+                    <strong>Source</strong>
+                    {% if 'source' in doc.metadata %}
+                    <p> {{doc.metadata['source']}} </p>
+                    {% endif %}
+                    <p>Url: <a href="{{doc.metadata['url']}}">{{doc.metadata['url']}}</a></p>
+                  </div>
                 </div>
               </div>
+              {% endfor %}
             </div>
-            {% endfor %}
-          </div>
-          {% endif %}
+            {% endif %}
         </section>
       </div>
-    </div>
-  </main>
+    </main>
 
 <script type="text/javascript">
   let form_params = {{ form | tojson | safe}}

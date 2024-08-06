@@ -49,14 +49,12 @@ def download_all_dirs(retriever: str):
     """
     Downloads the directories from s3 necessary for the flask app
     - retriever: Specify the retriever so the appropriate documents can be downloaded
-                 Choices are 'pinecone', 'pgvector'
+                 Choices are currently only 'pgvector'
     """
     # Specify directories to download
     dirs = ['documents']
 
-    if retriever == 'pinecone':
-        dirs.append('indexes/pinecone')
-    elif retriever == 'pgvector':
+    if retriever == 'pgvector':
         dirs.append('indexes/pgvector')
         
     for dir in dirs:

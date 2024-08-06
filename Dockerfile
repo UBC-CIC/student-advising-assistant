@@ -9,6 +9,9 @@ WORKDIR /usr/src/app
 COPY flask_app/requirements.txt ./
 RUN pip install --upgrade pip setuptools wheel && pip install --no-cache-dir -r requirements.txt
 
+# install langchain-community package since
+RUN pip install -U langchain-community
+
 # Copies the contents of the aws_helpers directory from the host machine into a aws_helpers/ directory 
 # under the container's working directory (/usr/src/app)
 COPY aws_helpers/ ./aws_helpers/

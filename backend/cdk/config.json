@@ -1,4 +1,4 @@
 {
     "retriever_type": "pgvector",
-    "llm_mode": "ec2"
+    "llm_mode": "bedrock"
 }

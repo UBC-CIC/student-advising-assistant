@@ -23,7 +23,8 @@ import * as s3 from "aws-cdk-lib/aws-s3";
 import * as s3n from "aws-cdk-lib/aws-s3-notifications";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
-import {readFileSync} from 'fs';
+import * as efs from "aws-cdk-lib/aws-efs";
+import { readFileSync } from 'fs';
 import config from '../config.json';
 
 export class InferenceStack extends Stack {
@@ -42,7 +43,7 @@ export class InferenceStack extends Stack {
   ) {
     super(scope, id, props);
 
-    this.S3_SSM_PARAM_NAME = "/student-advising/documents/S3_BUCKET_NAME"
+    this.S3_SSM_PARAM_NAME = "/student-advising/documents/S3_BUCKET_NAME";
     const vpc = vpcStack.vpc;
 
     // Bucket for files related to inference
@@ -53,6 +54,7 @@ export class InferenceStack extends Stack {
       publicReadAccess: false,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       encryption: s3.BucketEncryption.S3_MANAGED,
+      enforceSSL: true,
     });
 
     // Create the SSM parameter with the string value representing the S3 bucket name
@@ -61,10 +63,36 @@ export class InferenceStack extends Stack {
       stringValue: inferenceBucket.bucketName, // Replace 'your-s3-bucket-name' with the actual S3 bucket name
     });
 
+    // Define the authorized TCP ports
+    const authorizedTcpPorts = [80, 443];
+
+    // Create a security group
     const clusterSg = new ec2.SecurityGroup(this, "cluster-sg", {
       vpc: vpc,
       allowAllOutbound: true,
     });
+
+    // Add rules to allow incoming traffic on authorized ports
+    authorizedTcpPorts.forEach(port => {
+      clusterSg.addIngressRule(
+        ec2.Peer.anyIpv4(),
+        ec2.Port.tcp(port),
+        'Allow incoming traffic on port ' + port
+      );
+    });
+
+    // Create a security group for EFS
+    const efsSecurityGroup = new ec2.SecurityGroup(this, "EfsSecurityGroup", {
+      vpc: vpc,
+      allowAllOutbound: true,
+    });
+
+    // Allow traffic from within the VPC only on port 2049 for NFS
+    efsSecurityGroup.addIngressRule(
+      ec2.Peer.ipv4(vpc.vpcCidrBlock),
+      ec2.Port.tcp(2049),
+      "Allow NFS traffic from within VPC"
+    );
 
     // this role will be used for both task role and task execution role
     const ecsTaskRole = new iam.Role(this, "ecs-task-role", {
@@ -92,6 +120,17 @@ export class InferenceStack extends Stack {
         resources: ["*"],
       })
     );
+    ecsTaskRole.addToPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          "bedrock:InvokeModel"
+        ],
+        resources: [
+          `arn:aws:bedrock:${this.region}::foundation-model/amazon.titan-embed-text-v2:0`
+        ]
+      })
+    );
 
     const fargateCluster = new ecs.Cluster(this, "datapipeline-cluster", {
       vpc: vpc,
@@ -113,6 +152,46 @@ export class InferenceStack extends Stack {
         family: "scraping-and-embedding-16cpu-32gb",
       }
     );
+
+    // Create an EFS file system
+    const fileSystem = new efs.FileSystem(this, 'DataEfsFileSystem', {
+      vpc,
+      lifecyclePolicy: efs.LifecyclePolicy.AFTER_14_DAYS, // Optional, lifecycle policy
+      performanceMode: efs.PerformanceMode.GENERAL_PURPOSE, // Default
+      throughputMode: efs.ThroughputMode.BURSTING, // Default
+      removalPolicy: RemovalPolicy.DESTROY,
+      securityGroup: efsSecurityGroup,  // Attach the security group for EFS
+    });
+
+    const accessPoint = new efs.AccessPoint(this, 'DataEfsAccessPoint', {
+      fileSystem,
+      path: '/data',
+      createAcl: {
+        ownerUid: '1001',
+        ownerGid: '1001',
+        permissions: '755',
+      },
+      posixUser: {
+        uid: '1001',
+        gid: '1001',
+      },
+    });
+
+    // Define the EFS volume
+    const volumeName = "data-volume";
+    ecsTaskDef.addVolume({
+      name: volumeName,
+      efsVolumeConfiguration: {
+        fileSystemId: fileSystem.fileSystemId,
+        transitEncryption: 'ENABLED', // Enable transit encryption
+        authorizationConfig: {
+          accessPointId: accessPoint.accessPointId,
+          iam: 'ENABLED', // Use IAM for authorization
+        },
+      },
+    });
+
+    // Scraping container
     const scraping_container = ecsTaskDef.addContainer(
       "datapipeline-scraping",
       {
@@ -132,8 +211,17 @@ export class InferenceStack extends Stack {
         },
         essential: false,
         // gpuCount: 1,
+        readonlyRootFilesystem: true
       }
     );
+
+    // Add the bind mount to the scraping container
+    scraping_container.addMountPoints({
+      sourceVolume: volumeName,
+      containerPath: "/app/data",
+      readOnly: false,
+    });
+
     const embedding_container = ecsTaskDef.addContainer(
       "datapipeline-document-embeddings",
       {
@@ -153,10 +241,19 @@ export class InferenceStack extends Stack {
         environment: {
           // ECS_ENABLE_GPU_SUPPORT: "true",
           AWS_DEFAULT_REGION: this.region
-        }
+        },
+        readonlyRootFilesystem: true
       }
     );
-    // only start the embedding container when the scraping container successfully exit without error
+
+    // Add the bind mount to the embedding container
+    embedding_container.addMountPoints({
+      sourceVolume: volumeName,
+      containerPath: "/app/data",
+      readOnly: false,
+    });
+
+    // only start the embedding container when the scraping container successfully exits without error
     embedding_container.addContainerDependencies({
       container: scraping_container,
       condition: ecs.ContainerDependencyCondition.SUCCESS,
@@ -247,13 +344,13 @@ export class InferenceStack extends Stack {
 
     const lambdaRole = new iam.Role(this, "lambda-vpc-role", {
       assumedBy: new iam.ServicePrincipal("lambda.amazonaws.com"),
-      description: "Role for all Lambda function inside vpc",
+      description: "Role for all Lambda function inside VPC",
     });
     lambdaRole.addToPolicy(
       new iam.PolicyStatement({
         effect: iam.Effect.ALLOW,
         actions: [
-          //Secrets Manager
+          // Secrets Manager
           "secretsmanager:GetSecretValue",
         ],
         resources: [
@@ -311,7 +408,7 @@ export class InferenceStack extends Stack {
         timeout: Duration.seconds(300),
         memorySize: 512,
         environment: {
-          DB_SECRET_NAME: databaseStack.secretPath,
+          DB_SECRET_NAME: databaseStack.secretPathAdminName,
         },
         vpc: vpcStack.vpc,
         code: lambda.Code.fromAsset("./lambda/trigger_lambda"),
@@ -320,12 +417,34 @@ export class InferenceStack extends Stack {
       }
     );
 
-    // LLM configuration
-    const HUGGINGFACE_MODEL_ID = "arya/vicuna-7b-v1.5-hf";
-    const MODEL_NAME = "vicuna";
+    // Add the Lambda function to create the less privileged user and grant privileges
+    const createUserLambda = new triggers.TriggerFunction(this, "createUserLambda", {
+      functionName: "student-advising-create-db-user",
+      runtime: lambda.Runtime.PYTHON_3_9,
+      handler: "create_db_user.lambda_handler",
+      timeout: Duration.seconds(300),
+      memorySize: 512,
+      environment: {
+        DB_SECRET_NAME: databaseStack.secretPathAdminName,
+        DB_USER_SECRET_NAME: databaseStack.secretPathUser.secretName
+      },
+      vpc: vpcStack.vpc,
+      code: lambda.Code.fromAsset("./lambda/create_db_user"),
+      layers: [psycopg2],
+      role: lambdaRole,
+    });
+
+    /*
+     LLM configuration: Can choose any of the following models
+     - Llama 3 8B:     "meta.llama3-8b-instruct-v1:0"
+     - Llama 3 70B:    "meta.llama3-70b-instruct-v1:0"
+     - Mistral 7B:     "mistral.mistral-7b-instruct-v0:2"
+     - Mistral Large:  "mistral.mistral-large-2402-v1:0"
+    */
+    const MODEL_NAME = "meta.llama3-8b-instruct-v1:0";
 
     if (config.llm_mode == "sagemaker") {
-      this.ENDPOINT_NAME = MODEL_NAME + "-inference";
+      this.ENDPOINT_NAME = "vicuna" + "-inference";
       this.ENDPOINT_TYPE = "sagemaker";
       const INSTANCE_TYPE = "ml.g5.xlarge";
       const NUM_GPUS = "1";
@@ -353,7 +472,7 @@ export class InferenceStack extends Stack {
             SM_ENDPOINT_NAME: this.ENDPOINT_NAME,
             SM_REGION: this.region,
             SM_ROLE_ARN: smRole.roleArn,
-            HF_MODEL_ID: HUGGINGFACE_MODEL_ID,
+            HF_MODEL_ID: "arya/vicuna-7b-v1.5-hf",
             MODEL_NAME: MODEL_NAME,
             INSTANCE_TYPE: INSTANCE_TYPE,
             NUM_GPUS: NUM_GPUS,
@@ -403,6 +522,7 @@ export class InferenceStack extends Stack {
         disableInlineRules: true
       });
 
+      // Allow only necessary ports
       ec2SG.addIngressRule(
         ec2.Peer.ipv4(vpcStack.cidr),
         ec2.Port.tcp(22),
@@ -414,14 +534,14 @@ export class InferenceStack extends Stack {
         ec2.Port.tcp(8080),
         'Allow traffic to inference endpoint',
       );
-      
+
       // Find the Deep Learning Base GPU AMI (Ubuntu 20.04)
       const dlami = ec2.MachineImage.lookup({
         name: 'Deep Learning Base GPU AMI (Ubuntu 20.04)*',
         owners: ['amazon'],
       });
 
-      // Create a keypair for the instance 
+      // Create a keypair for the instance
       const ec2KeyPair = new ec2.CfnKeyPair(this, 'student-advising-tgi-keypair', {
         keyName: 'student-advising-ec2-tgi-key',
       });
@@ -450,13 +570,16 @@ export class InferenceStack extends Stack {
       const startupScript = readFileSync('./lib/ec2-tgi-startup.sh', 'utf8');
       ec2Instance.addUserData(startupScript);
 
-      this.ENDPOINT_NAME = ec2Instance.instancePrivateIp + ':8080';
+      this.ENDPOINT_NAME = ec2Instance.instancePrivateIp + ":8080";
+    } else if (config.llm_mode == "bedrock") {
+      this.ENDPOINT_TYPE = "bedrock";
+      this.ENDPOINT_NAME = MODEL_NAME;
     } else {
       this.ENDPOINT_NAME = "none";
       this.ENDPOINT_TYPE = "none";
     }
 
-    // Create the SSM parameter with the string value of the sagemaker inference endpoint name
+    // Create the SSM parameter with the string value of the inference endpoint name
     new ssm.StringParameter(this, "EndpointNameParameter", {
       parameterName: "/student-advising/generator/ENDPOINT_NAME",
       stringValue: this.ENDPOINT_NAME,

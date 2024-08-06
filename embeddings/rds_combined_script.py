@@ -12,7 +12,6 @@ import shutil
 import pathlib
 import ast
 import doc_loader
-import batcher
 import torch
 from combined_embeddings import concat_embeddings
 import sys
@@ -22,8 +21,10 @@ from aws_helpers.param_manager import get_param_manager
 from aws_helpers.s3_tools import download_s3_directory, upload_directory_to_s3
 from aws_helpers.ssh_forwarder import start_ssh_forwarder
 
+# /app/data is where ECS Tasks have writing privilegs due to EFS from Inference Stack
+
 ### CONFIGURATION
-# AWS Secrets Manager config for the Pinecone secret API key and region
+# AWS Secrets Manager config for the RDS secret
 secret_name = "credentials/RDSCredentials"
 param_manager = get_param_manager()
 
@@ -63,7 +64,7 @@ if not args.gpu_available:
 
 # Load the csv of documents from s3
 docs_dir = 'documents' 
-download_s3_directory(docs_dir)
+download_s3_directory(docs_dir, ecs_task=True)
 docs = doc_loader.load_docs(os.path.join(docs_dir, "website_extracts.csv"), eval_strings=False)
 metadatas = [doc.metadata for doc in docs]
 ids = [doc.metadata['doc_id'] for doc in docs]
@@ -71,7 +72,7 @@ ids = [doc.metadata['doc_id'] for doc in docs]
 # Load precomputed embeddings
 embed_dir = f"embeddings-{index_config['namespace']}"
 if not args.compute_embeddings: 
-    download_s3_directory(embed_dir)
+    download_s3_directory(embed_dir, ecs_task=True)
 
 # Create the different lists of texts for embedding
 title_sep = ' : ' # separator to use to join titles into strings

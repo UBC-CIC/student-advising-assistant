@@ -43,7 +43,7 @@ export class HostingStack extends cdk.Stack {
         timeout: cdk.Duration.seconds(300),
         memorySize: 512,
         environment: {
-          DB_SECRET_NAME: databaseStack.secretPath,
+          DB_SECRET_NAME: databaseStack.secretPathAdminName,
         },
         vpc: vpcStack.vpc,
         code: lambda.Code.fromAsset("./lambda/store_feedback"),
@@ -62,7 +62,7 @@ export class HostingStack extends cdk.Stack {
         timeout: cdk.Duration.seconds(300),
         memorySize: 512,
         environment: {
-          DB_SECRET_NAME: databaseStack.secretPath,
+          DB_SECRET_NAME: databaseStack.secretPathAdminName,
           BUCKET_PARAM_NAME: 	inferenceStack.S3_SSM_PARAM_NAME
         },
         vpc: vpcStack.vpc,
@@ -91,6 +91,7 @@ export class HostingStack extends cdk.Stack {
         blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
         publicReadAccess: false,
         removalPolicy: cdk.RemovalPolicy.DESTROY,
+        enforceSSL: true,
       });
     }
 
@@ -102,48 +103,67 @@ export class HostingStack extends cdk.Stack {
       extract: false // we want to upload the whole zip to s3, not extract the zip on s3
     });
 
-    // EC2 Instance Profile role for Beanstalk App
-    // this role will be used for both task role and task execution role
+    /*
+    - EC2 Instance Profile role for Beanstalk App
+    - this role will be used for both task role and task execution role
+    - Clarification: creates an IAM role with the logical ID ec2-iam-role, 
+                     but the actual name of the role in AWS will be generated 
+                     automatically by AWS CDK. The naming convention used by CDK is 
+                     <StackName>-<LogicalID>-<RandomString>.
+
+    */
     const ec2IamRole = new iam.Role(this, "ec2-iam-role", {
       assumedBy: new iam.ServicePrincipal("ec2.amazonaws.com"),
       description: "Role serves as EC2 Instance Profile",
     });
-    ec2IamRole.addManagedPolicy(
-      iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonS3FullAccess")
-    );
-    ec2IamRole.addManagedPolicy(
-      iam.ManagedPolicy.fromAwsManagedPolicyName("service-role/AWSLambdaRole")
-    );
-    ec2IamRole.addManagedPolicy(
-      iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonSSMReadOnlyAccess")
-    );
-    ec2IamRole.addManagedPolicy(
-      iam.ManagedPolicy.fromAwsManagedPolicyName("AWSElasticBeanstalkWebTier")
-    );
-    ec2IamRole.addManagedPolicy(
-      iam.ManagedPolicy.fromAwsManagedPolicyName(
-        "AWSElasticBeanstalkMulticontainerDocker"
-      )
-    );
-    ec2IamRole.addManagedPolicy(
-      iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonSageMakerFullAccess")
-    );
-    ec2IamRole.addManagedPolicy(
-      iam.ManagedPolicy.fromAwsManagedPolicyName("SecretsManagerReadWrite")
-    );
+    
+    // Add managed policies to the role
+    const managedPolicies = [
+      "service-role/AWSLambdaRole",
+      "AmazonSSMManagedInstanceCore",
+      "AWSElasticBeanstalkMulticontainerDocker",
+      "AWSElasticBeanstalkWebTier",
+      "AWSElasticBeanstalkWorkerTier",
+      "SecretsManagerReadWrite",
+      "AmazonSSMReadOnlyAccess",
+      "AmazonSageMakerFullAccess",
+      "AmazonS3FullAccess",
+    ];
 
-    const instanceProfName = "beanstalk-ec2-instance-profile"
-    let instanceProfile = iam.InstanceProfile.fromInstanceProfileName(this, instanceProfName, instanceProfName)
-    if (!instanceProfile.instanceProfileName) {
-      instanceProfile = new iam.InstanceProfile(
-        this,
-        instanceProfName,
-        {
-          role: ec2IamRole,
-          instanceProfileName: instanceProfName,
-        }
-      );
-    }
+    managedPolicies.forEach((policy) => {
+      ec2IamRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName(policy));
+    });
+
+    // Add custom inline policy for Bedrock access
+    const customBedrockPolicy = new iam.Policy(this, "custom-bedrock-policy", {
+      statements: [
+        new iam.PolicyStatement({
+          effect: iam.Effect.ALLOW,
+          actions: ["bedrock:InvokeModel"],
+          resources: [
+            "arn:aws:bedrock:" + this.region + "::foundation-model/meta.llama3-70b-instruct-v1:0",
+            "arn:aws:bedrock:" + this.region + "::foundation-model/meta.llama3-8b-instruct-v1:0",
+            "arn:aws:bedrock:" + this.region + "::foundation-model/mistral.mistral-7b-instruct-v0:2",
+            "arn:aws:bedrock:" + this.region + "::foundation-model/mistral.mistral-large-2402-v1:0",
+            "arn:aws:bedrock:" + this.region + "::foundation-model/amazon.titan-embed-text-v2:0",
+          ],
+        }),
+        new iam.PolicyStatement({
+          effect: iam.Effect.ALLOW,
+          actions: ["ssm:DescribeParameters", "secretsmanager:ListSecrets"],
+          resources: ["*"],
+        }),
+      ],
+    });
+
+    ec2IamRole.attachInlinePolicy(customBedrockPolicy);
+
+    const instanceProfName = "beanstalk-ec2-instance-profile";
+    // Create a new Instance Profile with the desired IAM Role
+    let instanceProfile = new iam.InstanceProfile(this, instanceProfName, {
+      role: ec2IamRole,
+      instanceProfileName: instanceProfName,
+    });
 
     const appName = "student-advising-demo-app";
     const app = new elasticbeanstalk.CfnApplication(
@@ -177,7 +197,7 @@ export class HostingStack extends cdk.Stack {
       cnamePrefix: cnamePrefix,
       description: "Docker environment for Python Flask application",
       applicationName: app.applicationName || appName,
-      solutionStackName: "64bit Amazon Linux 2 v3.6.0 running Docker",
+      solutionStackName: "64bit Amazon Linux 2 v4.0.0 running Docker",
       optionSettings: [
         // https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/command-options-general.html
         {

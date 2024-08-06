@@ -12,8 +12,6 @@ dependencies:
     - networkx
     - python-dotenv
     - flask[async]
-    - pinecone-client 
-    - pinecone-text
     - boto3
     - psycopg2-binary
     - pgvector

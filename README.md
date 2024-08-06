@@ -17,7 +17,7 @@ For more information visit the [CIC Website](https://cic.ubc.ca/).
 
 The following architecture diagram illustrates the various AWS components utilized to deliver the solution. For an in-depth explanation of the frontend and backend stacks, refer to the [Architecture Design](docs/ArchitectureDesign.md).
 
-![Alt text](docs/images/ArchiectureDiagram-EC2-tgi-inference.drawio.png)
+![Alt text](docs/images/ArchitectureDiagram-Phase-2.drawio.png)
 
 ## Deployment Guide
 
@@ -39,6 +39,8 @@ For instructions on how to develop the application, refer to the [Developer Guid
 │   └───cdk
 │       ├───bin
 │       ├───lambda
+│       │   ├───create_db_user
+│       │   ├───fetch_feedback
 │       │   ├───start_ecs
 │       │   ├───store_feedback
 │       │   └───trigger_lambda
@@ -71,7 +73,7 @@ For instructions on how to develop the application, refer to the [Developer Guid
     - `/filters`: Classes relating to document filters
     - `/llms`: Classes relating to LLMs, adapters to connect to LLMs, and helpers to load LLMs
     - `/prompts`: Prompt template definitions
-    - `/retrievers`: Retriever classes for PGVector and Pinecone
+    - `/retrievers`: Retriever classes for PGVector
     - `/static`: Static web content as .md or .json
     - `/templates`: HTML files with Jinja2 templates for the web app's pages
 6. `/misc`: Contains various other useful scripts, contents described in the [Developer Guide](./docs/DeveloperGuide.md)
@@ -81,7 +83,15 @@ N/A
 
 ## Credits
 
-This application was architected and developed by Arya Stevinson and Tien Nguyen, with project assistance by Victoria Li. A special thanks to the UBC Cloud Innovation Centre Technical and Project Management teams for their guidance and support.
+**Phase 2**
+
+Phase 2 of this application was architected and developed by Aman Prakash, with project assistance by Miranda Newell.
+
+**Phase 1**
+
+Phase 1 of this application was architected and developed by Arya Stevinson and Tien Nguyen, with project assistance by Victoria Li.
+
+A special thanks to the UBC Cloud Innovation Centre Technical and Project Management teams for their guidance and support.
 
 ## License
 
@@ -114,3 +124,9 @@ Licenses of libraries and tools used by the system are listed below:
 - Not true open source due to some restrictions regarding inappropriate use
 - "Your use of the Llama Materials must comply with applicable laws and regulations"
 - Also includes restrictions on solutions that have "700 million monthly active users"
+
+[LLaMa 3 Community License Agreement](https://llama.meta.com/llama3/license/)
+- For Llama 3 8B Instruct and Llama 3 70B Instruct models
+
+[Mistral Legal terms and conditions](https://mistral.ai/terms/)
+- For Mistral 7B Instruct and Mistral Large models

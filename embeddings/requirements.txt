@@ -4,6 +4,7 @@ huggingface_hub
 transformers
 langchain==0.0.240
 pandas
+numpy
 sentence-transformers
 python-dotenv
 sshtunnel
@@ -12,6 +13,5 @@ sshtunnel
 pgvector
 psycopg2-binary
 
-# Pinecone requirements
-pinecone-client
-pinecone-text
+# Embeddings requirements
+langchain-community

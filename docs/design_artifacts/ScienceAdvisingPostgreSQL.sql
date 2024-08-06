@@ -21,3 +21,14 @@ CREATE TABLE "update_logs" (
   "id" BIGSERIAL PRIMARY KEY,
   "datetime" timestamptz
 );
+
+CREATE TABLE "phase_2_embeddings" (
+  "id" BIGSERIAL PRIMARY KEY,
+  "doc_id" TEXT,
+  "url" TEXT,
+  "titles" JSONB,
+  "text" TEXT,
+  "links" JSONB,
+  "text_embedding" VECTOR(1024),
+  "title_embedding" VECTOR(1024)
+);
