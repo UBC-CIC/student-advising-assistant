@@ -22,6 +22,8 @@ RETRIEVER_NAME_SSM_KEY = "RETRIEVER_NAME"
 param_manager = get_param_manager()
 retriever_config = param_manager.get_parameter('retriever')
 retriever_name = retriever_config[RETRIEVER_NAME_SSM_KEY]
+ENDPOINT_TYPE = param_manager.get_parameter(['generator','ENDPOINT_TYPE'])
+
 
 args = ["--compute_embeddings", "--clear_index"]
 if torch.cuda.is_available() or torch.backends.mps.is_available():
@@ -31,7 +33,7 @@ else:
 
 try:
     if retriever_name == "pgvector":
-        command = ["python", "rds_data_ingestion.py"] + args
+        command = ["python", "rds_data_ingestion.py"] + args if ENDPOINT_TYPE == "bedrock" else ["python", "rds_combined_script.py"] + args
         # Ensure that the arguments are sanitized and valid
         safe_args = [str(arg) for arg in args]
         subprocess.run(command + safe_args, check=True)

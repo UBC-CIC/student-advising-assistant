@@ -444,7 +444,7 @@ export class InferenceStack extends Stack {
     const MODEL_NAME = "meta.llama3-8b-instruct-v1:0";
 
     if (config.llm_mode == "sagemaker") {
-      this.ENDPOINT_NAME = MODEL_NAME + "-inference";
+      this.ENDPOINT_NAME = "vicuna" + "-inference";
       this.ENDPOINT_TYPE = "sagemaker";
       const INSTANCE_TYPE = "ml.g5.xlarge";
       const NUM_GPUS = "1";
@@ -472,6 +472,7 @@ export class InferenceStack extends Stack {
             SM_ENDPOINT_NAME: this.ENDPOINT_NAME,
             SM_REGION: this.region,
             SM_ROLE_ARN: smRole.roleArn,
+            HF_MODEL_ID: "arya/vicuna-7b-v1.5-hf",
             MODEL_NAME: MODEL_NAME,
             INSTANCE_TYPE: INSTANCE_TYPE,
             NUM_GPUS: NUM_GPUS,

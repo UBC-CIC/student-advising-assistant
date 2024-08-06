@@ -118,13 +118,16 @@ The configuration options are in the `/backend/cdk/config.json` file. By default
 ```
 {
     "retriever_type": "pgvector",
-    "llm_mode": "ec2"
+    "llm_mode": "bedrock"
 }
 ```
 - `retriever_type` allowed values: "pgvector"
-- `llm_mode` allowed values: "ec2", "sagemaker", "none"
+- `llm_mode` allowed values: "bedrock", "ec2", "sagemaker", "none"
 
-If you would prefer not to deploy the LLM, replace the `"ec2"` value with `"none"`. The system will not deploy a LLM endpoint, and it will return references from the information sources only, without generated responses. 
+If you would not like to to use `"bedrock"` as the `llm_mode` and use any of the other options, you must do the following:
+- Go to `wsgi.py` in the `flask_app` folder and change ```from application import application``` to ```from old_application import application```
+
+If you would prefer not to deploy the LLM, set the `llm_mode` to `"none"`. The system will not deploy a LLM endpoint, and it will return references from the information sources only, without generated responses. 
 
 The `"sagemaker"` options for `llm_mode` will host the model with an SageMaker inference endpoint instead of an EC2 instance. This may incur a higher cost.
 
