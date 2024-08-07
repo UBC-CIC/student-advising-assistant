@@ -24,15 +24,15 @@ Script to download the data sources using wget, and then split all pages into do
 downstream tasks.
 """
 
-# /mnt/data is where ECS Tasks have writing privileges due to EBS from Inference Stack
+# /app/data is where ECS Tasks have writing privileges due to EBS from Inference Stack
 
 ### CONSTANTS
 # Input files
-CONFIG_FILEPATH = '/mnt/data/dump_config.json5' # Filepath to the dump config file in current working dir
+CONFIG_FILEPATH = '/app/data/dump_config.json5' # Filepath to the dump config file in current working dir
 
 # Output files
-BASE_DUMP_PATH = '/mnt/data/site_dumps' # Directory where site dump files are saved
-LOCAL_DOCUMENTS_DIR = '/mnt/data/documents' # Local directory where processed extracts are saved
+BASE_DUMP_PATH = '/app/data/site_dumps' # Directory where site dump files are saved
+LOCAL_DOCUMENTS_DIR = '/app/data/documents' # Local directory where processed extracts are saved
 S3_DOCUMENTS_DIR = 'documents' # S3 directory where processed extracts are saved
 REDIRECT_FILEPATH = os.path.join(BASE_DUMP_PATH, 'redirects.txt') # Filepath for dict of redirects
 LOCAL_FACULTIES_UNPRUNED_FILEPATH = os.path.join(LOCAL_DOCUMENTS_DIR, "faculties_unpruned.json")

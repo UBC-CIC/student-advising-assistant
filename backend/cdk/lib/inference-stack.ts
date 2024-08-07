@@ -136,7 +136,7 @@ export class InferenceStack extends Stack {
           cpuArchitecture: ecs.CpuArchitecture.X86_64
         },
         family: "scraping-and-embedding-16cpu-32gb",
-        ephemeralStorageGiB: 100 // Add this line for ephemeral storage
+        ephemeralStorageGiB: 120 // Add this line for ephemeral storage
       }
     );
 
