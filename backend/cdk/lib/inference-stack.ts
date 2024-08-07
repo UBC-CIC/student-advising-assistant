@@ -136,16 +136,14 @@ export class InferenceStack extends Stack {
           cpuArchitecture: ecs.CpuArchitecture.X86_64
         },
         family: "scraping-and-embedding-16cpu-32gb",
+        ephemeralStorageGiB: 100 // Add this line for ephemeral storage
       }
     );
 
-    // Define the EBS volume
+    // Define the bind mount volume
     const volumeName = "data-volume";
     ecsTaskDef.addVolume({
-      name: volumeName,
-      host: {
-        sourcePath: "/mnt/data",
-      },
+      name: volumeName
     });
 
     // Scraping container
@@ -175,7 +173,7 @@ export class InferenceStack extends Stack {
     // Add the bind mount to the scraping container
     scraping_container.addMountPoints({
       sourceVolume: volumeName,
-      containerPath: "/mnt/data",
+      containerPath: "/app/data",
       readOnly: false,
     });
 
@@ -206,7 +204,7 @@ export class InferenceStack extends Stack {
     // Add the bind mount to the embedding container
     embedding_container.addMountPoints({
       sourceVolume: volumeName,
-      containerPath: "/mnt/data",
+      containerPath: "/app/data",
       readOnly: false,
     });
 
