@@ -23,7 +23,6 @@ import * as s3 from "aws-cdk-lib/aws-s3";
 import * as s3n from "aws-cdk-lib/aws-s3-notifications";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
-import * as efs from "aws-cdk-lib/aws-efs";
 import { readFileSync } from 'fs';
 import config from '../config.json';
 
@@ -80,19 +79,6 @@ export class InferenceStack extends Stack {
         'Allow incoming traffic on port ' + port
       );
     });
-
-    // Create a security group for EFS
-    const efsSecurityGroup = new ec2.SecurityGroup(this, "EfsSecurityGroup", {
-      vpc: vpc,
-      allowAllOutbound: true,
-    });
-
-    // Allow traffic from within the VPC only on port 2049 for NFS
-    efsSecurityGroup.addIngressRule(
-      ec2.Peer.ipv4(vpc.vpcCidrBlock),
-      ec2.Port.tcp(2049),
-      "Allow NFS traffic from within VPC"
-    );
 
     // this role will be used for both task role and task execution role
     const ecsTaskRole = new iam.Role(this, "ecs-task-role", {
@@ -153,41 +139,12 @@ export class InferenceStack extends Stack {
       }
     );
 
-    // Create an EFS file system
-    const fileSystem = new efs.FileSystem(this, 'DataEfsFileSystem', {
-      vpc,
-      lifecyclePolicy: efs.LifecyclePolicy.AFTER_14_DAYS, // Optional, lifecycle policy
-      performanceMode: efs.PerformanceMode.GENERAL_PURPOSE, // Default
-      throughputMode: efs.ThroughputMode.BURSTING, // Default
-      removalPolicy: RemovalPolicy.DESTROY,
-      securityGroup: efsSecurityGroup,  // Attach the security group for EFS
-    });
-
-    const accessPoint = new efs.AccessPoint(this, 'DataEfsAccessPoint', {
-      fileSystem,
-      path: '/data',
-      createAcl: {
-        ownerUid: '1001',
-        ownerGid: '1001',
-        permissions: '755',
-      },
-      posixUser: {
-        uid: '1001',
-        gid: '1001',
-      },
-    });
-
-    // Define the EFS volume
+    // Define the EBS volume
     const volumeName = "data-volume";
     ecsTaskDef.addVolume({
       name: volumeName,
-      efsVolumeConfiguration: {
-        fileSystemId: fileSystem.fileSystemId,
-        transitEncryption: 'ENABLED', // Enable transit encryption
-        authorizationConfig: {
-          accessPointId: accessPoint.accessPointId,
-          iam: 'ENABLED', // Use IAM for authorization
-        },
+      host: {
+        sourcePath: "/mnt/data",
       },
     });
 
@@ -218,7 +175,7 @@ export class InferenceStack extends Stack {
     // Add the bind mount to the scraping container
     scraping_container.addMountPoints({
       sourceVolume: volumeName,
-      containerPath: "/app/data",
+      containerPath: "/mnt/data",
       readOnly: false,
     });
 
@@ -249,7 +206,7 @@ export class InferenceStack extends Stack {
     // Add the bind mount to the embedding container
     embedding_container.addMountPoints({
       sourceVolume: volumeName,
-      containerPath: "/app/data",
+      containerPath: "/mnt/data",
       readOnly: false,
     });
 
