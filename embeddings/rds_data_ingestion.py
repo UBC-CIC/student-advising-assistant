@@ -7,6 +7,7 @@ import psycopg2
 import ast
 import math
 from psycopg2.extras import execute_values
+from psycopg2 import sql
 from pgvector.psycopg2 import register_vector
 import sys
 import shutil
@@ -242,7 +243,7 @@ try:
             print(f"Terminated process {pid} holding lock on {table_name}.")
 
     # Drop the table if it already exists
-    drop_table_command = "DROP TABLE IF EXISTS phase_2_embeddings;"
+    drop_table_command = sql.SQL("DROP TABLE IF EXISTS phase_2_embeddings;")
 
     try:
         # Terminate the process holding the lock if any
@@ -258,7 +259,7 @@ try:
 
     ### CREATE EMBEDDINGS TABLE
     # Create table to store embeddings and metadata
-    table_create_command = f"""
+    table_create_command = sql.SQL("""
     CREATE TABLE phase_2_embeddings (
                 id bigserial primary key,
                 doc_id text,
@@ -266,10 +267,13 @@ try:
                 titles jsonb,
                 text text,
                 links jsonb,
-                text_embedding vector({VECTOR_DIMENSION}),
-                title_embedding vector({VECTOR_DIMENSION})
+                text_embedding vector({}),
+                title_embedding vector({})
                 );
-                """
+                """).format(
+        sql.Literal(VECTOR_DIMENSION),
+        sql.Literal(VECTOR_DIMENSION)
+    )
 
     try:
         # Create the new table
@@ -283,9 +287,9 @@ try:
     ### GRANT PRIVILEGES TO db_user_secret['username']
     try:
         db_user_secret = param_manager.get_secret(user_secret_name)
-        grant_privileges_command = f"""
-        GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE phase_2_embeddings TO {db_user_secret['username']};
-        """
+        grant_privileges_command = sql.SQL("""
+        GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE phase_2_embeddings TO {};
+        """).format(sql.Identifier(db_user_secret['username']))
         cur.execute(grant_privileges_command)
         connection.commit()
         logger.info(f"Privileges granted!")
@@ -306,7 +310,7 @@ try:
 
     # Function to convert string representation of list to numpy array
     def parse_embedding(embedding_str):
-        return np.array(eval(embedding_str))
+        return np.array(ast.literal_eval(embedding_str))
 
     # Apply the function to the text_embedding column if it's a string
     if isinstance(first_row['text_embedding'], str):
