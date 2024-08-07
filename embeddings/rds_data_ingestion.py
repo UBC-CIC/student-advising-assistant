@@ -16,7 +16,7 @@ from aws_helpers.param_manager import get_param_manager
 from aws_helpers.s3_tools import download_s3_directory, upload_directory_to_s3, upload_file_to_s3
 from aws_helpers.ssh_forwarder import start_ssh_forwarder
 
-# /app/data is where ECS Tasks have writing privileges due to EFS from Inference Stack
+# /mnt/data is where ECS Tasks have writing privileges due to EBS from Inference Stack
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -35,7 +35,7 @@ VECTOR_DIMENSION = 1024
 # Load the csv of documents from s3
 docs_dir = 'documents'
 download_s3_directory(docs_dir, ecs_task=True)
-extracts_df = pd.read_csv(os.path.join('/app/data', docs_dir, "website_extracts.csv"))
+extracts_df = pd.read_csv(os.path.join('/mnt/data', docs_dir, "website_extracts.csv"))
 # Print first 5 rows of CSV
 logger.info(f"First 5 rows of the CSV:\n{extracts_df.head()}")
 
@@ -119,7 +119,7 @@ def combine_titles(row):
 selected_columns_df['titles'] = selected_columns_df.apply(combine_titles, axis=1)
 
 # Define the path for the new CSV file
-file_path = '/app/data/moded.csv'
+file_path = '/mnt/data/moded.csv'
 
 try:
     # Save the new CSV file
@@ -165,7 +165,7 @@ try:
     data['title_embedding'] = title_embeddings_list
 
     # Save the updated DataFrame to a new CSV file
-    embeddings_file_path = '/app/data/moded_with_embeddings.csv'
+    embeddings_file_path = '/mnt/data/moded_with_embeddings.csv'
     data.to_csv(embeddings_file_path, index=False)
     logger.info(f"moded_with_embeddings.csv created successfully.")
 except Exception as e:
@@ -488,15 +488,15 @@ finally:
 
 # Upload documents to s3
 upload_directory_to_s3(docs_dir)
-upload_file_to_s3('/app/data/moded.csv', 'embeddings-amazon-titan/moded.csv')
-upload_file_to_s3('/app/data/moded_with_embeddings.csv', 'embeddings-amazon-titan/moded_with_embeddings.csv')
+upload_file_to_s3('/mnt/data/moded.csv', 'embeddings-amazon-titan/moded.csv')
+upload_file_to_s3('/mnt/data/moded_with_embeddings.csv', 'embeddings-amazon-titan/moded_with_embeddings.csv')
 
 # Delete directories from disk
-shutil.rmtree('/app/data/' + docs_dir)
+shutil.rmtree('/mnt/data/' + docs_dir)
 # Remove CSV files
 try:
-    os.remove('/app/data/moded.csv')
-    os.remove('/app/data/moded_with_embeddings.csv')
+    os.remove('/mnt/data/moded.csv')
+    os.remove('/mnt/data/moded_with_embeddings.csv')
     logger.info("Successfully removed 'moded.csv' and 'moded_with_embeddings.csv' from disk.")
 except OSError as e:
     logger.error(f"Error removing file: {e}")
