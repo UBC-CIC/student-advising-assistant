@@ -158,7 +158,7 @@ export class HostingStack extends cdk.Stack {
 
     ec2IamRole.attachInlinePolicy(customBedrockPolicy);
 
-    const instanceProfName = "beanstalk-ec2-instance-profile";
+    const instanceProfName = `beanstalk-ec2-instance-profile-${this.region}`;
     // Create a new Instance Profile with the desired IAM Role
     let instanceProfile = new iam.InstanceProfile(this, instanceProfName, {
       role: ec2IamRole,

@@ -31,6 +31,7 @@ param_manager = get_param_manager()
 
 ### CONSTANTS
 VECTOR_DIMENSION = 1024
+REGION = os.environ.get("AWS_DEFAULT_REGION")
 
 ### DOCUMENT LOADING
 # Load the csv of documents from s3
@@ -41,7 +42,7 @@ extracts_df = pd.read_csv(os.path.join('/app/data', docs_dir, "website_extracts.
 logger.info(f"First 5 rows of the CSV:\n{extracts_df.head()}")
 
 ### METHOD TO CONVERT DATA TO EMBEDDINGS
-def get_bedrock_embeddings(input_text, model_id="amazon.titan-embed-text-v2:0", region_name="us-west-2"):
+def get_bedrock_embeddings(input_text, model_id="amazon.titan-embed-text-v2:0", region_name=REGION):
     # Initialize the boto3 client for Bedrock
     bedrock = boto3.client(
         service_name='bedrock-runtime',
