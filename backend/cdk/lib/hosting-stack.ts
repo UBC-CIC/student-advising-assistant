@@ -12,6 +12,7 @@ import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as s3Deploy from "aws-cdk-lib/aws-s3-deployment";
 import * as wafv2 from 'aws-cdk-lib/aws-wafv2';
+import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
 
 // https://github.com/aws-samples/aws-elastic-beanstalk-hardened-security-cdk-sample/blob/main/lib/elastic_beanstalk_cdk_project-stack.ts
 export class HostingStack extends cdk.Stack {
@@ -192,7 +193,7 @@ export class HostingStack extends cdk.Stack {
     appVersionProps.node.addDependency(appDeploymentZip);  
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const cnamePrefix = "student-advising-demo"; // Prefix for the web app's url
+    const cnamePrefix = "student-advising-demo-1"; // Prefix for the web app's url
     const elbEnv = new elasticbeanstalk.CfnEnvironment(this, "Environment", {
       environmentName: "student-advising-demo-app-env",
       cnamePrefix: cnamePrefix,
@@ -393,17 +394,15 @@ export class HostingStack extends cdk.Stack {
       ],
     });
 
-    const albArn = cdk.Fn.join('', [
-      'arn:aws:elasticloadbalancing:',
-      this.region,
-      ':',
-      this.account,
-      ':loadbalancer/app/',
-      elbEnv.attrEndpointUrl,
-    ]);
+    // Look up the Application Load Balancer by the Elastic Beanstalk environment name
+    const loadBalancer = elbv2.ApplicationLoadBalancer.fromLookup(this, 'ALB', {
+      loadBalancerTags: {
+        'elasticbeanstalk:environment-name': 'student-advising-demo-app-env',
+      },
+    });
 
     new wafv2.CfnWebACLAssociation(this, 'WebAclAssociation', {
-      resourceArn: albArn,
+      resourceArn: loadBalancer.loadBalancerArn,
       webAclArn: webAcl.attrArn,
     });
 
