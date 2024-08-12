@@ -291,7 +291,7 @@ To take down the deployed stack for a fresh redeployment in the future, navigate
 
 ## Architecture Diagram and Database Schema
 
-You can find the XML file for the [Draw.io](https://app.diagrams.net/) Architecture Diagram of this project [here](design_artifacts/ArchiectureDiagram.drawio.xml) to make modification. The [DbDiagram](https://dbdiagram.io/home) schema for our PostgreSQL database can also be found inside that folder, you can import into DbDiagram using the SQL file `ScienceAdvisingPostgreSQL.sql` or paste the raw text
+You can find the XML file for the [Draw.io](https://app.diagrams.net/) Architecture Diagram of this project [here](design_artifacts/ArchitectureDiagram.drawio.xml) to make modification. The [DbDiagram](https://dbdiagram.io/home) schema for our PostgreSQL database can also be found inside that folder, you can import into DbDiagram using the SQL file `ScienceAdvisingPostgreSQL.sql` or paste the raw text
 `DbDiagramRawSchema.txt`.
 
 ## Miscellaneous Scripts
