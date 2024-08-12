@@ -20,9 +20,9 @@ def download_single_file(s3_key:str, local_path:str, bucket_name=default_bucket_
     """
     try:
         s3_client.download_file(bucket_name, s3_key, local_path)
-        print(f"File s3://{bucket_name}/{s3_key} downloaded successfully to {local_path}")
+        log.info(f"File s3://{bucket_name}/{s3_key} downloaded successfully to {local_path}")
     except Exception as e:
-        print(f"Error downloading file: {e}")
+        log.error(f"Error downloading file: {e}")
 
 def download_s3_directory(directory: str, ecs_task: bool = False, s3_client = default_client, output_prefix: str = './', bucket_name: str = default_bucket_name):
     """
@@ -30,7 +30,7 @@ def download_s3_directory(directory: str, ecs_task: bool = False, s3_client = de
     - s3_client: s3 client to use
     - directory: the path of the s3 directory 
     - output_prefix: the path to save the directory in
-    - bucket: the bucket name to use
+    - bucket_name: the bucket name to use
     - ecs_task: boolean indicating if the download is being performed by an ECS task
     """
     if ecs_task:
@@ -91,19 +91,19 @@ def upload_directory_to_s3(directory: str, s3_client = default_client, bucket_na
 def upload_file_to_s3(file_path: str, s3_file_path: str, s3_client = default_client, bucket_name: str = default_bucket_name):
 
     """
-    Upload a file to s3
+    Uploads a file to S3.
 
     Arguments:
-        file_path: the files' local path
-        s3_file_path: the path (key) of the file that will be created on s3
+        file_path: the file's local path.
+        s3_file_path: the path (key) of the file that will be created on S3.
         s3_client: the S3 client generated with boto3.client("s3")
         bucket_name: the name of the s3 bucket to upload
     """
     try:
         s3_client.upload_file(file_path, bucket_name, s3_file_path)
-        log.info(f"Successfully upload file to S3")
+        log.info(f"Successfully uploaded file to S3 at {s3_file_path}")
     except FileNotFoundError as e:
-        log.error("The file you want to upload does not exist on your local directory")
-        log.error("Make sure you are inside the document_scraping directory")
+        log.error("The file you want to upload does not exist in your local directory.")
+        log.error("Make sure you are inside the document_scraping directory.")
     except ClientError as e:
         log.error(f"There was an error uploading the file to S3: {str(e)}")
