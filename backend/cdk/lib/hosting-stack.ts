@@ -11,6 +11,7 @@ import { InferenceStack } from "./inference-stack";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as s3Deploy from "aws-cdk-lib/aws-s3-deployment";
+import * as wafv2 from 'aws-cdk-lib/aws-wafv2';
 
 // https://github.com/aws-samples/aws-elastic-beanstalk-hardened-security-cdk-sample/blob/main/lib/elastic_beanstalk_cdk_project-stack.ts
 export class HostingStack extends cdk.Stack {
@@ -116,7 +117,7 @@ export class HostingStack extends cdk.Stack {
       assumedBy: new iam.ServicePrincipal("ec2.amazonaws.com"),
       description: "Role serves as EC2 Instance Profile",
     });
-    
+
     // Add managed policies to the role
     const managedPolicies = [
       "service-role/AWSLambdaRole",
@@ -312,6 +313,101 @@ export class HostingStack extends cdk.Stack {
     });
     // Also very important - make sure that `app` exists before creating an app version
     appVersionProps.addDependency(app);
+
+    const webAcl = new wafv2.CfnWebACL(this, 'WebAcl', {
+      description: 'WAF for Student Advising ALB',
+      scope: 'REGIONAL',
+      defaultAction: { allow: {} },
+      visibilityConfig: {
+        cloudWatchMetricsEnabled: true,
+        metricName: 'studentAdvising-firewall',
+        sampledRequestsEnabled: true,
+      },
+      rules: [
+        {
+          name: 'AWS-AWSManagedRulesAmazonIpReputationList',
+          priority: 0,
+          statement: {
+            managedRuleGroupStatement: {
+              name: 'AWSManagedRulesAmazonIpReputationList',
+              vendorName: 'AWS'
+            }
+          },
+          overrideAction: { none: {} },
+          visibilityConfig: {
+            sampledRequestsEnabled: true,
+            cloudWatchMetricsEnabled: true,
+            metricName: 'AWS-AWSManagedRulesAmazonIpReputationList'
+          }
+        },
+        {
+          name: 'AWS-AWSManagedRulesCommonRuleSet',
+          priority: 1,
+          statement: {
+            managedRuleGroupStatement: {
+              name: 'AWSManagedRulesCommonRuleSet',
+              vendorName: 'AWS'
+            }
+          },
+          overrideAction: { none: {} },
+          visibilityConfig: {
+            sampledRequestsEnabled: true,
+            cloudWatchMetricsEnabled: true,
+            metricName: 'AWS-AWSManagedRulesCommonRuleSet'
+          }
+        },
+        {
+          name: 'AWS-AWSManagedRulesKnownBadInputsRuleSet',
+          priority: 2,
+          statement: {
+            managedRuleGroupStatement: {
+              name: 'AWSManagedRulesKnownBadInputsRuleSet',
+              vendorName: 'AWS'
+            }
+          },
+          overrideAction: { none: {} },
+          visibilityConfig: {
+            sampledRequestsEnabled: true,
+            cloudWatchMetricsEnabled: true,
+            metricName: 'AWS-AWSManagedRulesKnownBadInputsRuleSet'
+          }
+        },
+        {
+          name: "LimitRequests1000",
+          priority: 3,
+          action: {
+            block: {},
+          },
+          statement: {
+            rateBasedStatement: {
+              limit: 1000, // 1000 requests per 5 minutes
+              aggregateKeyType: "IP",
+            },
+          },
+          visibilityConfig: {
+            cloudWatchMetricsEnabled: true,
+            metricName: "LimitRequests1000",
+            sampledRequestsEnabled: true,
+          },
+        },
+      ],
+    });
+
+    const albArn = cdk.Fn.join('', [
+      'arn:aws:elasticloadbalancing:',
+      this.region,
+      ':',
+      this.account,
+      ':loadbalancer/app/',
+      elbEnv.attrEndpointUrl,
+    ]);
+
+    new wafv2.CfnWebACLAssociation(this, 'WebAclAssociation', {
+      resourceArn: albArn,
+      webAclArn: webAcl.attrArn,
+    });
+
+    elbEnv.node.addDependency(webAcl);
 
     // Create the SSM parameter with the url of the elastic beanstalk web app
     new ssm.StringParameter(this, "BeanstalkAppUrlParameter", {
