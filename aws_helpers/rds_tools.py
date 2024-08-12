@@ -54,11 +54,12 @@ def connect_and_callback(callback, dev_mode = False):
         connection = psycopg2.connect(**params)
         cursor = connection.cursor()
         callback(connection, cursor)
-    except:
+    except Exception as e:
         connection.rollback()
+        print(f"An error occurred: {e}")
     finally:
         cursor.close()
         connection.close()
-    
-    if dev_mode:
-        server.close()
+        
+        if dev_mode and server:
+            server.close()
