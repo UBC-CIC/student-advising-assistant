@@ -366,7 +366,7 @@ async def answer():
     
     formatted_question += question
 
-    response = answer_prompt(formatted_question, 5)
+    response = answer_prompt(formatted_question, 3)
 
     # Get the answer returned by the LLM
     main_response = response["answer"]
