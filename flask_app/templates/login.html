@@ -6,15 +6,25 @@
 </head>
 <body>
     <h2>Login</h2>
+    
+    <p>Thank you for visiting the Student Advising Assistant demo.</p>
+    <p>For further information, please contact <a href="mailto:cic.info@ubc.ca">cic.info@ubc.ca</a>.</p>
+    <p>To learn more about the UBC Cloud Innovation Centre and its projects, please visit <a href="http://cic.ubc.ca" target="_blank">http://cic.ubc.ca</a>.</p>
+    
     <form method="post" action="/login">
         <label for="username">Username:</label>
         <input type="text" id="username" name="username" required><br>
+        
         <label for="password">Password:</label>
         <input type="password" id="password" name="password" required><br>
+        
         <button type="submit">Login</button>
     </form>
+
     {% if error %}
         <p style="color:red;">{{ error }}</p>
     {% endif %}
+
+    <p><strong>UBC CIC Demo Access:</strong> If you have arrived at this page without noting the login credentials, please refer to credentials you received at the AI-cademy poster presentation or contact <a href="mailto:cic.info@ubc.ca">cic.info@ubc.ca</a>.</p>
 </body>
 </html>
